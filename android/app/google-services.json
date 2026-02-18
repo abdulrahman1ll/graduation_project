@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "247396912566",
+    "project_id": "kashta-39e72",
+    "storage_bucket": "kashta-39e72.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:247396912566:android:74296b8759558ca8e04517",
+        "android_client_info": {
+          "package_name": "com.example.kashta"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCKTs-1_0dcvpnq1rDQg3x-krtbyFZTYRA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

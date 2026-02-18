@@ -1,8 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
   runApp(const KashtaApp());
 }
 
@@ -76,38 +84,43 @@ class ExplorePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text("استكشاف")),
-      body: Column(
-        children: [
-          Expanded(
-            flex: 2,
-            child: FlutterMap(
-              options: const MapOptions(
-                initialCenter: LatLng(21.4858, 39.1925), // جدة
-                initialZoom: 11,
+    return Column(
+      children: [
+        AppBar(title: const Text("استكشاف")),
+        Expanded(
+          flex: 2,
+          child: FlutterMap(
+            options: const MapOptions(
+              initialCenter: LatLng(21.4858, 39.1925), // جدة
+              initialZoom: 11,
+            ),
+            children: [
+              TileLayer(
+                urlTemplate:
+                    "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                userAgentPackageName: 'com.example.kashta',
               ),
-              children: [
-                TileLayer(
-                  urlTemplate:
-                      "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-                  userAgentPackageName: 'com.example.kashta',
-                ),
-              ],
+            ],
+          ),
+        ),
+        Expanded(
+          flex: 1,
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            width: double.infinity,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(
+                top: Radius.circular(20),
+              ),
+            ),
+            child: const Text(
+              "هنا نحط تفاصيل أماكن",
+              style: TextStyle(fontSize: 16),
             ),
           ),
-          Expanded(
-            flex: 1,
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              child: const Text(
-                "هنا نحط تفاصيل أماكن  ",
-                style: TextStyle(fontSize: 16),
-              ),
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
