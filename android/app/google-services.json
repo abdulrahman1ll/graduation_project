@@ -12,7 +12,12 @@
           "package_name": "com.example.kashta"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "247396912566-tcfql1kc2lm2kkdss9lqn07ofrsqc27q.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCKTs-1_0dcvpnq1rDQg3x-krtbyFZTYRA"
@@ -20,7 +25,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "247396912566-tcfql1kc2lm2kkdss9lqn07ofrsqc27q.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "247396912566-nklb2lgc3bqkesgt0fr5m73gbhan8m6p.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.kashta"
+              }
+            }
+          ]
         }
       }
     }

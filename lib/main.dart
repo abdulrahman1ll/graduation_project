@@ -540,10 +540,14 @@ class ExplorePage extends StatelessWidget {
         Expanded(
           flex: 2,
           child: FlutterMap(
-            options: const MapOptions(
-              initialCenter: LatLng(21.4858, 39.1925),
-              initialZoom: 11,
-            ),
+            options: MapOptions(
+  initialCenter: const LatLng(21.4858, 39.1925),
+  initialZoom: 11,
+  onTap: (tapPosition, point) {
+    print("Lat: ${point.latitude}");
+    print("Lng: ${point.longitude}");
+  },
+),
             children: [
               TileLayer(
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',

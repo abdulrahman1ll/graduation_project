@@ -64,6 +64,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '247396912566',
     projectId: 'kashta-39e72',
     storageBucket: 'kashta-39e72.firebasestorage.app',
+    iosClientId: '247396912566-nklb2lgc3bqkesgt0fr5m73gbhan8m6p.apps.googleusercontent.com',
     iosBundleId: 'com.example.kashta',
   );
 
@@ -73,6 +74,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '247396912566',
     projectId: 'kashta-39e72',
     storageBucket: 'kashta-39e72.firebasestorage.app',
+    iosClientId: '247396912566-nklb2lgc3bqkesgt0fr5m73gbhan8m6p.apps.googleusercontent.com',
     iosBundleId: 'com.example.kashta',
   );
 
@@ -85,4 +87,5 @@ class DefaultFirebaseOptions {
     storageBucket: 'kashta-39e72.firebasestorage.app',
     measurementId: 'G-P5ETBXFZDP',
   );
+
 }
