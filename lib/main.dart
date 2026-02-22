@@ -6,9 +6,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:latlong2/latlong.dart';
-
 import 'firebase_options.dart';
-
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+import 'dart:convert';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
@@ -515,7 +516,7 @@ class _MainScreenState extends State<MainScreen> {
   }
 }
 
-class ExplorePage extends StatelessWidget {
+class ExplorePage extends StatefulWidget {
   const ExplorePage({
     super.key,
     required this.tr,
@@ -528,40 +529,172 @@ class ExplorePage extends StatelessWidget {
   final VoidCallback onToggleLanguage;
 
   @override
+  State<ExplorePage> createState() =>
+      _ExplorePageState();
+}
+
+class _ExplorePageState extends State<ExplorePage> {
+  LatLng? selectedPoint;
+
+ void _openAddPlaceForm(double lat, double lng) {
+  final TextEditingController nameController = TextEditingController();
+
+showModalBottomSheet(
+  context: context,
+  isScrollControlled: true,
+  builder: (context) {
+    XFile? selectedImage;
+
+    return StatefulBuilder(
+      builder: (context, setModalState) {
+        Future<void> pickImage() async {
+          final ImagePicker picker = ImagePicker();
+          final XFile? image =
+              await picker.pickImage(source: ImageSource.gallery);
+
+          if (image != null) {
+            setModalState(() {
+              selectedImage = image;
+            });
+          }
+        }
+
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+            left: 16,
+            right: 16,
+            top: 16,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text("Add New Place"),
+              const SizedBox(height: 10),
+
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: "Place Name",
+                  border: OutlineInputBorder(),
+                ),
+              ),
+
+              const SizedBox(height: 15),
+
+              ElevatedButton(
+                onPressed: pickImage,
+                child: const Text("Pick Image"),
+              ),
+
+              const SizedBox(height: 10),
+
+              if (selectedImage != null)
+                Image.file(
+                  File(selectedImage!.path),
+                  height: 120,
+                ),
+
+              const SizedBox(height: 15),
+
+              ElevatedButton(
+  onPressed: () async {
+    if (nameController.text.isEmpty || selectedImage == null) {
+      print("Missing data");
+      return;
+    }
+
+    try {
+      final bytes = await File(selectedImage!.path).readAsBytes();
+      final base64Image = base64Encode(bytes);
+
+      await FirebaseFirestore.instance
+          .collection('places')
+          .add({
+        'name': nameController.text,
+        'lat': lat,
+        'lng': lng,
+        'imageBase64': base64Image,
+        'createdBy': FirebaseAuth.instance.currentUser?.uid,
+        'createdAt': Timestamp.now(),
+        'status': 'pending',
+      });
+
+      print("Saved successfully");
+
+      Navigator.pop(context);
+
+    } catch (e) {
+      print("FIRESTORE ERROR: $e");
+    }
+  },
+  child: const Text("Submit"),
+),
+              const SizedBox(height: 20),
+            ],
+          ),
+        );
+      },
+    );
+  },
+);
+}
+  @override
   Widget build(BuildContext context) {
     return Column(
       children: [
         appBarWithLanguage(
-          tr: tr,
-          isArabic: isArabic,
-          title: tr.t('explore'),
-          onToggleLanguage: onToggleLanguage,
+          tr: widget.tr,
+          isArabic: widget.isArabic,
+          title: widget.tr.t('explore'),
+          onToggleLanguage: widget.onToggleLanguage,
         ),
         Expanded(
           flex: 2,
           child: FlutterMap(
-            options: MapOptions(
-  initialCenter: const LatLng(21.4858, 39.1925),
-  initialZoom: 11,
-  onTap: (tapPosition, point) {
-    print("Lat: ${point.latitude}");
-    print("Lng: ${point.longitude}");
-  },
-),
+  options: MapOptions(
+    initialCenter: const LatLng(21.4858, 39.1925),
+    initialZoom: 11,
+    onTap: (tapPosition, point) {
+      setState(() {
+        selectedPoint = point;
+                });
+                 _openAddPlaceForm(point.latitude, point.longitude);
+              },
+            ),
             children: [
               TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.example.kashta',
+                urlTemplate:
+                    'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                userAgentPackageName:
+                    'com.example.kashta',
               ),
+              if (selectedPoint != null)
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: selectedPoint!,
+                      width: 40,
+                      height: 40,
+                      child: const Icon(
+                        Icons.location_on,
+                        color: Colors.blue,
+                        size: 40,
+                      ),
+                    ),
+                  ],
+                ),
             ],
           ),
         ),
         Expanded(
           flex: 1,
           child: Container(
-            padding: const EdgeInsets.all(16),
+            padding:
+                const EdgeInsets.all(16),
             width: double.infinity,
-            child: Text(tr.t('explore_hint')),
+            child: Text(
+                widget.tr.t('explore_hint')),
           ),
         ),
       ],
