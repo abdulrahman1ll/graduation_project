@@ -52,7 +52,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyCKTs-1_0dcvpnq1rDQg3x-krtbyFZTYRA',
-    appId: '1:247396912566:android:74296b8759558ca8e04517',
+    appId: '1:247396912566:android:c0b58cfaba9535e6e04517',
     messagingSenderId: '247396912566',
     projectId: 'kashta-39e72',
     storageBucket: 'kashta-39e72.firebasestorage.app',
@@ -87,5 +87,4 @@ class DefaultFirebaseOptions {
     storageBucket: 'kashta-39e72.firebasestorage.app',
     measurementId: 'G-P5ETBXFZDP',
   );
-
 }

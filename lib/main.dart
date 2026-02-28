@@ -6,13 +6,28 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:provider/provider.dart';
 import 'firebase_options.dart';
-import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'dart:convert';
+import 'providers/role_provider.dart';
+import 'services/group_service.dart';
+import 'services/place_service.dart';
+import 'services/trip_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await Firebase.initializeApp(
+  options: DefaultFirebaseOptions.currentPlatform,
+);
+  final firebaseOptions = Firebase.app().options;
+  debugPrint('PROJECT ID: ${firebaseOptions.projectId}');
+  debugPrint('APP ID: ${firebaseOptions.appId}');
+  try {
+    final packageName = (firebaseOptions as dynamic).androidPackageName;
+    debugPrint('PACKAGE: $packageName');
+  } catch (_) {
+    debugPrint('PACKAGE: unavailable');
+  }
   runApp(const KashtaApp());
 }
 
@@ -39,14 +54,17 @@ class _KashtaAppState extends State<KashtaApp> {
     final tr = Tr(_lang);
     final isArabic = _lang == AppLanguage.ar;
 
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: Directionality(
-        textDirection: isArabic ? TextDirection.rtl : TextDirection.ltr,
-        child: AuthGate(
-          tr: tr,
-          isArabic: isArabic,
-          onToggleLanguage: _toggleLanguage,
+    return ChangeNotifierProvider<RoleProvider>(
+      create: (_) => RoleProvider(),
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: Directionality(
+          textDirection: isArabic ? TextDirection.rtl : TextDirection.ltr,
+          child: AuthGate(
+            tr: tr,
+            isArabic: isArabic,
+            onToggleLanguage: _toggleLanguage,
+          ),
         ),
       ),
     );
@@ -99,10 +117,26 @@ PreferredSizeWidget appBarWithLanguage({
   required bool isArabic,
   required String title,
   required VoidCallback onToggleLanguage,
+  VoidCallback? onAdminTap,
 }) {
   return AppBar(
     title: Text(title),
     actions: [
+      Consumer<RoleProvider>(
+        builder: (context, provider, child) {
+          if (kDebugMode) {
+            print("Current roles: ${provider.roles}");
+          }
+          if (provider.roles['admin'] == true && onAdminTap != null) {
+            return IconButton(
+              onPressed: onAdminTap,
+              icon: const Icon(Icons.shield_outlined),
+              tooltip: 'Admin Dashboard',
+            );
+          }
+          return const SizedBox.shrink();
+        },
+      ),
       TextButton(
         onPressed: onToggleLanguage,
         child: Text(
@@ -468,21 +502,25 @@ class _MainScreenState extends State<MainScreen> {
         tr: widget.tr,
         isArabic: widget.isArabic,
         onToggleLanguage: widget.onToggleLanguage,
+        onOpenAdminDashboard: _openAdminDashboard,
       ),
       TripsPage(
         tr: widget.tr,
         isArabic: widget.isArabic,
         onToggleLanguage: widget.onToggleLanguage,
+        onOpenAdminDashboard: _openAdminDashboard,
       ),
       GroupsPage(
         tr: widget.tr,
         isArabic: widget.isArabic,
         onToggleLanguage: widget.onToggleLanguage,
+        onOpenAdminDashboard: _openAdminDashboard,
       ),
       ProfilePage(
         tr: widget.tr,
         isArabic: widget.isArabic,
         onToggleLanguage: widget.onToggleLanguage,
+        onOpenAdminDashboard: _openAdminDashboard,
       ),
     ];
 
@@ -514,6 +552,12 @@ class _MainScreenState extends State<MainScreen> {
       ),
     );
   }
+
+  void _openAdminDashboard() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const AdminDashboardPage()),
+    );
+  }
 }
 
 class ExplorePage extends StatefulWidget {
@@ -522,11 +566,13 @@ class ExplorePage extends StatefulWidget {
     required this.tr,
     required this.isArabic,
     required this.onToggleLanguage,
+    required this.onOpenAdminDashboard,
   });
 
   final Tr tr;
   final bool isArabic;
   final VoidCallback onToggleLanguage;
+  final VoidCallback onOpenAdminDashboard;
 
   @override
   State<ExplorePage> createState() =>
@@ -535,110 +581,136 @@ class ExplorePage extends StatefulWidget {
 
 class _ExplorePageState extends State<ExplorePage> {
   LatLng? selectedPoint;
+  final PlaceService _placeService = PlaceService();
 
- void _openAddPlaceForm(double lat, double lng) {
-  final TextEditingController nameController = TextEditingController();
+  void _openAddPlaceForm(double lat, double lng) {
+    final nameController = TextEditingController();
+    String environmentType = 'desert';
+    Uint8List? selectedImageBytes;
 
-showModalBottomSheet(
-  context: context,
-  isScrollControlled: true,
-  builder: (context) {
-    XFile? selectedImage;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            Future<void> pickImage() async {
+              final picker = ImagePicker();
+              final image = await picker.pickImage(source: ImageSource.gallery);
+              if (image == null) {
+                return;
+              }
+              final bytes = await image.readAsBytes();
+              setModalState(() {
+                selectedImageBytes = bytes;
+              });
+            }
 
-    return StatefulBuilder(
-      builder: (context, setModalState) {
-        Future<void> pickImage() async {
-          final ImagePicker picker = ImagePicker();
-          final XFile? image =
-              await picker.pickImage(source: ImageSource.gallery);
-
-          if (image != null) {
-            setModalState(() {
-              selectedImage = image;
-            });
-          }
-        }
-
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-            left: 16,
-            right: 16,
-            top: 16,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text("Add New Place"),
-              const SizedBox(height: 10),
-
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: "Place Name",
-                  border: OutlineInputBorder(),
-                ),
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+                left: 16,
+                right: 16,
+                top: 16,
               ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Add New Place'),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: nameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Place Name',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    initialValue: environmentType,
+                    items: const [
+                      DropdownMenuItem(value: 'desert', child: Text('Desert')),
+                      DropdownMenuItem(value: 'nature', child: Text('Nature')),
+                      DropdownMenuItem(value: 'beach', child: Text('Beach')),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) {
+                        return;
+                      }
+                      setModalState(() {
+                        environmentType = value;
+                      });
+                    },
+                    decoration: const InputDecoration(
+                      labelText: 'Environment Type',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ElevatedButton(
+                    onPressed: pickImage,
+                    child: const Text('Pick Image (Optional)'),
+                  ),
+                  const SizedBox(height: 10),
+                  if (selectedImageBytes != null)
+                    Image.memory(selectedImageBytes!, height: 120),
+                  const SizedBox(height: 15),
+                  ElevatedButton(
+                    onPressed: () async {
+                      if (nameController.text.trim().isEmpty) {
+                        _showFirestoreError(
+                          sheetContext,
+                          FirebaseException(
+                            plugin: 'cloud_firestore',
+                            code: 'invalid-argument',
+                            message: widget.tr.t('fill_all_fields'),
+                          ),
+                        );
+                        return;
+                      }
 
-              const SizedBox(height: 15),
-
-              ElevatedButton(
-                onPressed: pickImage,
-                child: const Text("Pick Image"),
+                      try {
+                        await _placeService.addPlace(
+                          name: nameController.text.trim(),
+                          environmentType: environmentType,
+                          latitude: lat,
+                          longitude: lng,
+                          imageBase64: selectedImageBytes == null
+                              ? null
+                              : base64Encode(selectedImageBytes!),
+                        );
+                        if (sheetContext.mounted) {
+                          Navigator.of(sheetContext).pop();
+                        }
+                      } on FirebaseException catch (e) {
+                        if (sheetContext.mounted) {
+                          _showFirestoreError(sheetContext, e);
+                        }
+                      } catch (_) {
+                        if (sheetContext.mounted) {
+                          _showFirestoreError(
+                            sheetContext,
+                            FirebaseException(
+                              plugin: 'cloud_firestore',
+                              code: 'unknown',
+                              message: widget.tr.t('save_failed'),
+                            ),
+                          );
+                        }
+                      }
+                    },
+                    child: const Text('Submit'),
+                  ),
+                  const SizedBox(height: 20),
+                ],
               ),
-
-              const SizedBox(height: 10),
-
-              if (selectedImage != null)
-                Image.file(
-                  File(selectedImage!.path),
-                  height: 120,
-                ),
-
-              const SizedBox(height: 15),
-
-              ElevatedButton(
-  onPressed: () async {
-    if (nameController.text.isEmpty || selectedImage == null) {
-      print("Missing data");
-      return;
-    }
-
-    try {
-      final bytes = await File(selectedImage!.path).readAsBytes();
-      final base64Image = base64Encode(bytes);
-
-      await FirebaseFirestore.instance
-          .collection('places')
-          .add({
-        'name': nameController.text,
-        'lat': lat,
-        'lng': lng,
-        'imageBase64': base64Image,
-        'createdBy': FirebaseAuth.instance.currentUser?.uid,
-        'createdAt': Timestamp.now(),
-        'status': 'pending',
-      });
-
-      print("Saved successfully");
-
-      Navigator.pop(context);
-
-    } catch (e) {
-      print("FIRESTORE ERROR: $e");
-    }
-  },
-  child: const Text("Submit"),
-),
-              const SizedBox(height: 20),
-            ],
-          ),
+            );
+          },
         );
       },
     );
-  },
-);
-}
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -648,53 +720,82 @@ showModalBottomSheet(
           isArabic: widget.isArabic,
           title: widget.tr.t('explore'),
           onToggleLanguage: widget.onToggleLanguage,
+          onAdminTap: widget.onOpenAdminDashboard,
         ),
         Expanded(
           flex: 2,
-          child: FlutterMap(
-  options: MapOptions(
-    initialCenter: const LatLng(21.4858, 39.1925),
-    initialZoom: 11,
-    onTap: (tapPosition, point) {
-      setState(() {
-        selectedPoint = point;
-                });
-                 _openAddPlaceForm(point.latitude, point.longitude);
-              },
-            ),
-            children: [
-              TileLayer(
-                urlTemplate:
-                    'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName:
-                    'com.example.kashta',
-              ),
-              if (selectedPoint != null)
-                MarkerLayer(
-                  markers: [
-                    Marker(
-                      point: selectedPoint!,
-                      width: 40,
-                      height: 40,
-                      child: const Icon(
-                        Icons.location_on,
-                        color: Colors.blue,
-                        size: 40,
-                      ),
+          child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: FirebaseFirestore.instance
+                .collection('places')
+                .where('status', isEqualTo: 'approved')
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                _logFirestoreReadError('places', snapshot.error);
+              }
+              final docs = snapshot.data?.docs ?? [];
+              final approvedMarkers = docs.map((doc) {
+                final data = doc.data();
+                final lat = (data['lat'] as num?)?.toDouble();
+                final lng = (data['lng'] as num?)?.toDouble();
+                if (lat == null || lng == null) {
+                  return null;
+                }
+                return Marker(
+                  point: LatLng(lat, lng),
+                  width: 36,
+                  height: 36,
+                  child: const Icon(
+                    Icons.location_on,
+                    color: Colors.red,
+                    size: 36,
+                  ),
+                );
+              }).whereType<Marker>().toList();
+
+              final allMarkers = <Marker>[
+                ...approvedMarkers,
+                if (selectedPoint != null)
+                  Marker(
+                    point: selectedPoint!,
+                    width: 40,
+                    height: 40,
+                    child: const Icon(
+                      Icons.location_on,
+                      color: Colors.blue,
+                      size: 40,
                     ),
-                  ],
+                  ),
+              ];
+
+              return FlutterMap(
+                options: MapOptions(
+                  initialCenter: const LatLng(21.4858, 39.1925),
+                  initialZoom: 11,
+                  onTap: (tapPosition, point) {
+                    setState(() {
+                      selectedPoint = point;
+                    });
+                    _openAddPlaceForm(point.latitude, point.longitude);
+                  },
                 ),
-            ],
+                children: [
+                  TileLayer(
+                    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    userAgentPackageName: 'com.example.kashta',
+                  ),
+                  if (allMarkers.isNotEmpty) MarkerLayer(markers: allMarkers),
+                ],
+              );
+            },
           ),
         ),
         Expanded(
           flex: 1,
           child: Container(
-            padding:
-                const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(16),
             width: double.infinity,
-            child: Text(
-                widget.tr.t('explore_hint')),
+            child: Text(widget.tr.t('explore_hint')),
           ),
         ),
       ],
@@ -708,11 +809,13 @@ class TripsPage extends StatelessWidget {
     required this.tr,
     required this.isArabic,
     required this.onToggleLanguage,
+    required this.onOpenAdminDashboard,
   });
 
   final Tr tr;
   final bool isArabic;
   final VoidCallback onToggleLanguage;
+  final VoidCallback onOpenAdminDashboard;
 
   @override
   Widget build(BuildContext context) {
@@ -722,19 +825,33 @@ class TripsPage extends StatelessWidget {
         isArabic: isArabic,
         title: tr.t('trips'),
         onToggleLanguage: onToggleLanguage,
+        onAdminTap: onOpenAdminDashboard,
       ),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: FirebaseFirestore.instance
             .collection('trips')
-            .orderBy('createdAt', descending: true)
+            .where('visibility', isEqualTo: 'public')
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
+            final error = snapshot.error;
+            _logFirestoreReadError('trips', error);
+            if (error is FirebaseException && error.code == 'permission-denied') {
+              return Center(child: Text(tr.t('permission_denied')));
+            }
+            if (error is FirebaseException) {
+              final link = _extractIndexLink(error.message);
+              if (link != null) {
+                return const Center(
+                  child: Text('Trips query requires a Firestore index.'),
+                );
+              }
+            }
             return Center(
-              child: Text('${tr.t('load_error')}\n${snapshot.error}'),
+              child: Text(tr.t('load_error')),
             );
           }
           final docs = snapshot.data?.docs ?? [];
@@ -787,11 +904,13 @@ class AddTripPage extends StatefulWidget {
 }
 
 class _AddTripPageState extends State<AddTripPage> {
+  final TripService _tripService = TripService();
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _peopleController = TextEditingController();
   final _locationUrlController = TextEditingController();
+  String _visibility = 'public';
   DateTime? _tripDate;
   bool _saving = false;
 
@@ -830,6 +949,22 @@ class _AddTripPageState extends State<AddTripPage> {
             TextFormField(
               controller: _locationUrlController,
               decoration: InputDecoration(labelText: tr.t('location_url')),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: _visibility,
+              items: const [
+                DropdownMenuItem(value: 'public', child: Text('Public')),
+                DropdownMenuItem(value: 'private', child: Text('Private')),
+              ],
+              onChanged: _saving
+                  ? null
+                  : (value) {
+                      if (value != null) {
+                        setState(() => _visibility = value);
+                      }
+                    },
+              decoration: const InputDecoration(labelText: 'Visibility'),
             ),
             const SizedBox(height: 12),
             ElevatedButton(
@@ -881,22 +1016,26 @@ class _AddTripPageState extends State<AddTripPage> {
 
     setState(() => _saving = true);
     try {
-      await FirebaseFirestore.instance.collection('trips').add({
-        'title': _titleController.text.trim(),
-        'description': _descriptionController.text.trim(),
-        'peopleCount': count,
-        'locationUrl': _locationUrlController.text.trim(),
-        'tripDate': Timestamp.fromDate(_tripDate!),
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+      await _tripService.createTrip(
+        title: _titleController.text.trim(),
+        description: _descriptionController.text.trim(),
+        peopleCount: count,
+        locationUrl: _locationUrlController.text.trim(),
+        tripDate: _tripDate!,
+        visibility: _visibility,
+      );
       if (mounted) {
         Navigator.of(context).pop();
       }
-    } catch (e) {
+    } on FirebaseException catch (e) {
+      if (mounted) {
+        _showFirestoreError(context, e);
+      }
+    } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('${tr.t('save_failed')}: $e')));
+        ).showSnackBar(SnackBar(content: Text(tr.t('save_failed'))));
       }
     } finally {
       if (mounted) {
@@ -912,73 +1051,543 @@ class _AddTripPageState extends State<AddTripPage> {
   }
 }
 
-class GroupsPage extends StatelessWidget {
+class GroupsPage extends StatefulWidget {
   const GroupsPage({
     super.key,
     required this.tr,
     required this.isArabic,
     required this.onToggleLanguage,
+    required this.onOpenAdminDashboard,
   });
 
   final Tr tr;
   final bool isArabic;
   final VoidCallback onToggleLanguage;
+  final VoidCallback onOpenAdminDashboard;
+
+  @override
+  State<GroupsPage> createState() => _GroupsPageState();
+}
+
+class _GroupsPageState extends State<GroupsPage> {
+  final GroupService _groupService = GroupService();
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: appBarWithLanguage(
-        tr: tr,
-        isArabic: isArabic,
-        title: tr.t('groups'),
-        onToggleLanguage: onToggleLanguage,
+        tr: widget.tr,
+        isArabic: widget.isArabic,
+        title: widget.tr.t('groups'),
+        onToggleLanguage: widget.onToggleLanguage,
+        onAdminTap: widget.onOpenAdminDashboard,
       ),
-      body: Center(child: Text(tr.t('groups_page'))),
+      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: FirebaseFirestore.instance
+            .collection('groups')
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            final error = snapshot.error;
+            _logFirestoreReadError('groups', error);
+            if (error is FirebaseException && error.code == 'permission-denied') {
+              return Center(child: Text(widget.tr.t('permission_denied')));
+            }
+            if (error is FirebaseException) {
+              final link = _extractIndexLink(error.message);
+              if (link != null) {
+                return const Center(
+                  child: Text('Groups query requires a Firestore index.'),
+                );
+              }
+            }
+            return Center(child: Text(widget.tr.t('load_error')));
+          }
+          final docs = snapshot.data?.docs ?? [];
+          if (docs.isEmpty) {
+            return Center(child: Text(widget.tr.t('groups_page')));
+          }
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: docs.length,
+            itemBuilder: (context, index) {
+              final data = docs[index].data();
+              return Card(
+                child: ListTile(
+                  title: Text((data['name'] ?? '').toString()),
+                  subtitle: Text((data['description'] ?? '').toString()),
+                ),
+              );
+            },
+          );
+        },
+      ),
+      floatingActionButton: Consumer<RoleProvider>(
+        builder: (context, provider, child) {
+          final canCreate = provider.roles['groupOrganizer'] == true ||
+              provider.roles['admin'] == true;
+          if (!canCreate) {
+            return const SizedBox.shrink();
+          }
+          return FloatingActionButton.extended(
+            backgroundColor: Colors.orange,
+            foregroundColor: Colors.white,
+            icon: const Icon(Icons.add),
+            label: const Text('New Group'),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => AddGroupPage(
+                    tr: widget.tr,
+                    groupService: _groupService,
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }
 
-class ProfilePage extends StatelessWidget {
+class AddGroupPage extends StatefulWidget {
+  const AddGroupPage({
+    super.key,
+    required this.tr,
+    required this.groupService,
+  });
+
+  final Tr tr;
+  final GroupService groupService;
+
+  @override
+  State<AddGroupPage> createState() => _AddGroupPageState();
+}
+
+class _AddGroupPageState extends State<AddGroupPage> {
+  final _nameController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  bool _saving = false;
+  String _visibility = 'public';
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Add Group')),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          TextFormField(
+            controller: _nameController,
+            decoration: const InputDecoration(labelText: 'Group Name'),
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: _descriptionController,
+            decoration: const InputDecoration(labelText: 'Description'),
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            initialValue: _visibility,
+            items: const [
+              DropdownMenuItem(value: 'public', child: Text('Public')),
+              DropdownMenuItem(value: 'private', child: Text('Private')),
+            ],
+            onChanged: _saving
+                ? null
+                : (value) {
+                    if (value != null) {
+                      setState(() => _visibility = value);
+                    }
+                  },
+            decoration: const InputDecoration(labelText: 'Visibility'),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: _saving ? null : _save,
+            child: const Text('Save Group'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _save() async {
+    if (_nameController.text.trim().isEmpty ||
+        _descriptionController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(widget.tr.t('fill_all_fields'))),
+      );
+      return;
+    }
+
+    setState(() => _saving = true);
+    try {
+      await widget.groupService.createGroup(
+        name: _nameController.text.trim(),
+        description: _descriptionController.text.trim(),
+        visibility: _visibility,
+      );
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+    } on FirebaseException catch (e) {
+      if (mounted) {
+        _showFirestoreError(context, e);
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(widget.tr.t('save_failed'))),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
+  }
+}
+
+class ProfilePage extends StatefulWidget {
   const ProfilePage({
     super.key,
     required this.tr,
     required this.isArabic,
     required this.onToggleLanguage,
+    required this.onOpenAdminDashboard,
   });
 
   final Tr tr;
   final bool isArabic;
   final VoidCallback onToggleLanguage;
+  final VoidCallback onOpenAdminDashboard;
 
+  @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
   @override
   Widget build(BuildContext context) {
     final isAnonymous = FirebaseAuth.instance.currentUser?.isAnonymous ?? false;
     return Scaffold(
       appBar: appBarWithLanguage(
-        tr: tr,
-        isArabic: isArabic,
-        title: tr.t('profile'),
-        onToggleLanguage: onToggleLanguage,
+        tr: widget.tr,
+        isArabic: widget.isArabic,
+        title: widget.tr.t('profile'),
+        onToggleLanguage: widget.onToggleLanguage,
+        onAdminTap: widget.onOpenAdminDashboard,
       ),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              isAnonymous ? tr.t('guest_account') : tr.t('signed_in_account'),
+              isAnonymous
+                  ? widget.tr.t('guest_account')
+                  : widget.tr.t('signed_in_account'),
             ),
             const SizedBox(height: 10),
             ElevatedButton(
               onPressed: () async {
                 await FirebaseAuth.instance.signOut();
               },
-              child: Text(tr.t('sign_out')),
+              child: Text(widget.tr.t('sign_out')),
             ),
           ],
         ),
       ),
     );
   }
+}
+
+class AdminDashboardPage extends StatelessWidget {
+  const AdminDashboardPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.watch<RoleProvider>();
+    if (!provider.isAdmin) {
+      return const Scaffold(
+        body: Center(child: Text('Access denied')),
+      );
+    }
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Admin Dashboard')),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: FirebaseFirestore.instance
+              .collection('places')
+              .where('status', isEqualTo: 'pending')
+              .snapshots(),
+          builder: (context, pendingSnapshot) {
+            if (pendingSnapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (pendingSnapshot.hasError) {
+              _logFirestoreReadError('places', pendingSnapshot.error);
+              final error = pendingSnapshot.error;
+              if (error is FirebaseException && error.code == 'permission-denied') {
+                return const Center(child: Text('Permission denied'));
+              }
+              return const Center(
+                child: Text('Failed to load moderation dashboard'),
+              );
+            }
+
+            final pendingCount = pendingSnapshot.data?.docs.length ?? 0;
+            return Card(
+              child: ListTile(
+                contentPadding: const EdgeInsets.all(16),
+                title: const Text('Pending Places'),
+                subtitle: Text('$pendingCount waiting for review'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const PendingPlacesPage(),
+                    ),
+                  );
+                },
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class PendingPlacesPage extends StatefulWidget {
+  const PendingPlacesPage({super.key});
+
+  @override
+  State<PendingPlacesPage> createState() => _PendingPlacesPageState();
+}
+
+class _PendingPlacesPageState extends State<PendingPlacesPage> {
+  final PlaceService _placeService = PlaceService();
+  final Set<String> _busyIds = <String>{};
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.watch<RoleProvider>();
+    if (!provider.isAdmin) {
+      return const Scaffold(
+        body: Center(child: Text('Access denied')),
+      );
+    }
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Pending Places')),
+      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: FirebaseFirestore.instance
+            .collection('places')
+            .where('status', isEqualTo: 'pending')
+            .snapshots(),
+        builder: (context, pendingSnapshot) {
+          if (pendingSnapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (pendingSnapshot.hasError) {
+            final error = pendingSnapshot.error;
+            _logFirestoreReadError('places', error);
+            if (error is FirebaseException && error.code == 'permission-denied') {
+              return const Center(child: Text('Permission denied'));
+            }
+            return const Center(child: Text('Failed to load pending places'));
+          }
+
+          final docs = pendingSnapshot.data?.docs ?? [];
+          if (docs.isEmpty) {
+            return const Center(child: Text('No pending places'));
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: docs.length,
+            itemBuilder: (context, index) {
+              final doc = docs[index];
+              final data = doc.data();
+              final placeId = doc.id;
+              final imageBase64 = data['imageBase64'] as String?;
+              final isBusy = _busyIds.contains(placeId);
+
+              return Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        (data['name'] ?? '').toString(),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Type: ${(data['environmentType'] ?? '-').toString()}',
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Created by: ${(data['createdBy'] ?? '-').toString()}',
+                      ),
+                      if (imageBase64 != null && imageBase64.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.memory(
+                            base64Decode(imageBase64),
+                            height: 140,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                const SizedBox.shrink(),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: isBusy
+                                  ? null
+                                  : () => _handleApproveReject(
+                                        placeId: placeId,
+                                        approve: true,
+                                      ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                foregroundColor: Colors.white,
+                              ),
+                              child: const Text('Approve'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: isBusy
+                                  ? null
+                                  : () => _handleApproveReject(
+                                        placeId: placeId,
+                                        approve: false,
+                                      ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                foregroundColor: Colors.white,
+                              ),
+                              child: const Text('Reject'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _handleApproveReject({
+    required String placeId,
+    required bool approve,
+  }) async {
+    setState(() {
+      _busyIds.add(placeId);
+    });
+
+    try {
+      if (approve) {
+        await _placeService.approvePlace(placeId);
+      } else {
+        await _placeService.rejectPlace(placeId);
+      }
+    } on FirebaseException catch (e) {
+      if (mounted) {
+        _showFirestoreError(context, e);
+      }
+    } catch (_) {
+      if (mounted) {
+        _showFirestoreError(
+          context,
+          FirebaseException(
+            plugin: 'cloud_firestore',
+            code: 'unknown',
+            message: 'Operation failed',
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _busyIds.remove(placeId);
+        });
+      }
+    }
+  }
+}
+
+void _showFirestoreError(BuildContext context, FirebaseException e) {
+  String message;
+  if (e.code == 'permission-denied') {
+    message = 'You do not have permission to perform this action.';
+  } else if (e.code == 'unauthenticated') {
+    message = 'Please sign in again.';
+  } else if (e.code == 'invalid-argument') {
+    message = e.message ?? 'Some fields are invalid.';
+  } else {
+    message = 'Something went wrong. Please try again.';
+  }
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+}
+
+void _logFirestoreReadError(String collection, Object? error) {
+  if (!kDebugMode) {
+    return;
+  }
+  if (error is FirebaseException) {
+    debugPrint(
+      'Firestore read error [$collection] code=${error.code} message=${error.message}',
+    );
+    final link = _extractIndexLink(error.message);
+    if (link != null) {
+      debugPrint('Firestore index link [$collection]: $link');
+    }
+    return;
+  }
+  debugPrint('Firestore read error [$collection]: $error');
+}
+
+String? _extractIndexLink(String? message) {
+  if (message == null) {
+    return null;
+  }
+  final match = RegExp(r'https://\S+').firstMatch(message);
+  if (match == null) {
+    return null;
+  }
+  return match.group(0);
 }
 
 class Tr {
@@ -1022,6 +1631,7 @@ class Tr {
     'save_trip': 'Save Trip',
     'fill_all_fields': 'Fill all fields correctly',
     'save_failed': 'Failed to save trip',
+    'permission_denied': 'Permission denied',
     'groups_page': 'Groups page',
     'guest_account': 'Guest account',
     'signed_in_account': 'Signed in account',
@@ -1080,6 +1690,8 @@ class Tr {
         '\u0627\u0645\u0644\u0623 \u062c\u0645\u064a\u0639 \u0627\u0644\u062d\u0642\u0648\u0644 \u0628\u0634\u0643\u0644 \u0635\u062d\u064a\u062d',
     'save_failed':
         '\u0641\u0634\u0644 \u062d\u0641\u0638 \u0627\u0644\u0631\u062d\u0644\u0629',
+    'permission_denied':
+        '\u0644\u0627 \u062a\u0645\u0644\u0643 \u0635\u0644\u0627\u062d\u064a\u0629 \u0644\u0647\u0630\u0627 \u0627\u0644\u0625\u062c\u0631\u0627\u0621',
     'groups_page':
         '\u0635\u0641\u062d\u0629 \u0627\u0644\u0645\u062c\u0645\u0648\u0639\u0627\u062a',
     'guest_account': '\u062d\u0633\u0627\u0628 \u0636\u064a\u0641',
