@@ -580,6 +580,230 @@ class ExplorePage extends StatefulWidget {
 }
 
 class _ExplorePageState extends State<ExplorePage> {
+
+void _showPlaceDetails(Map<String, dynamic> data, String placeId) {
+  int selectedRating = 0;
+  final commentController = TextEditingController();
+  Uint8List? selectedImageBytes;
+
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.white,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (context) {
+      return DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (context, controller) {
+          return StatefulBuilder(
+            builder: (context, setModalState) {
+              Future<void> pickImage() async {
+                final picker = ImagePicker();
+                final image =
+                    await picker.pickImage(source: ImageSource.gallery);
+                if (image == null) return;
+
+                final bytes = await image.readAsBytes();
+                setModalState(() {
+                  selectedImageBytes = bytes;
+                });
+              }
+
+              return SingleChildScrollView(
+                controller: controller,
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+
+                    // ===== TITLE =====
+                    Text(
+                      data['name'] ?? '',
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+
+                    const SizedBox(height: 10),
+                    Text("Environment: ${data['environmentType'] ?? '-'}"),
+
+                    const SizedBox(height: 20),
+
+                    // ===== RATING STARS =====
+                    const Text("Rate this place:",
+                        style: TextStyle(fontWeight: FontWeight.bold)),
+
+                    const SizedBox(height: 8),
+
+                    Row(
+                      children: List.generate(5, (index) {
+                        return IconButton(
+                          icon: Icon(
+                            index < selectedRating
+                                ? Icons.star
+                                : Icons.star_border,
+                            color: Colors.orange,
+                          ),
+                          onPressed: () {
+                            setModalState(() {
+                              selectedRating = index + 1;
+                            });
+                          },
+                        );
+                      }),
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    // ===== COMMENT FIELD =====
+                    TextField(
+                      controller: commentController,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        hintText: "Write your comment...",
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    ElevatedButton(
+                      onPressed: pickImage,
+                      child: const Text("Add Image (Optional)"),
+                    ),
+
+                    if (selectedImageBytes != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 10),
+                        child: Image.memory(
+                          selectedImageBytes!,
+                          height: 120,
+                        ),
+                      ),
+
+                    const SizedBox(height: 15),
+
+                    // ===== SUBMIT REVIEW =====
+                    ElevatedButton(
+                      onPressed: () async {
+                        if (selectedRating == 0) return;
+
+                        await FirebaseFirestore.instance
+                            .collection('places')
+                            .doc(placeId)
+                            .collection('reviews')
+                            .add({
+                          'userId':
+                              FirebaseAuth.instance.currentUser?.uid,
+                          'rating': selectedRating,
+                          'comment': commentController.text.trim(),
+                          'imageBase64': selectedImageBytes == null
+                              ? null
+                              : base64Encode(selectedImageBytes!),
+                          'createdAt': FieldValue.serverTimestamp(),
+                        });
+
+                        Navigator.pop(context);
+                      },
+                      child: const Text("Submit Review"),
+                    ),
+
+                    const SizedBox(height: 25),
+
+                    const Divider(),
+
+                    const SizedBox(height: 10),
+
+                    // ===== REVIEWS LIST =====
+                    const Text("Reviews:",
+                        style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold)),
+
+                    const SizedBox(height: 10),
+
+                    StreamBuilder<QuerySnapshot>(
+                      stream: FirebaseFirestore.instance
+                          .collection('places')
+                          .doc(placeId)
+                          .collection('reviews')
+                          .orderBy('createdAt', descending: true)
+                          .snapshots(),
+                      builder: (context, snapshot) {
+                        if (!snapshot.hasData) {
+                          return const CircularProgressIndicator();
+                        }
+
+                        final reviews = snapshot.data!.docs;
+
+                        if (reviews.isEmpty) {
+                          return const Text("No reviews yet.");
+                        }
+
+                        return Column(
+                          children: reviews.map((doc) {
+                            final review =
+                                doc.data() as Map<String, dynamic>;
+
+                            return Card(
+                              margin: const EdgeInsets.only(bottom: 10),
+                              child: Padding(
+                                padding: const EdgeInsets.all(10),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: List.generate(
+                                        review['rating'] ?? 0,
+                                        (index) => const Icon(
+                                          Icons.star,
+                                          color: Colors.orange,
+                                          size: 18,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 5),
+                                    Text(review['comment'] ?? ''),
+                                    if (review['imageBase64'] != null)
+                                      Padding(
+                                        padding:
+                                            const EdgeInsets.only(top: 8),
+                                        child: Image.memory(
+                                          base64Decode(
+                                              review['imageBase64']),
+                                          height: 100,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
+      );
+    },
+  );
+}
+
+
+
+
+
   LatLng? selectedPoint;
   final PlaceService _placeService = PlaceService();
 
@@ -742,15 +966,20 @@ class _ExplorePageState extends State<ExplorePage> {
                   return null;
                 }
                 return Marker(
-                  point: LatLng(lat, lng),
-                  width: 36,
-                  height: 36,
-                  child: const Icon(
-                    Icons.location_on,
-                    color: Colors.red,
-                    size: 36,
-                  ),
-                );
+  point: LatLng(lat, lng),
+  width: 36,
+  height: 36,
+  child: GestureDetector(
+    onTap: () {
+     _showPlaceDetails(data, doc.id);
+    },
+    child: const Icon(
+      Icons.location_on,
+      color: Colors.red,
+      size: 36,
+    ),
+  ),
+);
               }).whereType<Marker>().toList();
 
               final allMarkers = <Marker>[
