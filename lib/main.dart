@@ -19,6 +19,7 @@ void main() async {
   await Firebase.initializeApp(
   options: DefaultFirebaseOptions.currentPlatform,
 );
+  await _seedChecklistTemplatesIfEmpty();
   final firebaseOptions = Firebase.app().options;
   debugPrint('PROJECT ID: ${firebaseOptions.projectId}');
   debugPrint('APP ID: ${firebaseOptions.appId}');
@@ -29,6 +30,111 @@ void main() async {
     debugPrint('PACKAGE: unavailable');
   }
   runApp(const KashtaApp());
+}
+
+Future<void> _seedChecklistTemplatesIfEmpty() async {
+  try {
+    final templates = FirebaseFirestore.instance.collection('checklist_templates');
+    final existing = await templates.limit(1).get();
+    if (existing.docs.isNotEmpty) {
+      return;
+    }
+
+    final defaults = <String, Map<String, String>>{
+      'tent': {
+        'name': 'Tent',
+        'category': 'Camping Gear',
+        'icon': 'tent',
+      },
+      'bbq': {
+        'name': 'BBQ Set',
+        'category': 'Food & Cooking',
+        'icon': 'restaurant',
+      },
+      'chairs': {
+        'name': 'Chairs',
+        'category': 'Comfort',
+        'icon': 'chair',
+      },
+      'water': {
+        'name': 'Water',
+        'category': 'Essentials',
+        'icon': 'water_drop',
+      },
+      'flashlight': {
+        'name': 'Flashlight',
+        'category': 'Camping Gear',
+        'icon': 'flashlight_on',
+      },
+    };
+
+    final batch = FirebaseFirestore.instance.batch();
+    defaults.forEach((docId, data) {
+      batch.set(templates.doc(docId), data);
+    });
+    await batch.commit();
+  } catch (e) {
+    if (kDebugMode) {
+      debugPrint('Checklist template seed skipped: $e');
+    }
+  }
+}
+
+IconData _iconFromName(String? iconName) {
+  switch (iconName) {
+    case 'tent':
+      return Icons.terrain;
+    case 'restaurant':
+      return Icons.restaurant;
+    case 'chair':
+      return Icons.chair_alt;
+    case 'water_drop':
+      return Icons.water_drop;
+    case 'flashlight_on':
+      return Icons.flashlight_on;
+    case 'checklist':
+      return Icons.checklist;
+    default:
+      return Icons.checklist;
+  }
+}
+
+Map<String, int> _categoryTemplateCounts(
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> templates,
+  Tr tr,
+) {
+  final counts = <String, int>{};
+  for (final doc in templates) {
+    final data = doc.data();
+    final category = (data['category'] ?? tr.t('other')).toString();
+    counts[category] = (counts[category] ?? 0) + 1;
+  }
+  return counts;
+}
+
+List<QueryDocumentSnapshot<Map<String, dynamic>>> _sortChecklistByCompletion(
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> items,
+) {
+  final sorted = [...items];
+  sorted.sort((a, b) {
+    final aDone = a.data()['done'] == true;
+    final bDone = b.data()['done'] == true;
+    if (aDone == bDone) {
+      return 0;
+    }
+    return aDone ? 1 : -1;
+  });
+  return sorted;
+}
+
+double _checklistProgressValue({
+  required int doneCount,
+  required int totalCount,
+}) {
+  if (totalCount == 0) {
+    return 0;
+  }
+  return doneCount / totalCount;
 }
 
 enum AppLanguage { en, ar }
@@ -117,26 +223,10 @@ PreferredSizeWidget appBarWithLanguage({
   required bool isArabic,
   required String title,
   required VoidCallback onToggleLanguage,
-  VoidCallback? onAdminTap,
 }) {
   return AppBar(
     title: Text(title),
     actions: [
-      Consumer<RoleProvider>(
-        builder: (context, provider, child) {
-          if (kDebugMode) {
-            print("Current roles: ${provider.roles}");
-          }
-          if (provider.roles['admin'] == true && onAdminTap != null) {
-            return IconButton(
-              onPressed: onAdminTap,
-              icon: const Icon(Icons.shield_outlined),
-              tooltip: 'Admin Dashboard',
-            );
-          }
-          return const SizedBox.shrink();
-        },
-      ),
       TextButton(
         onPressed: onToggleLanguage,
         child: Text(
@@ -502,19 +592,16 @@ class _MainScreenState extends State<MainScreen> {
         tr: widget.tr,
         isArabic: widget.isArabic,
         onToggleLanguage: widget.onToggleLanguage,
-        onOpenAdminDashboard: _openAdminDashboard,
       ),
       TripsPage(
         tr: widget.tr,
         isArabic: widget.isArabic,
         onToggleLanguage: widget.onToggleLanguage,
-        onOpenAdminDashboard: _openAdminDashboard,
       ),
       GroupsPage(
         tr: widget.tr,
         isArabic: widget.isArabic,
         onToggleLanguage: widget.onToggleLanguage,
-        onOpenAdminDashboard: _openAdminDashboard,
       ),
       ProfilePage(
         tr: widget.tr,
@@ -566,13 +653,11 @@ class ExplorePage extends StatefulWidget {
     required this.tr,
     required this.isArabic,
     required this.onToggleLanguage,
-    required this.onOpenAdminDashboard,
   });
 
   final Tr tr;
   final bool isArabic;
   final VoidCallback onToggleLanguage;
-  final VoidCallback onOpenAdminDashboard;
 
   @override
   State<ExplorePage> createState() =>
@@ -580,6 +665,8 @@ class ExplorePage extends StatefulWidget {
 }
 
 class _ExplorePageState extends State<ExplorePage> {
+  bool _showOnlyFavorites = false;
+  String? _selectedCategoryChip;
 
 void _showPlaceDetails(Map<String, dynamic> data, String placeId) {
   int selectedRating = 0;
@@ -806,6 +893,19 @@ void _showPlaceDetails(Map<String, dynamic> data, String placeId) {
 
   LatLng? selectedPoint;
   final PlaceService _placeService = PlaceService();
+  Stream<Set<String>> _favoritePlaceIdsStream() {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) {
+      return Stream.value(<String>{});
+    }
+
+    return FirebaseFirestore.instance
+        .collection('users')
+        .doc(userId)
+        .collection('favorites')
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map((doc) => doc.id).toSet());
+  }
 
   void _openAddPlaceForm(double lat, double lng) {
     final nameController = TextEditingController();
@@ -944,87 +1044,212 @@ void _showPlaceDetails(Map<String, dynamic> data, String placeId) {
           isArabic: widget.isArabic,
           title: widget.tr.t('explore'),
           onToggleLanguage: widget.onToggleLanguage,
-          onAdminTap: widget.onOpenAdminDashboard,
         ),
-        Expanded(
-          flex: 2,
-          child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream: FirebaseFirestore.instance
-                .collection('places')
-                .where('status', isEqualTo: 'approved')
-                .snapshots(),
-            builder: (context, snapshot) {
-              if (snapshot.hasError) {
-                _logFirestoreReadError('places', snapshot.error);
-              }
-              final docs = snapshot.data?.docs ?? [];
-              final approvedMarkers = docs.map((doc) {
-                final data = doc.data();
-                final lat = (data['lat'] as num?)?.toDouble();
-                final lng = (data['lng'] as num?)?.toDouble();
-                if (lat == null || lng == null) {
-                  return null;
-                }
-                return Marker(
-  point: LatLng(lat, lng),
-  width: 36,
-  height: 36,
-  child: GestureDetector(
-    onTap: () {
-     _showPlaceDetails(data, doc.id);
-    },
-    child: const Icon(
-      Icons.location_on,
-      color: Colors.red,
-      size: 36,
-    ),
-  ),
-);
-              }).whereType<Marker>().toList();
-
-              final allMarkers = <Marker>[
-                ...approvedMarkers,
-                if (selectedPoint != null)
-                  Marker(
-                    point: selectedPoint!,
-                    width: 40,
-                    height: 40,
-                    child: const Icon(
-                      Icons.location_on,
-                      color: Colors.blue,
-                      size: 40,
-                    ),
-                  ),
-              ];
-
-              return FlutterMap(
-                options: MapOptions(
-                  initialCenter: const LatLng(21.4858, 39.1925),
-                  initialZoom: 11,
-                  onTap: (tapPosition, point) {
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
+          child: SizedBox(
+            height: 44,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              children: [
+                FilterChip(
+                  selected: _showOnlyFavorites,
+                  onSelected: (_) {
                     setState(() {
-                      selectedPoint = point;
+                      _showOnlyFavorites = !_showOnlyFavorites;
                     });
-                    _openAddPlaceForm(point.latitude, point.longitude);
                   },
-                ),
-                children: [
-                  TileLayer(
-                    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                    userAgentPackageName: 'com.example.kashta',
+                  avatar: Icon(
+                    _showOnlyFavorites ? Icons.star : Icons.star_border,
+                    size: 18,
+                    color: _showOnlyFavorites ? Colors.orange : Colors.black54,
                   ),
-                  if (allMarkers.isNotEmpty) MarkerLayer(markers: allMarkers),
-                ],
-              );
-            },
+                  label: Text(widget.tr.t('favorites')),
+                  selectedColor: Colors.orange.withValues(alpha: 0.16),
+                  checkmarkColor: Colors.orange,
+                  side: BorderSide(
+                    color: _showOnlyFavorites
+                        ? Colors.orange
+                        : Colors.orange.shade200,
+                  ),
+                  backgroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  labelStyle: TextStyle(
+                    color: _showOnlyFavorites ? Colors.orange : Colors.black87,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                FilterChip(
+                  selected: _selectedCategoryChip == 'desert',
+                  onSelected: (_) {
+                    setState(() {
+                      _selectedCategoryChip = _selectedCategoryChip == 'desert'
+                          ? null
+                          : 'desert';
+                    });
+                  },
+                  label: Text(widget.tr.t('desert')),
+                  selectedColor: Colors.orange.withValues(alpha: 0.16),
+                  checkmarkColor: Colors.orange,
+                  side: BorderSide(
+                    color: _selectedCategoryChip == 'desert'
+                        ? Colors.orange
+                        : Colors.orange.shade200,
+                  ),
+                  backgroundColor: Colors.white,
+                  labelStyle: TextStyle(
+                    color: _selectedCategoryChip == 'desert'
+                        ? Colors.orange
+                        : Colors.black87,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                FilterChip(
+                  selected: _selectedCategoryChip == 'beach',
+                  onSelected: (_) {
+                    setState(() {
+                      _selectedCategoryChip = _selectedCategoryChip == 'beach'
+                          ? null
+                          : 'beach';
+                    });
+                  },
+                  label: Text(widget.tr.t('beach')),
+                  selectedColor: Colors.orange.withValues(alpha: 0.16),
+                  checkmarkColor: Colors.orange,
+                  side: BorderSide(
+                    color: _selectedCategoryChip == 'beach'
+                        ? Colors.orange
+                        : Colors.orange.shade200,
+                  ),
+                  backgroundColor: Colors.white,
+                  labelStyle: TextStyle(
+                    color: _selectedCategoryChip == 'beach'
+                        ? Colors.orange
+                        : Colors.black87,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                FilterChip(
+                  selected: _selectedCategoryChip == 'family',
+                  onSelected: (_) {
+                    setState(() {
+                      _selectedCategoryChip = _selectedCategoryChip == 'family'
+                          ? null
+                          : 'family';
+                    });
+                  },
+                  label: Text(widget.tr.t('family')),
+                  selectedColor: Colors.orange.withValues(alpha: 0.16),
+                  checkmarkColor: Colors.orange,
+                  side: BorderSide(
+                    color: _selectedCategoryChip == 'family'
+                        ? Colors.orange
+                        : Colors.orange.shade200,
+                  ),
+                  backgroundColor: Colors.white,
+                  labelStyle: TextStyle(
+                    color: _selectedCategoryChip == 'family'
+                        ? Colors.orange
+                        : Colors.black87,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
         Expanded(
-          flex: 1,
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            width: double.infinity,
-            child: Text(widget.tr.t('explore_hint')),
+          flex: 2,
+          child: StreamBuilder<Set<String>>(
+            stream: _favoritePlaceIdsStream(),
+            builder: (context, favoritesSnapshot) {
+              if (favoritesSnapshot.hasError) {
+                _logFirestoreReadError(
+                  'users/*/favorites',
+                  favoritesSnapshot.error,
+                );
+              }
+              final favoriteIds = favoritesSnapshot.data ?? <String>{};
+
+              return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: FirebaseFirestore.instance
+                    .collection('places')
+                    .where('status', isEqualTo: 'approved')
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    _logFirestoreReadError('places', snapshot.error);
+                  }
+                  final docs = snapshot.data?.docs ?? [];
+                  final visibleDocs = _showOnlyFavorites
+                      ? docs.where((doc) => favoriteIds.contains(doc.id)).toList()
+                      : docs;
+                  final approvedMarkers = visibleDocs.map((doc) {
+                    final data = doc.data();
+                    final lat = (data['lat'] as num?)?.toDouble();
+                    final lng = (data['lng'] as num?)?.toDouble();
+                    if (lat == null || lng == null) {
+                      return null;
+                    }
+                    return Marker(
+                      point: LatLng(lat, lng),
+                      width: 36,
+                      height: 36,
+                      child: GestureDetector(
+                        onTap: () {
+                          _showPlaceDetails(data, doc.id);
+                        },
+                        child: const Icon(
+                          Icons.location_on,
+                          color: Colors.red,
+                          size: 36,
+                        ),
+                      ),
+                    );
+                  }).whereType<Marker>().toList();
+
+                  final allMarkers = <Marker>[
+                    ...approvedMarkers,
+                    if (selectedPoint != null)
+                      Marker(
+                        point: selectedPoint!,
+                        width: 40,
+                        height: 40,
+                        child: const Icon(
+                          Icons.location_on,
+                          color: Colors.blue,
+                          size: 40,
+                        ),
+                      ),
+                  ];
+
+                  return FlutterMap(
+                    options: MapOptions(
+                      initialCenter: const LatLng(21.4858, 39.1925),
+                      initialZoom: 11,
+                      onTap: (tapPosition, point) {
+                        setState(() {
+                          selectedPoint = point;
+                        });
+                        _openAddPlaceForm(point.latitude, point.longitude);
+                      },
+                    ),
+                    children: [
+                      TileLayer(
+                        urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        userAgentPackageName: 'com.example.kashta',
+                      ),
+                      if (allMarkers.isNotEmpty) MarkerLayer(markers: allMarkers),
+                    ],
+                  );
+                },
+              );
+            },
           ),
         ),
       ],
@@ -1038,13 +1263,11 @@ class TripsPage extends StatelessWidget {
     required this.tr,
     required this.isArabic,
     required this.onToggleLanguage,
-    required this.onOpenAdminDashboard,
   });
 
   final Tr tr;
   final bool isArabic;
   final VoidCallback onToggleLanguage;
-  final VoidCallback onOpenAdminDashboard;
 
   @override
   Widget build(BuildContext context) {
@@ -1054,7 +1277,6 @@ class TripsPage extends StatelessWidget {
         isArabic: isArabic,
         title: tr.t('trips'),
         onToggleLanguage: onToggleLanguage,
-        onAdminTap: onOpenAdminDashboard,
       ),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: FirebaseFirestore.instance
@@ -1084,24 +1306,114 @@ class TripsPage extends StatelessWidget {
             );
           }
           final docs = snapshot.data?.docs ?? [];
-          if (docs.isEmpty) {
-            return Center(child: Text(tr.t('no_trips')));
+          final today = DateTime.now();
+          final todayStart = DateTime(today.year, today.month, today.day);
+          int upcomingCount = 0;
+          int pastCount = 0;
+          for (final doc in docs) {
+            final data = doc.data();
+            final tripDateValue = data['tripDate'];
+            if (tripDateValue is! Timestamp) {
+              continue;
+            }
+            final tripDate = tripDateValue.toDate();
+            if (tripDate.isBefore(todayStart)) {
+              pastCount++;
+            } else {
+              upcomingCount++;
+            }
           }
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: docs.length,
-            itemBuilder: (context, index) {
-              final data = docs[index].data();
-              return Card(
-                child: ListTile(
-                  title: Text((data['title'] ?? '').toString()),
-                  subtitle: Text((data['description'] ?? '').toString()),
-                  trailing: Text(
-                    '${tr.t('members')} ${(data['peopleCount'] ?? 0)}',
+
+          if (docs.isEmpty) {
+            return Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _TripStatCard(
+                          title: tr.t('upcoming'),
+                          value: upcomingCount,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _TripStatCard(
+                          title: tr.t('past'),
+                          value: pastCount,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              );
-            },
+                Expanded(child: Center(child: Text(tr.t('no_trips')))),
+              ],
+            );
+          }
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _TripStatCard(
+                        title: tr.t('upcoming'),
+                        value: upcomingCount,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _TripStatCard(
+                        title: tr.t('past'),
+                        value: pastCount,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                  itemCount: docs.length,
+                  itemBuilder: (context, index) {
+                    final doc = docs[index];
+                    final data = docs[index].data();
+                    return Card(
+                      child: ListTile(
+                        title: Text((data['title'] ?? '').toString()),
+                        subtitle: Text((data['description'] ?? '').toString()),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '${tr.t('members')} ${(data['peopleCount'] ?? 0)}',
+                            ),
+                            const SizedBox(width: 8),
+                            IconButton(
+                              tooltip: tr.t('trip_checklist'),
+                              icon: const Icon(Icons.checklist, color: Colors.orange),
+                              onPressed: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => TripChecklistPage(
+                                      tr: tr,
+                                      tripId: doc.id,
+                                      tripTitle: (data['title'] ?? '').toString(),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
           );
         },
       ),
@@ -1117,6 +1429,436 @@ class TripsPage extends StatelessWidget {
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add),
         label: Text(tr.t('new_trip')),
+      ),
+    );
+  }
+}
+
+class _TripStatCard extends StatelessWidget {
+  const _TripStatCard({
+    required this.title,
+    required this.value,
+  });
+
+  final String title;
+  final int value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 1.5,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                color: Colors.grey.shade700,
+                fontSize: 13,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '$value',
+              style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Colors.orange,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class AddChecklistItemsPage extends StatelessWidget {
+  const AddChecklistItemsPage({
+    super.key,
+    required this.tr,
+    required this.tripId,
+  });
+
+  final Tr tr;
+  final String tripId;
+
+  Future<void> _addTemplateToTripChecklist(
+    BuildContext context,
+    String templateId,
+    Map<String, dynamic> data,
+  ) async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    try {
+      await FirebaseFirestore.instance
+          .collection('trips')
+          .doc(tripId)
+          .collection('checklist')
+          .doc(templateId)
+          .set({
+        'name': (data['name'] ?? '').toString(),
+        'category': (data['category'] ?? '').toString(),
+        'icon': (data['icon'] ?? 'checklist').toString(),
+        'done': false,
+        'addedBy': userId ?? 'unknown',
+        'assignedTo': null,
+        'createdAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(tr.t('checklist_item_added'))),
+        );
+      }
+    } on FirebaseException catch (e) {
+      if (context.mounted) {
+        _showFirestoreError(context, e);
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(tr.t('save_failed'))),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(tr.t('add_checklist_items'))),
+      backgroundColor: Colors.white,
+      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: FirebaseFirestore.instance.collection('checklist_templates').snapshots(),
+        builder: (context, templatesSnapshot) {
+          if (templatesSnapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (templatesSnapshot.hasError) {
+            _logFirestoreReadError('checklist_templates', templatesSnapshot.error);
+            return Center(child: Text(tr.t('load_error')));
+          }
+
+          final docs = templatesSnapshot.data?.docs ?? [];
+          if (docs.isEmpty) {
+            return Center(child: Text(tr.t('no_checklist_templates')));
+          }
+
+          return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: FirebaseFirestore.instance
+                .collection('trips')
+                .doc(tripId)
+                .collection('checklist')
+                .snapshots(),
+            builder: (context, checklistSnapshot) {
+              if (checklistSnapshot.hasError) {
+                _logFirestoreReadError('trips/*/checklist', checklistSnapshot.error);
+              }
+              final existingIds = checklistSnapshot.data?.docs
+                      .map((doc) => doc.id)
+                      .toSet() ??
+                  <String>{};
+
+              final grouped =
+                  <String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>{};
+              for (final doc in docs) {
+                final data = doc.data();
+                final category = (data['category'] ?? tr.t('other')).toString();
+                grouped.putIfAbsent(
+                  category,
+                  () => <QueryDocumentSnapshot<Map<String, dynamic>>>[],
+                );
+                grouped[category]!.add(doc);
+              }
+              final categoryCounts = _categoryTemplateCounts(docs, tr);
+              final categories = grouped.keys.toList()..sort();
+              for (final category in categories) {
+                grouped[category]!.sort((a, b) {
+                  final aName = (a.data()['name'] ?? '').toString();
+                  final bName = (b.data()['name'] ?? '').toString();
+                  return aName.compareTo(bName);
+                });
+              }
+
+              return ListView.builder(
+                padding: const EdgeInsets.all(12),
+                itemCount: categories.length,
+                itemBuilder: (context, index) {
+                  final category = categories[index];
+                  final items = grouped[category]!;
+                  final count = categoryCounts[category] ?? 0;
+                  return Card(
+                    elevation: 1.2,
+                    color: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: ExpansionTile(
+                      title: Text(
+                        '$category ($count)',
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      children: items.map((itemDoc) {
+                        final data = itemDoc.data();
+                        final iconName = (data['icon'] ?? 'checklist').toString();
+                        final name = (data['name'] ?? '').toString();
+                        final alreadyAdded = existingIds.contains(itemDoc.id);
+                        return ListTile(
+                          leading: Icon(_iconFromName(iconName), color: Colors.orange),
+                          title: Text(name),
+                          trailing: alreadyAdded
+                              ? Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.check_circle,
+                                      color: Colors.green,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      tr.t('added'),
+                                      style: const TextStyle(
+                                        color: Colors.green,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : IconButton(
+                                  icon: const Icon(
+                                    Icons.add_circle,
+                                    color: Colors.orange,
+                                  ),
+                                  onPressed: () => _addTemplateToTripChecklist(
+                                    context,
+                                    itemDoc.id,
+                                    data,
+                                  ),
+                                ),
+                        );
+                      }).toList(),
+                    ),
+                  );
+                },
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+class TripChecklistPage extends StatelessWidget {
+  const TripChecklistPage({
+    super.key,
+    required this.tr,
+    required this.tripId,
+    required this.tripTitle,
+  });
+
+  final Tr tr;
+  final String tripId;
+  final String tripTitle;
+
+  Future<void> _toggleDone(
+    BuildContext context,
+    String itemId,
+    bool newValue,
+  ) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('trips')
+          .doc(tripId)
+          .collection('checklist')
+          .doc(itemId)
+          .update({'done': newValue});
+    } on FirebaseException catch (e) {
+      if (context.mounted) {
+        _showFirestoreError(context, e);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('${tr.t('trip_checklist')} - $tripTitle'),
+        actions: [
+          IconButton(
+            tooltip: tr.t('add'),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => AddChecklistItemsPage(
+                    tr: tr,
+                    tripId: tripId,
+                  ),
+                ),
+              );
+            },
+            icon: const Icon(Icons.add),
+          ),
+        ],
+      ),
+      backgroundColor: Colors.white,
+      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: FirebaseFirestore.instance
+            .collection('trips')
+            .doc(tripId)
+            .collection('checklist')
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            _logFirestoreReadError('trips/*/checklist', snapshot.error);
+            return Center(child: Text(tr.t('load_error')));
+          }
+
+          final docs = snapshot.data?.docs ?? [];
+          final sortedDocs = _sortChecklistByCompletion(docs);
+          final totalItems = sortedDocs.length;
+          final doneCount = sortedDocs.where((doc) => doc.data()['done'] == true).length;
+          final progress = _checklistProgressValue(
+            doneCount: doneCount,
+            totalCount: totalItems,
+          );
+          if (docs.isEmpty) {
+            return Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    tr.t('checklist_progress'),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text('0 / 0 ${tr.t('items_completed')}'),
+                  const SizedBox(height: 10),
+                  const LinearProgressIndicator(
+                    value: 0,
+                    color: Colors.orange,
+                    backgroundColor: Color(0xFFF5F5F5),
+                  ),
+                  const SizedBox(height: 24),
+                  Expanded(
+                    child: Center(
+                      child: Text(tr.t('no_checklist_items')),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
+                child: Text(
+                  tr.t('checklist_progress'),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text('$doneCount / $totalItems ${tr.t('items_completed')}'),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    minHeight: 8,
+                    color: Colors.orange,
+                    backgroundColor: const Color(0xFFF1F1F1),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.all(12),
+                  itemCount: sortedDocs.length,
+                  itemBuilder: (context, index) {
+                    final doc = sortedDocs[index];
+                    final data = doc.data();
+                    final done = data['done'] == true;
+                    final iconName = (data['icon'] ?? 'checklist').toString();
+                    final itemName = (data['name'] ?? '').toString();
+
+                    return Card(
+                      elevation: 1.2,
+                      color: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: CheckboxListTile(
+                        value: done,
+                        onChanged: (value) {
+                          if (value == null) {
+                            return;
+                          }
+                          _toggleDone(context, doc.id, value);
+                        },
+                        activeColor: Colors.orange,
+                        controlAffinity: ListTileControlAffinity.leading,
+                        title: Row(
+                          children: [
+                            Icon(_iconFromName(iconName), color: Colors.orange),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                itemName,
+                                style: TextStyle(
+                                  decoration: done
+                                      ? TextDecoration.lineThrough
+                                      : TextDecoration.none,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: Colors.orange,
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.add),
+        label: Text(tr.t('add_from_template')),
+        onPressed: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => AddChecklistItemsPage(
+                tr: tr,
+                tripId: tripId,
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -1286,13 +2028,11 @@ class GroupsPage extends StatefulWidget {
     required this.tr,
     required this.isArabic,
     required this.onToggleLanguage,
-    required this.onOpenAdminDashboard,
   });
 
   final Tr tr;
   final bool isArabic;
   final VoidCallback onToggleLanguage;
-  final VoidCallback onOpenAdminDashboard;
 
   @override
   State<GroupsPage> createState() => _GroupsPageState();
@@ -1309,7 +2049,6 @@ class _GroupsPageState extends State<GroupsPage> {
         isArabic: widget.isArabic,
         title: widget.tr.t('groups'),
         onToggleLanguage: widget.onToggleLanguage,
-        onAdminTap: widget.onOpenAdminDashboard,
       ),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: FirebaseFirestore.instance
@@ -1337,7 +2076,40 @@ class _GroupsPageState extends State<GroupsPage> {
           }
           final docs = snapshot.data?.docs ?? [];
           if (docs.isEmpty) {
-            return Center(child: Text(widget.tr.t('groups_page')));
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.groups,
+                      size: 72,
+                      color: Colors.orange,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      widget.tr.t('no_groups_yet'),
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      widget.tr.t('groups_empty_subtitle'),
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: Colors.grey.shade700,
+                        height: 1.4,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            );
           }
           return ListView.builder(
             padding: const EdgeInsets.all(16),
@@ -1508,35 +2280,72 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
+  void _showComingSoon(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
   @override
   Widget build(BuildContext context) {
     final isAnonymous = FirebaseAuth.instance.currentUser?.isAnonymous ?? false;
+    final provider = context.watch<RoleProvider>();
+    final isAdmin = provider.roles['admin'] == true;
     return Scaffold(
       appBar: appBarWithLanguage(
         tr: widget.tr,
         isArabic: widget.isArabic,
         title: widget.tr.t('profile'),
         onToggleLanguage: widget.onToggleLanguage,
-        onAdminTap: widget.onOpenAdminDashboard,
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              isAnonymous
-                  ? widget.tr.t('guest_account')
-                  : widget.tr.t('signed_in_account'),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          ListTile(
+            leading: const Icon(Icons.account_circle_outlined),
+            title: Text(
+              isAnonymous ? widget.tr.t('guest_account') : widget.tr.t('signed_in_account'),
             ),
-            const SizedBox(height: 10),
-            ElevatedButton(
-              onPressed: () async {
+          ),
+          const SizedBox(height: 8),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: Text(widget.tr.t('edit_profile')),
+              onTap: () => _showComingSoon(widget.tr.t('coming_soon')),
+            ),
+          ),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.hiking_outlined),
+              title: Text(widget.tr.t('my_trips')),
+              onTap: () => _showComingSoon(widget.tr.t('coming_soon')),
+            ),
+          ),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.star_border),
+              title: Text(widget.tr.t('favorites')),
+              onTap: () => _showComingSoon(widget.tr.t('coming_soon')),
+            ),
+          ),
+          if (isAdmin)
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.shield_outlined, color: Colors.orange),
+                title: Text(widget.tr.t('admin_dashboard')),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: widget.onOpenAdminDashboard,
+              ),
+            ),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.logout, color: Colors.redAccent),
+              title: Text(widget.tr.t('sign_out')),
+              onTap: () async {
                 await FirebaseAuth.instance.signOut();
               },
-              child: Text(widget.tr.t('sign_out')),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -1850,7 +2659,21 @@ class Tr {
     'load_error': 'Failed to load trips',
     'no_trips': 'No trips yet. Add a new trip.',
     'new_trip': 'New Trip',
+    'trip_checklist': 'Trip Checklist',
+    'add_checklist_items': 'Add Checklist Items',
+    'add_items': 'Add Items',
+    'add_from_template': 'Add From Template',
+    'added': 'Added',
+    'checklist_progress': 'Checklist Progress',
+    'items_completed': 'items completed',
+    'checklist_item_added': 'Checklist item added',
+    'no_checklist_items': 'No checklist items yet',
+    'no_checklist_templates': 'No checklist templates found',
+    'other': 'Other',
+    'add': 'Add',
     'members': 'Members',
+    'upcoming': 'Upcoming',
+    'past': 'Past',
     'add_trip': 'Add Trip',
     'trip_name': 'Trip Name',
     'description': 'Description',
@@ -1862,9 +2685,20 @@ class Tr {
     'save_failed': 'Failed to save trip',
     'permission_denied': 'Permission denied',
     'groups_page': 'Groups page',
+    'no_groups_yet': 'No groups yet',
+    'groups_empty_subtitle':
+        'Create a group to start planning your next Kashta',
     'guest_account': 'Guest account',
     'signed_in_account': 'Signed in account',
     'sign_out': 'Sign Out',
+    'favorites': 'Favorites',
+    'desert': 'Desert',
+    'beach': 'Beach',
+    'family': 'Family',
+    'edit_profile': 'Edit Profile',
+    'my_trips': 'My Trips',
+    'admin_dashboard': 'Admin Dashboard',
+    'coming_soon': 'Coming soon',
   };
 
   static const _ar = {
@@ -1904,7 +2738,29 @@ class Tr {
     'no_trips':
         '\u0644\u0627 \u062a\u0648\u062c\u062f \u0631\u062d\u0644\u0627\u062a \u062d\u0627\u0644\u064a\u0627\u064b\u060c \u0623\u0636\u0641 \u0631\u062d\u0644\u0629 \u062c\u062f\u064a\u062f\u0629.',
     'new_trip': '\u0631\u062d\u0644\u0629 \u062c\u062f\u064a\u062f\u0629',
+    'trip_checklist':
+        '\u0642\u0627\u0626\u0645\u0629 \u0627\u0644\u062a\u062c\u0647\u064a\u0632 \u0644\u0644\u0631\u062d\u0644\u0629',
+    'add_checklist_items':
+        '\u0625\u0636\u0627\u0641\u0629 \u0639\u0646\u0627\u0635\u0631 \u0627\u0644\u0642\u0627\u0626\u0645\u0629',
+    'add_items': '\u0625\u0636\u0627\u0641\u0629 \u0639\u0646\u0627\u0635\u0631',
+    'add_from_template':
+        '\u0625\u0636\u0627\u0641\u0629 \u0645\u0646 \u0627\u0644\u0642\u0627\u0644\u0628',
+    'added': '\u062a\u0645\u062a \u0625\u0636\u0627\u0641\u062a\u0647',
+    'checklist_progress':
+        '\u062a\u0642\u062f\u0645 \u0627\u0644\u0642\u0627\u0626\u0645\u0629',
+    'items_completed':
+        '\u0639\u0646\u0635\u0631 \u0645\u0643\u062a\u0645\u0644',
+    'checklist_item_added':
+        '\u062a\u0645\u062a \u0625\u0636\u0627\u0641\u0629 \u0639\u0646\u0635\u0631 \u0627\u0644\u0642\u0627\u0626\u0645\u0629',
+    'no_checklist_items':
+        '\u0644\u0627 \u062a\u0648\u062c\u062f \u0639\u0646\u0627\u0635\u0631 \u0641\u064a \u0627\u0644\u0642\u0627\u0626\u0645\u0629 \u0628\u0639\u062f',
+    'no_checklist_templates':
+        '\u0644\u0627 \u062a\u0648\u062c\u062f \u0642\u0648\u0627\u0644\u0628 \u0642\u0627\u0626\u0645\u0629 \u0627\u0644\u062a\u062c\u0647\u064a\u0632',
+    'other': '\u0623\u062e\u0631\u0649',
+    'add': '\u0625\u0636\u0627\u0641\u0629',
     'members': '\u0623\u0639\u0636\u0627\u0621',
+    'upcoming': '\u0627\u0644\u0642\u0627\u062f\u0645\u0629',
+    'past': '\u0627\u0644\u0633\u0627\u0628\u0642\u0629',
     'add_trip': '\u0625\u0636\u0627\u0641\u0629 \u0631\u062d\u0644\u0629',
     'trip_name': '\u0627\u0633\u0645 \u0627\u0644\u0631\u062d\u0644\u0629',
     'description': '\u0648\u0635\u0641',
@@ -1923,9 +2779,21 @@ class Tr {
         '\u0644\u0627 \u062a\u0645\u0644\u0643 \u0635\u0644\u0627\u062d\u064a\u0629 \u0644\u0647\u0630\u0627 \u0627\u0644\u0625\u062c\u0631\u0627\u0621',
     'groups_page':
         '\u0635\u0641\u062d\u0629 \u0627\u0644\u0645\u062c\u0645\u0648\u0639\u0627\u062a',
+    'no_groups_yet':
+        '\u0644\u0627 \u062a\u0648\u062c\u062f \u0645\u062c\u0645\u0648\u0639\u0627\u062a \u0628\u0639\u062f',
+    'groups_empty_subtitle':
+        '\u0623\u0646\u0634\u0626 \u0645\u062c\u0645\u0648\u0639\u0629 \u0644\u0628\u062f\u0621 \u0627\u0644\u062a\u062e\u0637\u064a\u0637 \u0644\u0643\u0634\u062a\u062a\u0643 \u0627\u0644\u0642\u0627\u062f\u0645\u0629',
     'guest_account': '\u062d\u0633\u0627\u0628 \u0636\u064a\u0641',
     'signed_in_account': '\u062d\u0633\u0627\u0628 \u0645\u0633\u062c\u0644',
     'sign_out': '\u062a\u0633\u062c\u064a\u0644 \u062e\u0631\u0648\u062c',
+    'favorites': '\u0627\u0644\u0645\u0641\u0636\u0644\u0629',
+    'desert': '\u0635\u062d\u0631\u0627\u0621',
+    'beach': '\u0634\u0627\u0637\u0626',
+    'family': '\u0639\u0627\u0626\u0644\u064a',
+    'edit_profile': '\u062a\u0639\u062f\u064a\u0644 \u0627\u0644\u0645\u0644\u0641',
+    'my_trips': '\u0631\u062d\u0644\u0627\u062a\u064a',
+    'admin_dashboard': '\u0644\u0648\u062d\u0629 \u0627\u0644\u0645\u0634\u0631\u0641',
+    'coming_soon': '\u0642\u0631\u064a\u0628\u0627\u064b',
   };
 
   String t(String key) {
