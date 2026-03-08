@@ -14,11 +14,10 @@ import 'providers/role_provider.dart';
 import 'services/group_service.dart';
 import 'services/place_service.dart';
 import 'services/trip_service.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-  options: DefaultFirebaseOptions.currentPlatform,
-);
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await _seedChecklistTemplatesIfEmpty();
   final firebaseOptions = Firebase.app().options;
   debugPrint('PROJECT ID: ${firebaseOptions.projectId}');
@@ -34,28 +33,22 @@ void main() async {
 
 Future<void> _seedChecklistTemplatesIfEmpty() async {
   try {
-    final templates = FirebaseFirestore.instance.collection('checklist_templates');
+    final templates = FirebaseFirestore.instance.collection(
+      'checklist_templates',
+    );
     final existing = await templates.limit(1).get();
     if (existing.docs.isNotEmpty) {
       return;
     }
 
     final defaults = <String, Map<String, String>>{
-      'tent': {
-        'name': 'Tent',
-        'category': 'Camping Gear',
-        'icon': 'tent',
-      },
+      'tent': {'name': 'Tent', 'category': 'Camping Gear', 'icon': 'tent'},
       'bbq': {
         'name': 'BBQ Set',
         'category': 'Food & Cooking',
         'icon': 'restaurant',
       },
-      'chairs': {
-        'name': 'Chairs',
-        'category': 'Comfort',
-        'icon': 'chair',
-      },
+      'chairs': {'name': 'Chairs', 'category': 'Comfort', 'icon': 'chair'},
       'water': {
         'name': 'Water',
         'category': 'Essentials',
@@ -641,9 +634,9 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _openAdminDashboard() {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const AdminDashboardPage()),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const AdminDashboardPage()));
   }
 }
 
@@ -660,236 +653,313 @@ class ExplorePage extends StatefulWidget {
   final VoidCallback onToggleLanguage;
 
   @override
-  State<ExplorePage> createState() =>
-      _ExplorePageState();
+  State<ExplorePage> createState() => _ExplorePageState();
 }
 
 class _ExplorePageState extends State<ExplorePage> {
   bool _showOnlyFavorites = false;
   String? _selectedCategoryChip;
+  void _showPlaceDetails(Map<String, dynamic> data, String placeId) {
+    int selectedRating = 0;
+    final commentController = TextEditingController();
+    Uint8List? selectedImageBytes;
 
-void _showPlaceDetails(Map<String, dynamic> data, String placeId) {
-  int selectedRating = 0;
-  final commentController = TextEditingController();
-  Uint8List? selectedImageBytes;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.75,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          builder: (context, controller) {
+            return StatefulBuilder(
+              builder: (context, setModalState) {
+                Future<void> pickImage() async {
+                  final picker = ImagePicker();
+                  final image = await picker.pickImage(
+                    source: ImageSource.gallery,
+                  );
 
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.white,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-    ),
-    builder: (context) {
-      return DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: 0.7,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        builder: (context, controller) {
-          return StatefulBuilder(
-            builder: (context, setModalState) {
-              Future<void> pickImage() async {
-                final picker = ImagePicker();
-                final image =
-                    await picker.pickImage(source: ImageSource.gallery);
-                if (image == null) return;
+                  if (image == null) return;
 
-                final bytes = await image.readAsBytes();
-                setModalState(() {
-                  selectedImageBytes = bytes;
-                });
-              }
+                  final bytes = await image.readAsBytes();
 
-              return SingleChildScrollView(
-                controller: controller,
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+                  setModalState(() {
+                    selectedImageBytes = bytes;
+                  });
+                }
 
-                    // ===== TITLE =====
-                    Text(
-                      data['name'] ?? '',
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-
-                    const SizedBox(height: 10),
-                    Text("Environment: ${data['environmentType'] ?? '-'}"),
-
-                    const SizedBox(height: 20),
-
-                    // ===== RATING STARS =====
-                    const Text("Rate this place:",
-                        style: TextStyle(fontWeight: FontWeight.bold)),
-
-                    const SizedBox(height: 8),
-
-                    Row(
-                      children: List.generate(5, (index) {
-                        return IconButton(
-                          icon: Icon(
-                            index < selectedRating
-                                ? Icons.star
-                                : Icons.star_border,
-                            color: Colors.orange,
-                          ),
-                          onPressed: () {
-                            setModalState(() {
-                              selectedRating = index + 1;
-                            });
-                          },
-                        );
-                      }),
-                    ),
-
-                    const SizedBox(height: 10),
-
-                    // ===== COMMENT FIELD =====
-                    TextField(
-                      controller: commentController,
-                      maxLines: 3,
-                      decoration: const InputDecoration(
-                        hintText: "Write your comment...",
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-
-                    const SizedBox(height: 10),
-
-                    ElevatedButton(
-                      onPressed: pickImage,
-                      child: const Text("Add Image (Optional)"),
-                    ),
-
-                    if (selectedImageBytes != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 10),
-                        child: Image.memory(
-                          selectedImageBytes!,
-                          height: 120,
+                return SingleChildScrollView(
+                  controller: controller,
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      /// ===== PLACE TITLE =====
+                      Text(
+                        data['name'] ?? '',
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
 
-                    const SizedBox(height: 15),
+                      const SizedBox(height: 8),
 
-                    // ===== SUBMIT REVIEW =====
-                    ElevatedButton(
-                      onPressed: () async {
-                        if (selectedRating == 0) return;
+                      Text("Environment: ${data['environmentType'] ?? '-'}"),
 
-                        await FirebaseFirestore.instance
+                      const SizedBox(height: 20),
+
+                      /// ===== RATING =====
+                      const Text(
+                        "Rate this place",
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      Row(
+                        children: List.generate(5, (index) {
+                          return IconButton(
+                            icon: Icon(
+                              index < selectedRating
+                                  ? Icons.star
+                                  : Icons.star_border,
+                              color: Colors.orange,
+                            ),
+                            onPressed: () {
+                              setModalState(() {
+                                selectedRating = index + 1;
+                              });
+                            },
+                          );
+                        }),
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      /// ===== COMMENT =====
+                      TextField(
+                        controller: commentController,
+                        maxLines: 3,
+                        decoration: const InputDecoration(
+                          hintText: "Write your comment...",
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      /// ===== IMAGE PICKER =====
+                      ElevatedButton(
+                        onPressed: pickImage,
+                        child: const Text("Add Image (Optional)"),
+                      ),
+
+                      if (selectedImageBytes != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 10),
+                          child: Image.memory(selectedImageBytes!, height: 120),
+                        ),
+
+                      const SizedBox(height: 15),
+
+                      /// ===== SUBMIT REVIEW =====
+                      ElevatedButton(
+                        onPressed: () async {
+                          if (selectedRating == 0) return;
+
+                          await FirebaseFirestore.instance
+                              .collection('places')
+                              .doc(placeId)
+                              .collection('reviews')
+                              .add({
+                                'userId':
+                                    FirebaseAuth.instance.currentUser?.uid,
+                                'rating': selectedRating,
+                                'comment': commentController.text.trim(),
+                                'imageBase64': selectedImageBytes == null
+                                    ? null
+                                    : base64Encode(selectedImageBytes!),
+                                'createdAt': FieldValue.serverTimestamp(),
+                              });
+
+                          Navigator.pop(context);
+                        },
+                        child: const Text("Submit Review"),
+                      ),
+
+                      const SizedBox(height: 25),
+                      const Divider(),
+                      const SizedBox(height: 10),
+
+                      /// ===== REVIEWS + PHOTOS =====
+                      StreamBuilder<QuerySnapshot>(
+                        stream: FirebaseFirestore.instance
                             .collection('places')
                             .doc(placeId)
                             .collection('reviews')
-                            .add({
-                          'userId':
-                              FirebaseAuth.instance.currentUser?.uid,
-                          'rating': selectedRating,
-                          'comment': commentController.text.trim(),
-                          'imageBase64': selectedImageBytes == null
-                              ? null
-                              : base64Encode(selectedImageBytes!),
-                          'createdAt': FieldValue.serverTimestamp(),
-                        });
+                            .snapshots(),
+                        builder: (context, snapshot) {
+                          if (!snapshot.hasData) {
+                            return const CircularProgressIndicator();
+                          }
 
-                        Navigator.pop(context);
-                      },
-                      child: const Text("Submit Review"),
-                    ),
+                          final reviews = snapshot.data!.docs;
 
-                    const SizedBox(height: 25),
+                          double avgRating = 0;
+                          if (reviews.isNotEmpty) {
+                            final total = reviews.fold<double>(
+                              0,
+                              (sum, doc) =>
+                                  sum +
+                                  ((doc.data()
+                                          as Map<String, dynamic>)['rating'] ??
+                                      0),
+                            );
+                            avgRating = total / reviews.length;
+                          }
 
-                    const Divider(),
+                          if (reviews.isEmpty) {
+                            return const Text("No reviews yet.");
+                          }
 
-                    const SizedBox(height: 10),
+                          /// ===== COLLECT IMAGES =====
+                          final images = reviews
+                              .map(
+                                (doc) =>
+                                    (doc.data()
+                                        as Map<String, dynamic>)['imageBase64'],
+                              )
+                              .where((e) => e != null && e != '')
+                              .toList();
 
-                    // ===== REVIEWS LIST =====
-                    const Text("Reviews:",
-                        style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold)),
-
-                    const SizedBox(height: 10),
-
-                    StreamBuilder<QuerySnapshot>(
-                      stream: FirebaseFirestore.instance
-                          .collection('places')
-                          .doc(placeId)
-                          .collection('reviews')
-                          .orderBy('createdAt', descending: true)
-                          .snapshots(),
-                      builder: (context, snapshot) {
-                        if (!snapshot.hasData) {
-                          return const CircularProgressIndicator();
-                        }
-
-                        final reviews = snapshot.data!.docs;
-
-                        if (reviews.isEmpty) {
-                          return const Text("No reviews yet.");
-                        }
-
-                        return Column(
-                          children: reviews.map((doc) {
-                            final review =
-                                doc.data() as Map<String, dynamic>;
-
-                            return Card(
-                              margin: const EdgeInsets.only(bottom: 10),
-                              child: Padding(
-                                padding: const EdgeInsets.all(10),
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: List.generate(
-                                        review['rating'] ?? 0,
-                                        (index) => const Icon(
-                                          Icons.star,
-                                          color: Colors.orange,
-                                          size: 18,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 5),
-                                    Text(review['comment'] ?? ''),
-                                    if (review['imageBase64'] != null)
-                                      Padding(
-                                        padding:
-                                            const EdgeInsets.only(top: 8),
-                                        child: Image.memory(
-                                          base64Decode(
-                                              review['imageBase64']),
-                                          height: 100,
-                                        ),
-                                      ),
-                                  ],
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "Average rating: ${avgRating.toStringAsFixed(1)} ⭐",
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
-                            );
-                          }).toList(),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              );
-            },
-          );
-        },
-      );
-    },
-  );
-}
 
+                              const SizedBox(height: 10),
 
+                              /// ===== PHOTOS SECTION =====
+                              if (images.isNotEmpty) ...[
+                                const Text(
+                                  "Photos",
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
 
+                                const SizedBox(height: 10),
 
+                                GridView.builder(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  gridDelegate:
+                                      const SliverGridDelegateWithFixedCrossAxisCount(
+                                        crossAxisCount: 3,
+                                        crossAxisSpacing: 6,
+                                        mainAxisSpacing: 6,
+                                      ),
+                                  itemCount: images.length,
+                                  itemBuilder: (context, index) {
+                                    final img = images[index];
+
+                                    return GestureDetector(
+                                      onTap: () {
+                                        showDialog(
+                                          context: context,
+                                          builder: (_) => Dialog(
+                                            child: InteractiveViewer(
+                                              child: Image.memory(
+                                                base64Decode(img),
+                                                fit: BoxFit.contain,
+                                              ),
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Image.memory(
+                                          base64Decode(img),
+                                          fit: BoxFit.cover,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+
+                                const SizedBox(height: 20),
+                              ],
+
+                              /// ===== REVIEWS =====
+                              const Text(
+                                "Reviews",
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+
+                              const SizedBox(height: 10),
+
+                              ...reviews.map((doc) {
+                                final review =
+                                    doc.data() as Map<String, dynamic>;
+
+                                return Card(
+                                  margin: const EdgeInsets.only(bottom: 10),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(10),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: List.generate(
+                                            review['rating'] ?? 0,
+                                            (index) => const Icon(
+                                              Icons.star,
+                                              color: Colors.orange,
+                                              size: 18,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 5),
+                                        Text(review['comment'] ?? ''),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ],
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
 
   LatLng? selectedPoint;
   final PlaceService _placeService = PlaceService();
@@ -1187,31 +1257,36 @@ void _showPlaceDetails(Map<String, dynamic> data, String placeId) {
                   }
                   final docs = snapshot.data?.docs ?? [];
                   final visibleDocs = _showOnlyFavorites
-                      ? docs.where((doc) => favoriteIds.contains(doc.id)).toList()
+                      ? docs
+                            .where((doc) => favoriteIds.contains(doc.id))
+                            .toList()
                       : docs;
-                  final approvedMarkers = visibleDocs.map((doc) {
-                    final data = doc.data();
-                    final lat = (data['lat'] as num?)?.toDouble();
-                    final lng = (data['lng'] as num?)?.toDouble();
-                    if (lat == null || lng == null) {
-                      return null;
-                    }
-                    return Marker(
-                      point: LatLng(lat, lng),
-                      width: 36,
-                      height: 36,
-                      child: GestureDetector(
-                        onTap: () {
-                          _showPlaceDetails(data, doc.id);
-                        },
-                        child: const Icon(
-                          Icons.location_on,
-                          color: Colors.red,
-                          size: 36,
-                        ),
-                      ),
-                    );
-                  }).whereType<Marker>().toList();
+                  final approvedMarkers = visibleDocs
+                      .map((doc) {
+                        final data = doc.data();
+                        final lat = (data['lat'] as num?)?.toDouble();
+                        final lng = (data['lng'] as num?)?.toDouble();
+                        if (lat == null || lng == null) {
+                          return null;
+                        }
+                        return Marker(
+                          point: LatLng(lat, lng),
+                          width: 36,
+                          height: 36,
+                          child: GestureDetector(
+                            onTap: () {
+                              _showPlaceDetails(data, doc.id);
+                            },
+                            child: const Icon(
+                              Icons.location_on,
+                              color: Colors.red,
+                              size: 36,
+                            ),
+                          ),
+                        );
+                      })
+                      .whereType<Marker>()
+                      .toList();
 
                   final allMarkers = <Marker>[
                     ...approvedMarkers,
@@ -1241,10 +1316,12 @@ void _showPlaceDetails(Map<String, dynamic> data, String placeId) {
                     ),
                     children: [
                       TileLayer(
-                        urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        urlTemplate:
+                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                         userAgentPackageName: 'com.example.kashta',
                       ),
-                      if (allMarkers.isNotEmpty) MarkerLayer(markers: allMarkers),
+                      if (allMarkers.isNotEmpty)
+                        MarkerLayer(markers: allMarkers),
                     ],
                   );
                 },
@@ -1290,7 +1367,8 @@ class TripsPage extends StatelessWidget {
           if (snapshot.hasError) {
             final error = snapshot.error;
             _logFirestoreReadError('trips', error);
-            if (error is FirebaseException && error.code == 'permission-denied') {
+            if (error is FirebaseException &&
+                error.code == 'permission-denied') {
               return Center(child: Text(tr.t('permission_denied')));
             }
             if (error is FirebaseException) {
@@ -1301,9 +1379,7 @@ class TripsPage extends StatelessWidget {
                 );
               }
             }
-            return Center(
-              child: Text(tr.t('load_error')),
-            );
+            return Center(child: Text(tr.t('load_error')));
           }
           final docs = snapshot.data?.docs ?? [];
           final today = DateTime.now();
@@ -1393,14 +1469,18 @@ class TripsPage extends StatelessWidget {
                             const SizedBox(width: 8),
                             IconButton(
                               tooltip: tr.t('trip_checklist'),
-                              icon: const Icon(Icons.checklist, color: Colors.orange),
+                              icon: const Icon(
+                                Icons.checklist,
+                                color: Colors.orange,
+                              ),
                               onPressed: () {
                                 Navigator.of(context).push(
                                   MaterialPageRoute(
                                     builder: (_) => TripChecklistPage(
                                       tr: tr,
                                       tripId: doc.id,
-                                      tripTitle: (data['title'] ?? '').toString(),
+                                      tripTitle: (data['title'] ?? '')
+                                          .toString(),
                                     ),
                                   ),
                                 );
@@ -1435,10 +1515,7 @@ class TripsPage extends StatelessWidget {
 }
 
 class _TripStatCard extends StatelessWidget {
-  const _TripStatCard({
-    required this.title,
-    required this.value,
-  });
+  const _TripStatCard({required this.title, required this.value});
 
   final String title;
   final int value;
@@ -1456,10 +1533,7 @@ class _TripStatCard extends StatelessWidget {
           children: [
             Text(
               title,
-              style: TextStyle(
-                color: Colors.grey.shade700,
-                fontSize: 13,
-              ),
+              style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
             ),
             const SizedBox(height: 6),
             Text(
@@ -1500,19 +1574,19 @@ class AddChecklistItemsPage extends StatelessWidget {
           .collection('checklist')
           .doc(templateId)
           .set({
-        'name': (data['name'] ?? '').toString(),
-        'category': (data['category'] ?? '').toString(),
-        'icon': (data['icon'] ?? 'checklist').toString(),
-        'done': false,
-        'addedBy': userId ?? 'unknown',
-        'assignedTo': null,
-        'createdAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+            'name': (data['name'] ?? '').toString(),
+            'category': (data['category'] ?? '').toString(),
+            'icon': (data['icon'] ?? 'checklist').toString(),
+            'done': false,
+            'addedBy': userId ?? 'unknown',
+            'assignedTo': null,
+            'createdAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
 
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(tr.t('checklist_item_added'))),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(tr.t('checklist_item_added'))));
       }
     } on FirebaseException catch (e) {
       if (context.mounted) {
@@ -1520,9 +1594,9 @@ class AddChecklistItemsPage extends StatelessWidget {
       }
     } catch (_) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(tr.t('save_failed'))),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(tr.t('save_failed'))));
       }
     }
   }
@@ -1533,13 +1607,18 @@ class AddChecklistItemsPage extends StatelessWidget {
       appBar: AppBar(title: Text(tr.t('add_checklist_items'))),
       backgroundColor: Colors.white,
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: FirebaseFirestore.instance.collection('checklist_templates').snapshots(),
+        stream: FirebaseFirestore.instance
+            .collection('checklist_templates')
+            .snapshots(),
         builder: (context, templatesSnapshot) {
           if (templatesSnapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
           if (templatesSnapshot.hasError) {
-            _logFirestoreReadError('checklist_templates', templatesSnapshot.error);
+            _logFirestoreReadError(
+              'checklist_templates',
+              templatesSnapshot.error,
+            );
             return Center(child: Text(tr.t('load_error')));
           }
 
@@ -1556,11 +1635,13 @@ class AddChecklistItemsPage extends StatelessWidget {
                 .snapshots(),
             builder: (context, checklistSnapshot) {
               if (checklistSnapshot.hasError) {
-                _logFirestoreReadError('trips/*/checklist', checklistSnapshot.error);
+                _logFirestoreReadError(
+                  'trips/*/checklist',
+                  checklistSnapshot.error,
+                );
               }
-              final existingIds = checklistSnapshot.data?.docs
-                      .map((doc) => doc.id)
-                      .toSet() ??
+              final existingIds =
+                  checklistSnapshot.data?.docs.map((doc) => doc.id).toSet() ??
                   <String>{};
 
               final grouped =
@@ -1604,11 +1685,15 @@ class AddChecklistItemsPage extends StatelessWidget {
                       ),
                       children: items.map((itemDoc) {
                         final data = itemDoc.data();
-                        final iconName = (data['icon'] ?? 'checklist').toString();
+                        final iconName = (data['icon'] ?? 'checklist')
+                            .toString();
                         final name = (data['name'] ?? '').toString();
                         final alreadyAdded = existingIds.contains(itemDoc.id);
                         return ListTile(
-                          leading: Icon(_iconFromName(iconName), color: Colors.orange),
+                          leading: Icon(
+                            _iconFromName(iconName),
+                            color: Colors.orange,
+                          ),
                           title: Text(name),
                           trailing: alreadyAdded
                               ? Row(
@@ -1696,10 +1781,7 @@ class TripChecklistPage extends StatelessWidget {
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (_) => AddChecklistItemsPage(
-                    tr: tr,
-                    tripId: tripId,
-                  ),
+                  builder: (_) => AddChecklistItemsPage(tr: tr, tripId: tripId),
                 ),
               );
             },
@@ -1726,7 +1808,9 @@ class TripChecklistPage extends StatelessWidget {
           final docs = snapshot.data?.docs ?? [];
           final sortedDocs = _sortChecklistByCompletion(docs);
           final totalItems = sortedDocs.length;
-          final doneCount = sortedDocs.where((doc) => doc.data()['done'] == true).length;
+          final doneCount = sortedDocs
+              .where((doc) => doc.data()['done'] == true)
+              .length;
           final progress = _checklistProgressValue(
             doneCount: doneCount,
             totalCount: totalItems,
@@ -1754,9 +1838,7 @@ class TripChecklistPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 24),
                   Expanded(
-                    child: Center(
-                      child: Text(tr.t('no_checklist_items')),
-                    ),
+                    child: Center(child: Text(tr.t('no_checklist_items'))),
                   ),
                 ],
               ),
@@ -1778,7 +1860,9 @@ class TripChecklistPage extends StatelessWidget {
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text('$doneCount / $totalItems ${tr.t('items_completed')}'),
+                child: Text(
+                  '$doneCount / $totalItems ${tr.t('items_completed')}',
+                ),
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
@@ -1852,10 +1936,7 @@ class TripChecklistPage extends StatelessWidget {
         onPressed: () {
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (_) => AddChecklistItemsPage(
-                tr: tr,
-                tripId: tripId,
-              ),
+              builder: (_) => AddChecklistItemsPage(tr: tr, tripId: tripId),
             ),
           );
         },
@@ -2051,9 +2132,7 @@ class _GroupsPageState extends State<GroupsPage> {
         onToggleLanguage: widget.onToggleLanguage,
       ),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: FirebaseFirestore.instance
-            .collection('groups')
-            .snapshots(),
+        stream: FirebaseFirestore.instance.collection('groups').snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -2061,7 +2140,8 @@ class _GroupsPageState extends State<GroupsPage> {
           if (snapshot.hasError) {
             final error = snapshot.error;
             _logFirestoreReadError('groups', error);
-            if (error is FirebaseException && error.code == 'permission-denied') {
+            if (error is FirebaseException &&
+                error.code == 'permission-denied') {
               return Center(child: Text(widget.tr.t('permission_denied')));
             }
             if (error is FirebaseException) {
@@ -2082,11 +2162,7 @@ class _GroupsPageState extends State<GroupsPage> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(
-                      Icons.groups,
-                      size: 72,
-                      color: Colors.orange,
-                    ),
+                    const Icon(Icons.groups, size: 72, color: Colors.orange),
                     const SizedBox(height: 16),
                     Text(
                       widget.tr.t('no_groups_yet'),
@@ -2128,7 +2204,8 @@ class _GroupsPageState extends State<GroupsPage> {
       ),
       floatingActionButton: Consumer<RoleProvider>(
         builder: (context, provider, child) {
-          final canCreate = provider.roles['groupOrganizer'] == true ||
+          final canCreate =
+              provider.roles['groupOrganizer'] == true ||
               provider.roles['admin'] == true;
           if (!canCreate) {
             return const SizedBox.shrink();
@@ -2141,10 +2218,8 @@ class _GroupsPageState extends State<GroupsPage> {
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (_) => AddGroupPage(
-                    tr: widget.tr,
-                    groupService: _groupService,
-                  ),
+                  builder: (_) =>
+                      AddGroupPage(tr: widget.tr, groupService: _groupService),
                 ),
               );
             },
@@ -2156,11 +2231,7 @@ class _GroupsPageState extends State<GroupsPage> {
 }
 
 class AddGroupPage extends StatefulWidget {
-  const AddGroupPage({
-    super.key,
-    required this.tr,
-    required this.groupService,
-  });
+  const AddGroupPage({super.key, required this.tr, required this.groupService});
 
   final Tr tr;
   final GroupService groupService;
@@ -2227,9 +2298,9 @@ class _AddGroupPageState extends State<AddGroupPage> {
   Future<void> _save() async {
     if (_nameController.text.trim().isEmpty ||
         _descriptionController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(widget.tr.t('fill_all_fields'))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(widget.tr.t('fill_all_fields'))));
       return;
     }
 
@@ -2249,9 +2320,9 @@ class _AddGroupPageState extends State<AddGroupPage> {
       }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(widget.tr.t('save_failed'))),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(widget.tr.t('save_failed'))));
       }
     } finally {
       if (mounted) {
@@ -2281,7 +2352,9 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   void _showComingSoon(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -2302,7 +2375,9 @@ class _ProfilePageState extends State<ProfilePage> {
           ListTile(
             leading: const Icon(Icons.account_circle_outlined),
             title: Text(
-              isAnonymous ? widget.tr.t('guest_account') : widget.tr.t('signed_in_account'),
+              isAnonymous
+                  ? widget.tr.t('guest_account')
+                  : widget.tr.t('signed_in_account'),
             ),
           ),
           const SizedBox(height: 8),
@@ -2330,7 +2405,10 @@ class _ProfilePageState extends State<ProfilePage> {
           if (isAdmin)
             Card(
               child: ListTile(
-                leading: const Icon(Icons.shield_outlined, color: Colors.orange),
+                leading: const Icon(
+                  Icons.shield_outlined,
+                  color: Colors.orange,
+                ),
                 title: Text(widget.tr.t('admin_dashboard')),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: widget.onOpenAdminDashboard,
@@ -2358,9 +2436,7 @@ class AdminDashboardPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final provider = context.watch<RoleProvider>();
     if (!provider.isAdmin) {
-      return const Scaffold(
-        body: Center(child: Text('Access denied')),
-      );
+      return const Scaffold(body: Center(child: Text('Access denied')));
     }
 
     return Scaffold(
@@ -2379,7 +2455,8 @@ class AdminDashboardPage extends StatelessWidget {
             if (pendingSnapshot.hasError) {
               _logFirestoreReadError('places', pendingSnapshot.error);
               final error = pendingSnapshot.error;
-              if (error is FirebaseException && error.code == 'permission-denied') {
+              if (error is FirebaseException &&
+                  error.code == 'permission-denied') {
                 return const Center(child: Text('Permission denied'));
               }
               return const Center(
@@ -2425,9 +2502,7 @@ class _PendingPlacesPageState extends State<PendingPlacesPage> {
   Widget build(BuildContext context) {
     final provider = context.watch<RoleProvider>();
     if (!provider.isAdmin) {
-      return const Scaffold(
-        body: Center(child: Text('Access denied')),
-      );
+      return const Scaffold(body: Center(child: Text('Access denied')));
     }
 
     return Scaffold(
@@ -2444,7 +2519,8 @@ class _PendingPlacesPageState extends State<PendingPlacesPage> {
           if (pendingSnapshot.hasError) {
             final error = pendingSnapshot.error;
             _logFirestoreReadError('places', error);
-            if (error is FirebaseException && error.code == 'permission-denied') {
+            if (error is FirebaseException &&
+                error.code == 'permission-denied') {
               return const Center(child: Text('Permission denied'));
             }
             return const Center(child: Text('Failed to load pending places'));
@@ -2508,9 +2584,9 @@ class _PendingPlacesPageState extends State<PendingPlacesPage> {
                               onPressed: isBusy
                                   ? null
                                   : () => _handleApproveReject(
-                                        placeId: placeId,
-                                        approve: true,
-                                      ),
+                                      placeId: placeId,
+                                      approve: true,
+                                    ),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.green,
                                 foregroundColor: Colors.white,
@@ -2524,9 +2600,9 @@ class _PendingPlacesPageState extends State<PendingPlacesPage> {
                               onPressed: isBusy
                                   ? null
                                   : () => _handleApproveReject(
-                                        placeId: placeId,
-                                        approve: false,
-                                      ),
+                                      placeId: placeId,
+                                      approve: false,
+                                    ),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.red,
                                 foregroundColor: Colors.white,
@@ -2742,7 +2818,8 @@ class Tr {
         '\u0642\u0627\u0626\u0645\u0629 \u0627\u0644\u062a\u062c\u0647\u064a\u0632 \u0644\u0644\u0631\u062d\u0644\u0629',
     'add_checklist_items':
         '\u0625\u0636\u0627\u0641\u0629 \u0639\u0646\u0627\u0635\u0631 \u0627\u0644\u0642\u0627\u0626\u0645\u0629',
-    'add_items': '\u0625\u0636\u0627\u0641\u0629 \u0639\u0646\u0627\u0635\u0631',
+    'add_items':
+        '\u0625\u0636\u0627\u0641\u0629 \u0639\u0646\u0627\u0635\u0631',
     'add_from_template':
         '\u0625\u0636\u0627\u0641\u0629 \u0645\u0646 \u0627\u0644\u0642\u0627\u0644\u0628',
     'added': '\u062a\u0645\u062a \u0625\u0636\u0627\u0641\u062a\u0647',
@@ -2790,9 +2867,11 @@ class Tr {
     'desert': '\u0635\u062d\u0631\u0627\u0621',
     'beach': '\u0634\u0627\u0637\u0626',
     'family': '\u0639\u0627\u0626\u0644\u064a',
-    'edit_profile': '\u062a\u0639\u062f\u064a\u0644 \u0627\u0644\u0645\u0644\u0641',
+    'edit_profile':
+        '\u062a\u0639\u062f\u064a\u0644 \u0627\u0644\u0645\u0644\u0641',
     'my_trips': '\u0631\u062d\u0644\u0627\u062a\u064a',
-    'admin_dashboard': '\u0644\u0648\u062d\u0629 \u0627\u0644\u0645\u0634\u0631\u0641',
+    'admin_dashboard':
+        '\u0644\u0648\u062d\u0629 \u0627\u0644\u0645\u0634\u0631\u0641',
     'coming_soon': '\u0642\u0631\u064a\u0628\u0627\u064b',
   };
 
