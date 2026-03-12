@@ -14,6 +14,7 @@ import 'providers/role_provider.dart';
 import 'services/group_service.dart';
 import 'services/place_service.dart';
 import 'services/trip_service.dart';
+import 'package:http/http.dart' as http;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -640,6 +641,35 @@ class _MainScreenState extends State<MainScreen> {
   }
 }
 
+Future<Map<String, dynamic>?> getWeather(double lat, double lon) async {
+  const apiKey = "00d90bb41bd1aa8875aaa0f729a42613";
+
+  final url =
+      "https://api.openweathermap.org/data/2.5/weather?lat=$lat&lon=$lon&appid=$apiKey&units=metric";
+
+  print("WEATHER URL:");
+  print(url);
+
+  final response = await http.get(Uri.parse(url));
+
+  print("STATUS:");
+  print(response.statusCode);
+
+  print("BODY:");
+  print(response.body);
+
+  if (response.statusCode == 200) {
+    final data = jsonDecode(response.body);
+
+    return {
+      "temp": data["main"]["temp"],        // temperature
+      "weather": data["weather"][0]["main"], // Clouds / Rain / Clear
+      "wind": data["wind"]["speed"]        // wind speed
+    };
+  }
+
+  return null;
+}
 class ExplorePage extends StatefulWidget {
   const ExplorePage({
     super.key,
@@ -660,6 +690,7 @@ class _ExplorePageState extends State<ExplorePage> {
   bool _showOnlyFavorites = false;
   String? _selectedCategoryChip;
   void _showPlaceDetails(Map<String, dynamic> data, String placeId) {
+    
     int selectedRating = 0;
     final commentController = TextEditingController();
     Uint8List? selectedImageBytes;
@@ -714,6 +745,77 @@ class _ExplorePageState extends State<ExplorePage> {
 
                       Text("Environment: ${data['environmentType'] ?? '-'}"),
 
+                      
+
+                      const SizedBox(height: 8),
+
+FutureBuilder<Map<String, dynamic>?>(
+  future: getWeather(
+    (data['lat'] as num).toDouble(),
+    (data['lng'] as num).toDouble(),
+  ),
+  builder: (context, snapshot) {
+    print("PLACE DATA:");
+print(data);
+
+    if (snapshot.connectionState == ConnectionState.waiting) {
+      return const Text("Loading weather...");
+    }
+
+    if (!snapshot.hasData) {
+      return const Text("Weather unavailable");
+    }
+
+    final temp = snapshot.data!["temp"];
+final weather = snapshot.data!["weather"];
+final wind = snapshot.data!["wind"];
+
+String kashtaCondition = "Good";
+
+if (weather == "Rain" || wind > 8) {
+  kashtaCondition = "Bad";
+}
+
+return Column(
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+
+    Row(
+      children: [
+        const Icon(Icons.thermostat, color: Colors.orange),
+        const SizedBox(width: 6),
+        Text("${temp.toStringAsFixed(1)} °C"),
+      ],
+    ),
+
+    Row(
+      children: [
+        const Icon(Icons.cloud, color: Colors.grey),
+        const SizedBox(width: 6),
+        Text("Weather: $weather"),
+      ],
+    ),
+
+    Row(
+      children: [
+        const Icon(Icons.air, color: Colors.blue),
+        const SizedBox(width: 6),
+        Text("Wind: $wind m/s"),
+      ],
+    ),
+
+    Row(
+      children: [
+        const Icon(Icons.emoji_nature, color: Colors.green),
+        const SizedBox(width: 6),
+        Text("Kashta conditions: $kashtaCondition"),
+      ],
+    ),
+
+  ],
+);
+  },
+),
                       const SizedBox(height: 20),
 
                       /// ===== RATING =====
