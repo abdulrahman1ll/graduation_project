@@ -61,7 +61,7 @@ Future<void> _seedChecklistTemplatesIfEmpty() async {
         'icon': 'flashlight_on',
       },
     };
-
+//fsfds
     final batch = FirebaseFirestore.instance.batch();
     defaults.forEach((docId, data) {
       batch.set(templates.doc(docId), data);
