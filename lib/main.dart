@@ -3,9 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'package:image_picker/image_picker.dart';
@@ -14,7 +13,7 @@ import 'providers/role_provider.dart';
 import 'services/group_service.dart';
 import 'services/place_service.dart';
 import 'services/trip_service.dart';
-import 'package:http/http.dart' as http;
+import 'services/weather_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -641,35 +640,6 @@ class _MainScreenState extends State<MainScreen> {
   }
 }
 
-Future<Map<String, dynamic>?> getWeather(double lat, double lon) async {
-  const apiKey = "00d90bb41bd1aa8875aaa0f729a42613";
-
-  final url =
-      "https://api.openweathermap.org/data/2.5/weather?lat=$lat&lon=$lon&appid=$apiKey&units=metric";
-
-  print("WEATHER URL:");
-  print(url);
-
-  final response = await http.get(Uri.parse(url));
-
-  print("STATUS:");
-  print(response.statusCode);
-
-  print("BODY:");
-  print(response.body);
-
-  if (response.statusCode == 200) {
-    final data = jsonDecode(response.body);
-
-    return {
-      "temp": data["main"]["temp"],        // temperature
-      "weather": data["weather"][0]["main"], // Clouds / Rain / Clear
-      "wind": data["wind"]["speed"]        // wind speed
-    };
-  }
-
-  return null;
-}
 class ExplorePage extends StatefulWidget {
   const ExplorePage({
     super.key,
@@ -689,6 +659,7 @@ class ExplorePage extends StatefulWidget {
 class _ExplorePageState extends State<ExplorePage> {
   bool _showOnlyFavorites = false;
   String? _selectedCategoryChip;
+  final WeatherService _weatherService = WeatherService();
   void _showPlaceDetails(Map<String, dynamic> data, String placeId) {
     
     int selectedRating = 0;
@@ -750,13 +721,13 @@ class _ExplorePageState extends State<ExplorePage> {
                       const SizedBox(height: 8),
 
 FutureBuilder<Map<String, dynamic>?>(
-  future: getWeather(
+  future: _weatherService.getWeather(
     (data['lat'] as num).toDouble(),
     (data['lng'] as num).toDouble(),
   ),
   builder: (context, snapshot) {
-    print("PLACE DATA:");
-print(data);
+    debugPrint("PLACE DATA:");
+debugPrint(data.toString());
 
     if (snapshot.connectionState == ConnectionState.waiting) {
       return const Text("Loading weather...");
@@ -877,6 +848,7 @@ return Column(
                         onPressed: () async {
                           if (selectedRating == 0) return;
 
+                          final navigator = Navigator.of(context);
                           await FirebaseFirestore.instance
                               .collection('places')
                               .doc(placeId)
@@ -892,7 +864,7 @@ return Column(
                                 'createdAt': FieldValue.serverTimestamp(),
                               });
 
-                          Navigator.pop(context);
+                          navigator.pop();
                         },
                         child: const Text("Submit Review"),
                       ),
@@ -919,8 +891,8 @@ return Column(
                           if (reviews.isNotEmpty) {
                             final total = reviews.fold<double>(
                               0,
-                              (sum, doc) =>
-                                  sum +
+                              (total, doc) =>
+                                  total +
                                   ((doc.data()
                                           as Map<String, dynamic>)['rating'] ??
                                       0),
@@ -1047,7 +1019,7 @@ return Column(
                                     ),
                                   ),
                                 );
-                              }).toList(),
+                              }),
                             ],
                           );
                         },
@@ -1363,68 +1335,50 @@ return Column(
                             .where((doc) => favoriteIds.contains(doc.id))
                             .toList()
                       : docs;
-                  final approvedMarkers = visibleDocs
-                      .map((doc) {
-                        final data = doc.data();
-                        final lat = (data['lat'] as num?)?.toDouble();
-                        final lng = (data['lng'] as num?)?.toDouble();
-                        if (lat == null || lng == null) {
-                          return null;
-                        }
-                        return Marker(
-                          point: LatLng(lat, lng),
-                          width: 36,
-                          height: 36,
-                          child: GestureDetector(
-                            onTap: () {
-                              _showPlaceDetails(data, doc.id);
-                            },
-                            child: const Icon(
-                              Icons.location_on,
-                              color: Colors.red,
-                              size: 36,
-                            ),
-                          ),
-                        );
-                      })
-                      .whereType<Marker>()
-                      .toList();
+                  final approvedMarkers = visibleDocs.map((doc) {
+                    final data = doc.data();
+                    final lat = (data['lat'] as num?)?.toDouble();
+                    final lng = (data['lng'] as num?)?.toDouble();
+                    if (lat == null || lng == null) {
+                      return null;
+                    }
+                    return Marker(
+                      markerId: MarkerId(doc.id),
+                      position: LatLng(lat, lng),
+                      onTap: () => _showPlaceDetails(data, doc.id),
+                      icon: BitmapDescriptor.defaultMarkerWithHue(
+                        BitmapDescriptor.hueRed,
+                      ),
+                    );
+                  }).whereType<Marker>().toSet();
 
-                  final allMarkers = <Marker>[
+                  final allMarkers = <Marker>{
                     ...approvedMarkers,
                     if (selectedPoint != null)
                       Marker(
-                        point: selectedPoint!,
-                        width: 40,
-                        height: 40,
-                        child: const Icon(
-                          Icons.location_on,
-                          color: Colors.blue,
-                          size: 40,
+                        markerId: const MarkerId('selected_point'),
+                        position: selectedPoint!,
+                        icon: BitmapDescriptor.defaultMarkerWithHue(
+                          BitmapDescriptor.hueBlue,
                         ),
                       ),
-                  ];
+                  };
 
-                  return FlutterMap(
-                    options: MapOptions(
-                      initialCenter: const LatLng(21.4858, 39.1925),
-                      initialZoom: 11,
-                      onTap: (tapPosition, point) {
-                        setState(() {
-                          selectedPoint = point;
-                        });
-                        _openAddPlaceForm(point.latitude, point.longitude);
-                      },
+                  return GoogleMap(
+                    initialCameraPosition: const CameraPosition(
+                      target: LatLng(21.5433, 39.1728),
+                      zoom: 12,
                     ),
-                    children: [
-                      TileLayer(
-                        urlTemplate:
-                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                        userAgentPackageName: 'com.example.kashta',
-                      ),
-                      if (allMarkers.isNotEmpty)
-                        MarkerLayer(markers: allMarkers),
-                    ],
+                    myLocationEnabled: true,
+                    myLocationButtonEnabled: true,
+                    zoomControlsEnabled: true,
+                    onTap: (point) {
+                      setState(() {
+                        selectedPoint = point;
+                      });
+                      _openAddPlaceForm(point.latitude, point.longitude);
+                    },
+                    markers: allMarkers,
                   );
                 },
               );
