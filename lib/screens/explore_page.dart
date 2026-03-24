@@ -19,23 +19,57 @@ class ExplorePage extends StatefulWidget {
 class _ExplorePageState extends State<ExplorePage> {
   bool _showOnlyFavorites = false;
   String? _selectedCategoryChip;
+  String? _preferredPlaceType;
+
   final WeatherService _weatherService = WeatherService();
+
   static const String _directionsApiKey = String.fromEnvironment(
     'GOOGLE_MAPS_API_KEY',
     defaultValue: 'AIzaSyBwKTf5-oHsyPHv_-qF1r3fbcDU9Nsm2yQ',
   );
+
   GoogleMapController? _mapController;
   LatLng? _userLocation;
   bool _hasCenteredOnUserLocation = false;
+
   Set<Polyline> _routePolylines = <Polyline>{};
   String? _routeDistanceText;
   String? _routeDurationText;
   bool _isFetchingRoute = false;
 
+  LatLng? selectedPoint;
+  final PlaceService _placeService = PlaceService();
+
+ Future<void> _loadUserPreferences() async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) return;
+
+  print("CURRENT UID: ${user.uid}");
+
+  final doc = await FirebaseFirestore.instance
+      .collection('users')
+      .doc(user.uid)
+      .get();
+
+  print("USER DOC EXISTS: ${doc.exists}");
+  print("USER DOC DATA: ${doc.data()}");
+
+  if (!doc.exists) return;
+
+  final data = doc.data();
+  final prefs = data?['preferences'] as Map<String, dynamic>?;
+
+  setState(() {
+    _preferredPlaceType = prefs?['placeType']?.toString();
+  });
+
+  print("PREFERRED PLACE TYPE: $_preferredPlaceType");
+}
   @override
   void initState() {
     super.initState();
     _loadCurrentUserLocation();
+    _loadUserPreferences();
   }
 
   @override
@@ -177,15 +211,14 @@ class _ExplorePageState extends State<ExplorePage> {
 
       final leg = legs.first as Map<String, dynamic>;
       final distanceText =
-          (leg['distance'] as Map<String, dynamic>?)?['text'] as String? ??
-          '';
+          (leg['distance'] as Map<String, dynamic>?)?['text'] as String? ?? '';
       final durationText =
-          (leg['duration'] as Map<String, dynamic>?)?['text'] as String? ??
-          '';
+          (leg['duration'] as Map<String, dynamic>?)?['text'] as String? ?? '';
       final encodedPolyline =
           (route['overview_polyline'] as Map<String, dynamic>?)?['points']
               as String? ??
           '';
+
       if (encodedPolyline.isEmpty) {
         throw Exception('Route path is unavailable.');
       }
@@ -297,7 +330,6 @@ class _ExplorePageState extends State<ExplorePage> {
   }
 
   void _showPlaceDetails(Map<String, dynamic> data, String placeId) {
-    
     int selectedRating = 0;
     final commentController = TextEditingController();
     Uint8List? selectedImageBytes;
@@ -339,7 +371,6 @@ class _ExplorePageState extends State<ExplorePage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      /// ===== PLACE TITLE =====
                       Text(
                         data['name'] ?? '',
                         style: const TextStyle(
@@ -347,90 +378,85 @@ class _ExplorePageState extends State<ExplorePage> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-
                       const SizedBox(height: 8),
-
                       Text("Environment: ${data['environmentType'] ?? '-'}"),
-
-                      
-
                       const SizedBox(height: 8),
 
-FutureBuilder<Map<String, dynamic>?>(
-  future: _weatherService.getWeather(
-    (data['lat'] as num).toDouble(),
-    (data['lng'] as num).toDouble(),
-  ),
-  builder: (context, snapshot) {
-    debugPrint("PLACE DATA:");
-debugPrint(data.toString());
+                      FutureBuilder<Map<String, dynamic>?>(
+                        future: _weatherService.getWeather(
+                          (data['lat'] as num).toDouble(),
+                          (data['lng'] as num).toDouble(),
+                        ),
+                        builder: (context, snapshot) {
+                          debugPrint("PLACE DATA:");
+                          debugPrint(data.toString());
 
-    if (snapshot.connectionState == ConnectionState.waiting) {
-      return const Text("Loading weather...");
-    }
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Text("Loading weather...");
+                          }
 
-    if (!snapshot.hasData) {
-      return const Text("Weather unavailable");
-    }
+                          if (!snapshot.hasData) {
+                            return const Text("Weather unavailable");
+                          }
 
-    final temp = snapshot.data!["temp"];
-final weather = snapshot.data!["weather"];
-final wind = snapshot.data!["wind"];
+                          final temp = snapshot.data!["temp"];
+                          final weather = snapshot.data!["weather"];
+                          final wind = snapshot.data!["wind"];
 
-String kashtaCondition = "Good";
+                          String kashtaCondition = "Good";
+                          if (weather == "Rain" || wind > 8) {
+                            kashtaCondition = "Bad";
+                          }
 
-if (weather == "Rain" || wind > 8) {
-  kashtaCondition = "Bad";
-}
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.thermostat,
+                                    color: Colors.orange,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text("${temp.toStringAsFixed(1)} °C"),
+                                ],
+                              ),
+                              Row(
+                                children: [
+                                  const Icon(Icons.cloud, color: Colors.grey),
+                                  const SizedBox(width: 6),
+                                  Text("Weather: $weather"),
+                                ],
+                              ),
+                              Row(
+                                children: [
+                                  const Icon(Icons.air, color: Colors.blue),
+                                  const SizedBox(width: 6),
+                                  Text("Wind: $wind m/s"),
+                                ],
+                              ),
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.emoji_nature,
+                                    color: Colors.green,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text("Kashta conditions: $kashtaCondition"),
+                                ],
+                              ),
+                            ],
+                          );
+                        },
+                      ),
 
-return Column(
-  crossAxisAlignment: CrossAxisAlignment.start,
-  children: [
-
-    Row(
-      children: [
-        const Icon(Icons.thermostat, color: Colors.orange),
-        const SizedBox(width: 6),
-        Text("${temp.toStringAsFixed(1)} °C"),
-      ],
-    ),
-
-    Row(
-      children: [
-        const Icon(Icons.cloud, color: Colors.grey),
-        const SizedBox(width: 6),
-        Text("Weather: $weather"),
-      ],
-    ),
-
-    Row(
-      children: [
-        const Icon(Icons.air, color: Colors.blue),
-        const SizedBox(width: 6),
-        Text("Wind: $wind m/s"),
-      ],
-    ),
-
-    Row(
-      children: [
-        const Icon(Icons.emoji_nature, color: Colors.green),
-        const SizedBox(width: 6),
-        Text("Kashta conditions: $kashtaCondition"),
-      ],
-    ),
-
-  ],
-);
-  },
-),
                       const SizedBox(height: 20),
 
-                      /// ===== RATING =====
                       const Text(
                         "Rate this place",
                         style: TextStyle(fontWeight: FontWeight.bold),
                       ),
-
                       const SizedBox(height: 8),
 
                       Row(
@@ -453,7 +479,6 @@ return Column(
 
                       const SizedBox(height: 10),
 
-                      /// ===== COMMENT =====
                       TextField(
                         controller: commentController,
                         maxLines: 3,
@@ -465,7 +490,6 @@ return Column(
 
                       const SizedBox(height: 10),
 
-                      /// ===== IMAGE PICKER =====
                       ElevatedButton(
                         onPressed: pickImage,
                         child: const Text("Add Image (Optional)"),
@@ -479,7 +503,6 @@ return Column(
 
                       const SizedBox(height: 15),
 
-                      /// ===== SUBMIT REVIEW =====
                       ElevatedButton(
                         onPressed: () async {
                           if (selectedRating == 0) return;
@@ -509,7 +532,6 @@ return Column(
                       const Divider(),
                       const SizedBox(height: 10),
 
-                      /// ===== REVIEWS + PHOTOS =====
                       StreamBuilder<QuerySnapshot>(
                         stream: FirebaseFirestore.instance
                             .collection('places')
@@ -540,7 +562,6 @@ return Column(
                             return const Text("No reviews yet.");
                           }
 
-                          /// ===== COLLECT IMAGES =====
                           final images = reviews
                               .map(
                                 (doc) =>
@@ -563,7 +584,6 @@ return Column(
 
                               const SizedBox(height: 10),
 
-                              /// ===== PHOTOS SECTION =====
                               if (images.isNotEmpty) ...[
                                 const Text(
                                   "Photos",
@@ -572,9 +592,7 @@ return Column(
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
-
                                 const SizedBox(height: 10),
-
                                 GridView.builder(
                                   shrinkWrap: true,
                                   physics: const NeverScrollableScrollPhysics(),
@@ -612,11 +630,9 @@ return Column(
                                     );
                                   },
                                 ),
-
                                 const SizedBox(height: 20),
                               ],
 
-                              /// ===== REVIEWS =====
                               const Text(
                                 "Reviews",
                                 style: TextStyle(
@@ -624,7 +640,6 @@ return Column(
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-
                               const SizedBox(height: 10),
 
                               ...reviews.map((doc) {
@@ -671,8 +686,6 @@ return Column(
     );
   }
 
-  LatLng? selectedPoint;
-  final PlaceService _placeService = PlaceService();
   Stream<Set<String>> _favoritePlaceIdsStream() {
     final userId = FirebaseAuth.instance.currentUser?.uid;
     if (userId == null) {
@@ -954,6 +967,7 @@ return Column(
                   favoritesSnapshot.error,
                 );
               }
+
               final favoriteIds = favoritesSnapshot.data ?? <String>{};
 
               return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -965,34 +979,54 @@ return Column(
                   if (snapshot.hasError) {
                     logFirestoreReadError('places', snapshot.error);
                   }
+
                   final docs = snapshot.data?.docs ?? [];
+
+                  final recommendedDocs = docs.where((doc) {
+                    final data = doc.data();
+
+                    final placeType = data['environmentType']
+                        ?.toString()
+                        .toLowerCase();
+                    final userPref = _preferredPlaceType?.toLowerCase();
+
+                    if (placeType == null || userPref == null) return false;
+
+                    return placeType == userPref;
+                  }).toList();
+
                   final visibleDocs = _showOnlyFavorites
                       ? docs
                             .where((doc) => favoriteIds.contains(doc.id))
                             .toList()
                       : docs;
-                  final approvedMarkers = visibleDocs.map((doc) {
-                    final data = doc.data();
-                    final lat = (data['lat'] as num?)?.toDouble();
-                    final lng = (data['lng'] as num?)?.toDouble();
-                    if (lat == null || lng == null) {
-                      return null;
-                    }
-                    return Marker(
-                      markerId: MarkerId(doc.id),
-                      position: LatLng(lat, lng),
-                      onTap: () {
-                        fetchRoute(
-                          destinationLatitude: lat,
-                          destinationLongitude: lng,
+
+                  final approvedMarkers = visibleDocs
+                      .map((doc) {
+                        final data = doc.data();
+                        final lat = (data['lat'] as num?)?.toDouble();
+                        final lng = (data['lng'] as num?)?.toDouble();
+                        if (lat == null || lng == null) {
+                          return null;
+                        }
+
+                        return Marker(
+                          markerId: MarkerId(doc.id),
+                          position: LatLng(lat, lng),
+                          onTap: () {
+                            fetchRoute(
+                              destinationLatitude: lat,
+                              destinationLongitude: lng,
+                            );
+                            _showPlaceDetails(data, doc.id);
+                          },
+                          icon: BitmapDescriptor.defaultMarkerWithHue(
+                            BitmapDescriptor.hueRed,
+                          ),
                         );
-                        _showPlaceDetails(data, doc.id);
-                      },
-                      icon: BitmapDescriptor.defaultMarkerWithHue(
-                        BitmapDescriptor.hueRed,
-                      ),
-                    );
-                  }).whereType<Marker>().toSet();
+                      })
+                      .whereType<Marker>()
+                      .toSet();
 
                   final allMarkers = <Marker>{
                     ...approvedMarkers,
@@ -1014,6 +1048,8 @@ return Column(
                         ),
                       ),
                   };
+
+                  print("RECOMMENDED: ${recommendedDocs.length}");
 
                   return Stack(
                     children: [
@@ -1042,6 +1078,7 @@ return Column(
                         markers: allMarkers,
                         polylines: _routePolylines,
                       ),
+
                       if (_isFetchingRoute ||
                           (_routeDistanceText != null &&
                               _routeDurationText != null))
@@ -1074,9 +1111,10 @@ return Column(
                             ),
                           ),
                         ),
+
                       Positioned(
                         right: 50,
-                        bottom: 50,
+                        bottom: 140,
                         child: FloatingActionButton(
                           heroTag: 'recenter_user_location_button',
                           mini: true,
@@ -1084,6 +1122,64 @@ return Column(
                           child: const Icon(Icons.my_location),
                         ),
                       ),
+
+                      if (recommendedDocs.isNotEmpty)
+                        Positioned(
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          child: Container(
+                            height: 120,
+                            color: Colors.white,
+                            child: ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: recommendedDocs.length,
+                              itemBuilder: (context, index) {
+                                final place = recommendedDocs[index].data();
+
+                                return GestureDetector(
+                                  onTap: () {
+                                    final lat =
+                                        (place['lat'] as num).toDouble();
+                                    final lng =
+                                        (place['lng'] as num).toDouble();
+
+                                    fetchRoute(
+                                      destinationLatitude: lat,
+                                      destinationLongitude: lng,
+                                    );
+
+                                    _showPlaceDetails(
+                                      place,
+                                      recommendedDocs[index].id,
+                                    );
+                                  },
+                                  child: Card(
+                                    margin: const EdgeInsets.all(8),
+                                    child: Container(
+                                      width: 140,
+                                      padding: const EdgeInsets.all(8),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            place['name'] ?? '',
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 5),
+                                          Text(place['environmentType'] ?? ''),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
                     ],
                   );
                 },
@@ -1095,5 +1191,3 @@ return Column(
     );
   }
 }
-
-
