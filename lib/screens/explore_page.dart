@@ -16,7 +16,35 @@ class ExplorePage extends StatefulWidget {
   State<ExplorePage> createState() => _ExplorePageState();
 }
 
+class RecommendedPlace {
+  final QueryDocumentSnapshot<Map<String, dynamic>> doc;
+  final double averageRating;
+  final double distanceKm;
+
+  RecommendedPlace({
+    required this.doc,
+    required this.averageRating,
+    required this.distanceKm,
+  });
+}
+
 class _ExplorePageState extends State<ExplorePage> {
+
+  double _calculateDistanceKm({
+  required double startLat,
+  required double startLng,
+  required double endLat,
+  required double endLng,
+}) {
+  return Geolocator.distanceBetween(
+        startLat,
+        startLng,
+        endLat,
+        endLng,
+      ) /
+      1000;
+}
+
   bool _showOnlyFavorites = false;
   String? _selectedCategoryChip;
   String? _preferredPlaceType;
@@ -36,35 +64,105 @@ class _ExplorePageState extends State<ExplorePage> {
   String? _routeDistanceText;
   String? _routeDurationText;
   bool _isFetchingRoute = false;
+  String? _distancePreference;
 
   LatLng? selectedPoint;
   final PlaceService _placeService = PlaceService();
 
- Future<void> _loadUserPreferences() async {
-  final user = FirebaseAuth.instance.currentUser;
-  if (user == null) return;
-
-  print("CURRENT UID: ${user.uid}");
+  Future<void> _loadUserPreferences() async {
+  final userId = FirebaseAuth.instance.currentUser?.uid;
+  if (userId == null) return;
 
   final doc = await FirebaseFirestore.instance
       .collection('users')
-      .doc(user.uid)
+      .doc(userId)
       .get();
-
-  print("USER DOC EXISTS: ${doc.exists}");
-  print("USER DOC DATA: ${doc.data()}");
 
   if (!doc.exists) return;
 
-  final data = doc.data();
-  final prefs = data?['preferences'] as Map<String, dynamic>?;
+  final data = doc.data() as Map<String, dynamic>;
+  final prefs = data['preferences'] as Map<String, dynamic>?;
+
+  print("FULL USER DATA: $data");
+  print("PREFS MAP: $prefs");
 
   setState(() {
     _preferredPlaceType = prefs?['placeType']?.toString();
+    _distancePreference = prefs?['distancePreference']?.toString();
   });
 
   print("PREFERRED PLACE TYPE: $_preferredPlaceType");
+  print("DISTANCE PREFERENCE: $_distancePreference");
 }
+
+  Future<double> _getAverageRatingForPlace(String placeId) async {
+    final reviewsSnapshot = await FirebaseFirestore.instance
+        .collection('places')
+        .doc(placeId)
+        .collection('reviews')
+        .get();
+
+    if (reviewsSnapshot.docs.isEmpty) {
+      return 0.0;
+    }
+
+    double total = 0;
+    for (final doc in reviewsSnapshot.docs) {
+      final data = doc.data();
+      total += ((data['rating'] ?? 0) as num).toDouble();
+    }
+
+    return total / reviewsSnapshot.docs.length;
+  }
+
+  Future<List<RecommendedPlace>> _buildRecommendedPlaces(
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+) async {
+  final userPref = _preferredPlaceType?.toLowerCase();
+  final distancePref = _distancePreference?.toLowerCase();
+  final userLocation = _userLocation;
+
+  if (userPref == null || userLocation == null) return [];
+
+  final results = <RecommendedPlace>[];
+
+  for (final doc in docs) {
+    final data = doc.data();
+
+    final placeType = data['environmentType']?.toString().toLowerCase();
+    if (placeType != userPref) continue;
+
+    final lat = (data['lat'] as num?)?.toDouble();
+    final lng = (data['lng'] as num?)?.toDouble();
+    if (lat == null || lng == null) continue;
+
+    final distanceKm = _calculateDistanceKm(
+      startLat: userLocation.latitude,
+      startLng: userLocation.longitude,
+      endLat: lat,
+      endLng: lng,
+    );
+
+    // فلترة حسب near / far
+    if (distancePref == 'near' && distanceKm > 20) continue;
+    if (distancePref == 'far' && distanceKm < 20) continue;
+
+    final avgRating = await _getAverageRatingForPlace(doc.id);
+
+    results.add(
+      RecommendedPlace(
+        doc: doc,
+        averageRating: avgRating,
+        distanceKm: distanceKm,
+      ),
+    );
+  }
+
+  results.sort((a, b) => b.averageRating.compareTo(a.averageRating));
+
+  return results;
+}
+
   @override
   void initState() {
     super.initState();
@@ -388,9 +486,6 @@ class _ExplorePageState extends State<ExplorePage> {
                           (data['lng'] as num).toDouble(),
                         ),
                         builder: (context, snapshot) {
-                          debugPrint("PLACE DATA:");
-                          debugPrint(data.toString());
-
                           if (snapshot.connectionState ==
                               ConnectionState.waiting) {
                             return const Text("Loading weather...");
@@ -573,6 +668,7 @@ class _ExplorePageState extends State<ExplorePage> {
 
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
+                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
                                 "Average rating: ${avgRating.toStringAsFixed(1)} ⭐",
@@ -581,7 +677,6 @@ class _ExplorePageState extends State<ExplorePage> {
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-
                               const SizedBox(height: 10),
 
                               if (images.isNotEmpty) ...[
@@ -982,19 +1077,6 @@ class _ExplorePageState extends State<ExplorePage> {
 
                   final docs = snapshot.data?.docs ?? [];
 
-                  final recommendedDocs = docs.where((doc) {
-                    final data = doc.data();
-
-                    final placeType = data['environmentType']
-                        ?.toString()
-                        .toLowerCase();
-                    final userPref = _preferredPlaceType?.toLowerCase();
-
-                    if (placeType == null || userPref == null) return false;
-
-                    return placeType == userPref;
-                  }).toList();
-
                   final visibleDocs = _showOnlyFavorites
                       ? docs
                             .where((doc) => favoriteIds.contains(doc.id))
@@ -1049,8 +1131,6 @@ class _ExplorePageState extends State<ExplorePage> {
                       ),
                   };
 
-                  print("RECOMMENDED: ${recommendedDocs.length}");
-
                   return Stack(
                     children: [
                       GoogleMap(
@@ -1065,6 +1145,8 @@ class _ExplorePageState extends State<ExplorePage> {
                         myLocationEnabled: true,
                         myLocationButtonEnabled: true,
                         zoomControlsEnabled: true,
+                        zoomGesturesEnabled: true,
+scrollGesturesEnabled: true,
                         onTap: (point) {
                           setState(() {
                             selectedPoint = point;
@@ -1123,63 +1205,89 @@ class _ExplorePageState extends State<ExplorePage> {
                         ),
                       ),
 
-                      if (recommendedDocs.isNotEmpty)
-                        Positioned(
-                          bottom: 0,
-                          left: 0,
-                          right: 0,
-                          child: Container(
-                            height: 120,
-                            color: Colors.white,
-                            child: ListView.builder(
-                              scrollDirection: Axis.horizontal,
-                              itemCount: recommendedDocs.length,
-                              itemBuilder: (context, index) {
-                                final place = recommendedDocs[index].data();
+                      FutureBuilder<List<RecommendedPlace>>(
+                        future: _buildRecommendedPlaces(docs),
+                        builder: (context, recommendationSnapshot) {
+                          if (!recommendationSnapshot.hasData ||
+                              recommendationSnapshot.data!.isEmpty) {
+                            return const SizedBox.shrink();
+                          }
 
-                                return GestureDetector(
-                                  onTap: () {
-                                    final lat =
-                                        (place['lat'] as num).toDouble();
-                                    final lng =
-                                        (place['lng'] as num).toDouble();
+                          final recommendedPlaces =
+                              recommendationSnapshot.data!;
 
-                                    fetchRoute(
-                                      destinationLatitude: lat,
-                                      destinationLongitude: lng,
-                                    );
+                          return Positioned(
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            child: Container(
+                              height: 150,
+                              color: Colors.white,
+                              child: ListView.builder(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: recommendedPlaces.length,
+                                itemBuilder: (context, index) {
+                                  final item = recommendedPlaces[index];
+                                  final place = item.doc.data();
 
-                                    _showPlaceDetails(
-                                      place,
-                                      recommendedDocs[index].id,
-                                    );
-                                  },
-                                  child: Card(
-                                    margin: const EdgeInsets.all(8),
-                                    child: Container(
-                                      width: 140,
-                                      padding: const EdgeInsets.all(8),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            place['name'] ?? '',
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
+                                  return GestureDetector(
+                                    onTap: () {
+                                      final lat =
+                                          (place['lat'] as num).toDouble();
+                                      final lng =
+                                          (place['lng'] as num).toDouble();
+
+                                      fetchRoute(
+                                        destinationLatitude: lat,
+                                        destinationLongitude: lng,
+                                      );
+
+                                      _showPlaceDetails(place, item.doc.id);
+                                    },
+                                    child: Card(
+                                      margin: const EdgeInsets.all(8),
+                                      child: Container(
+                                        width: 160,
+                                        padding: const EdgeInsets.all(8),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              place['name'] ?? '',
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                              ),
                                             ),
-                                          ),
-                                          const SizedBox(height: 5),
-                                          Text(place['environmentType'] ?? ''),
-                                        ],
+                                            const SizedBox(height: 5),
+                                            Text(place['environmentType'] ?? ''),
+                                            const SizedBox(height: 8),
+                                            Row(
+  children: [
+    const Icon(Icons.star, color: Colors.orange, size: 16),
+    const SizedBox(width: 4),
+    Text(item.averageRating.toStringAsFixed(1)),
+  ],
+),
+const SizedBox(height: 6),
+Row(
+  children: [
+    const Icon(Icons.place, size: 16, color: Colors.blue),
+    const SizedBox(width: 4),
+    Text("${item.distanceKm.toStringAsFixed(1)} km"),
+  ],
+),
+                                          ],
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                );
-                              },
+                                  );
+                                },
+                              ),
                             ),
-                          ),
-                        ),
+                          );
+                        },
+                      ),
                     ],
                   );
                 },
