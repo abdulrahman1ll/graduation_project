@@ -16,26 +16,158 @@ class ExplorePage extends StatefulWidget {
   State<ExplorePage> createState() => _ExplorePageState();
 }
 
+class RecommendedPlace {
+  final QueryDocumentSnapshot<Map<String, dynamic>> doc;
+  final double averageRating;
+  final double distanceKm;
+
+  RecommendedPlace({
+    required this.doc,
+    required this.averageRating,
+    required this.distanceKm,
+  });
+}
+
 class _ExplorePageState extends State<ExplorePage> {
+
+  double _calculateDistanceKm({
+  required double startLat,
+  required double startLng,
+  required double endLat,
+  required double endLng,
+}) {
+  return Geolocator.distanceBetween(
+        startLat,
+        startLng,
+        endLat,
+        endLng,
+      ) /
+      1000;
+}
+
   bool _showOnlyFavorites = false;
   String? _selectedCategoryChip;
+  String? _preferredPlaceType;
+
   final WeatherService _weatherService = WeatherService();
+
   static const String _directionsApiKey = String.fromEnvironment(
     'GOOGLE_MAPS_API_KEY',
     defaultValue: 'AIzaSyBwKTf5-oHsyPHv_-qF1r3fbcDU9Nsm2yQ',
   );
+
   GoogleMapController? _mapController;
   LatLng? _userLocation;
   bool _hasCenteredOnUserLocation = false;
+
   Set<Polyline> _routePolylines = <Polyline>{};
   String? _routeDistanceText;
   String? _routeDurationText;
   bool _isFetchingRoute = false;
+  String? _distancePreference;
+
+  LatLng? selectedPoint;
+  final PlaceService _placeService = PlaceService();
+
+  Future<void> _loadUserPreferences() async {
+  final userId = FirebaseAuth.instance.currentUser?.uid;
+  if (userId == null) return;
+
+  final doc = await FirebaseFirestore.instance
+      .collection('users')
+      .doc(userId)
+      .get();
+
+  if (!doc.exists) return;
+
+  final data = doc.data() as Map<String, dynamic>;
+  final prefs = data['preferences'] as Map<String, dynamic>?;
+
+  print("FULL USER DATA: $data");
+  print("PREFS MAP: $prefs");
+
+  setState(() {
+    _preferredPlaceType = prefs?['placeType']?.toString();
+    _distancePreference = prefs?['distancePreference']?.toString();
+  });
+
+  print("PREFERRED PLACE TYPE: $_preferredPlaceType");
+  print("DISTANCE PREFERENCE: $_distancePreference");
+}
+
+  Future<double> _getAverageRatingForPlace(String placeId) async {
+    final reviewsSnapshot = await FirebaseFirestore.instance
+        .collection('places')
+        .doc(placeId)
+        .collection('reviews')
+        .get();
+
+    if (reviewsSnapshot.docs.isEmpty) {
+      return 0.0;
+    }
+
+    double total = 0;
+    for (final doc in reviewsSnapshot.docs) {
+      final data = doc.data();
+      total += ((data['rating'] ?? 0) as num).toDouble();
+    }
+
+    return total / reviewsSnapshot.docs.length;
+  }
+
+  Future<List<RecommendedPlace>> _buildRecommendedPlaces(
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+) async {
+  final userPref = _preferredPlaceType?.toLowerCase();
+  final distancePref = _distancePreference?.toLowerCase();
+  final userLocation = _userLocation;
+
+  if (userPref == null || userLocation == null) return [];
+
+  final results = <RecommendedPlace>[];
+
+  for (final doc in docs) {
+    final data = doc.data();
+
+    final placeType = data['environmentType']?.toString().toLowerCase();
+    if (placeType != userPref) continue;
+
+    final lat = (data['lat'] as num?)?.toDouble();
+    final lng = (data['lng'] as num?)?.toDouble();
+    if (lat == null || lng == null) continue;
+
+    final distanceKm = _calculateDistanceKm(
+      startLat: userLocation.latitude,
+      startLng: userLocation.longitude,
+      endLat: lat,
+      endLng: lng,
+    );
+
+    // فلترة حسب near / far
+    if (distancePref == 'near' && distanceKm > 20) continue;
+    if (distancePref == 'far' && distanceKm < 20) continue;
+
+    final avgRating = await _getAverageRatingForPlace(doc.id);
+
+    results.add(
+      RecommendedPlace(
+        doc: doc,
+        averageRating: avgRating,
+        distanceKm: distanceKm,
+      ),
+    );
+  }
+
+  results.sort((a, b) => b.averageRating.compareTo(a.averageRating));
+
+  return results;
+}
 
   @override
   void initState() {
     super.initState();
     _loadCurrentUserLocation();
+    _loadUserPreferences();
   }
 
   @override
@@ -177,15 +309,14 @@ class _ExplorePageState extends State<ExplorePage> {
 
       final leg = legs.first as Map<String, dynamic>;
       final distanceText =
-          (leg['distance'] as Map<String, dynamic>?)?['text'] as String? ??
-          '';
+          (leg['distance'] as Map<String, dynamic>?)?['text'] as String? ?? '';
       final durationText =
-          (leg['duration'] as Map<String, dynamic>?)?['text'] as String? ??
-          '';
+          (leg['duration'] as Map<String, dynamic>?)?['text'] as String? ?? '';
       final encodedPolyline =
           (route['overview_polyline'] as Map<String, dynamic>?)?['points']
               as String? ??
           '';
+
       if (encodedPolyline.isEmpty) {
         throw Exception('Route path is unavailable.');
       }
@@ -297,7 +428,6 @@ class _ExplorePageState extends State<ExplorePage> {
   }
 
   void _showPlaceDetails(Map<String, dynamic> data, String placeId) {
-    
     int selectedRating = 0;
     final commentController = TextEditingController();
     Uint8List? selectedImageBytes;
@@ -339,7 +469,6 @@ class _ExplorePageState extends State<ExplorePage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      /// ===== PLACE TITLE =====
                       Text(
                         data['name'] ?? '',
                         style: const TextStyle(
@@ -347,90 +476,82 @@ class _ExplorePageState extends State<ExplorePage> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-
                       const SizedBox(height: 8),
-
                       Text("Environment: ${data['environmentType'] ?? '-'}"),
-
-                      
-
                       const SizedBox(height: 8),
 
-FutureBuilder<Map<String, dynamic>?>(
-  future: _weatherService.getWeather(
-    (data['lat'] as num).toDouble(),
-    (data['lng'] as num).toDouble(),
-  ),
-  builder: (context, snapshot) {
-    debugPrint("PLACE DATA:");
-debugPrint(data.toString());
+                      FutureBuilder<Map<String, dynamic>?>(
+                        future: _weatherService.getWeather(
+                          (data['lat'] as num).toDouble(),
+                          (data['lng'] as num).toDouble(),
+                        ),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Text("Loading weather...");
+                          }
 
-    if (snapshot.connectionState == ConnectionState.waiting) {
-      return const Text("Loading weather...");
-    }
+                          if (!snapshot.hasData) {
+                            return const Text("Weather unavailable");
+                          }
 
-    if (!snapshot.hasData) {
-      return const Text("Weather unavailable");
-    }
+                          final temp = snapshot.data!["temp"];
+                          final weather = snapshot.data!["weather"];
+                          final wind = snapshot.data!["wind"];
 
-    final temp = snapshot.data!["temp"];
-final weather = snapshot.data!["weather"];
-final wind = snapshot.data!["wind"];
+                          String kashtaCondition = "Good";
+                          if (weather == "Rain" || wind > 8) {
+                            kashtaCondition = "Bad";
+                          }
 
-String kashtaCondition = "Good";
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.thermostat,
+                                    color: Colors.orange,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text("${temp.toStringAsFixed(1)} °C"),
+                                ],
+                              ),
+                              Row(
+                                children: [
+                                  const Icon(Icons.cloud, color: Colors.grey),
+                                  const SizedBox(width: 6),
+                                  Text("Weather: $weather"),
+                                ],
+                              ),
+                              Row(
+                                children: [
+                                  const Icon(Icons.air, color: Colors.blue),
+                                  const SizedBox(width: 6),
+                                  Text("Wind: $wind m/s"),
+                                ],
+                              ),
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.emoji_nature,
+                                    color: Colors.green,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text("Kashta conditions: $kashtaCondition"),
+                                ],
+                              ),
+                            ],
+                          );
+                        },
+                      ),
 
-if (weather == "Rain" || wind > 8) {
-  kashtaCondition = "Bad";
-}
-
-return Column(
-  crossAxisAlignment: CrossAxisAlignment.start,
-  children: [
-
-    Row(
-      children: [
-        const Icon(Icons.thermostat, color: Colors.orange),
-        const SizedBox(width: 6),
-        Text("${temp.toStringAsFixed(1)} °C"),
-      ],
-    ),
-
-    Row(
-      children: [
-        const Icon(Icons.cloud, color: Colors.grey),
-        const SizedBox(width: 6),
-        Text("Weather: $weather"),
-      ],
-    ),
-
-    Row(
-      children: [
-        const Icon(Icons.air, color: Colors.blue),
-        const SizedBox(width: 6),
-        Text("Wind: $wind m/s"),
-      ],
-    ),
-
-    Row(
-      children: [
-        const Icon(Icons.emoji_nature, color: Colors.green),
-        const SizedBox(width: 6),
-        Text("Kashta conditions: $kashtaCondition"),
-      ],
-    ),
-
-  ],
-);
-  },
-),
                       const SizedBox(height: 20),
 
-                      /// ===== RATING =====
                       const Text(
                         "Rate this place",
                         style: TextStyle(fontWeight: FontWeight.bold),
                       ),
-
                       const SizedBox(height: 8),
 
                       Row(
@@ -453,7 +574,6 @@ return Column(
 
                       const SizedBox(height: 10),
 
-                      /// ===== COMMENT =====
                       TextField(
                         controller: commentController,
                         maxLines: 3,
@@ -465,7 +585,6 @@ return Column(
 
                       const SizedBox(height: 10),
 
-                      /// ===== IMAGE PICKER =====
                       ElevatedButton(
                         onPressed: pickImage,
                         child: const Text("Add Image (Optional)"),
@@ -479,7 +598,6 @@ return Column(
 
                       const SizedBox(height: 15),
 
-                      /// ===== SUBMIT REVIEW =====
                       ElevatedButton(
                         onPressed: () async {
                           if (selectedRating == 0) return;
@@ -509,7 +627,6 @@ return Column(
                       const Divider(),
                       const SizedBox(height: 10),
 
-                      /// ===== REVIEWS + PHOTOS =====
                       StreamBuilder<QuerySnapshot>(
                         stream: FirebaseFirestore.instance
                             .collection('places')
@@ -540,7 +657,6 @@ return Column(
                             return const Text("No reviews yet.");
                           }
 
-                          /// ===== COLLECT IMAGES =====
                           final images = reviews
                               .map(
                                 (doc) =>
@@ -552,6 +668,7 @@ return Column(
 
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
+                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
                                 "Average rating: ${avgRating.toStringAsFixed(1)} ⭐",
@@ -560,10 +677,8 @@ return Column(
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-
                               const SizedBox(height: 10),
 
-                              /// ===== PHOTOS SECTION =====
                               if (images.isNotEmpty) ...[
                                 const Text(
                                   "Photos",
@@ -572,9 +687,7 @@ return Column(
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
-
                                 const SizedBox(height: 10),
-
                                 GridView.builder(
                                   shrinkWrap: true,
                                   physics: const NeverScrollableScrollPhysics(),
@@ -612,11 +725,9 @@ return Column(
                                     );
                                   },
                                 ),
-
                                 const SizedBox(height: 20),
                               ],
 
-                              /// ===== REVIEWS =====
                               const Text(
                                 "Reviews",
                                 style: TextStyle(
@@ -624,7 +735,6 @@ return Column(
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-
                               const SizedBox(height: 10),
 
                               ...reviews.map((doc) {
@@ -671,8 +781,6 @@ return Column(
     );
   }
 
-  LatLng? selectedPoint;
-  final PlaceService _placeService = PlaceService();
   Stream<Set<String>> _favoritePlaceIdsStream() {
     final userId = FirebaseAuth.instance.currentUser?.uid;
     if (userId == null) {
@@ -954,6 +1062,7 @@ return Column(
                   favoritesSnapshot.error,
                 );
               }
+
               final favoriteIds = favoritesSnapshot.data ?? <String>{};
 
               return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -965,34 +1074,41 @@ return Column(
                   if (snapshot.hasError) {
                     logFirestoreReadError('places', snapshot.error);
                   }
+
                   final docs = snapshot.data?.docs ?? [];
+
                   final visibleDocs = _showOnlyFavorites
                       ? docs
                             .where((doc) => favoriteIds.contains(doc.id))
                             .toList()
                       : docs;
-                  final approvedMarkers = visibleDocs.map((doc) {
-                    final data = doc.data();
-                    final lat = (data['lat'] as num?)?.toDouble();
-                    final lng = (data['lng'] as num?)?.toDouble();
-                    if (lat == null || lng == null) {
-                      return null;
-                    }
-                    return Marker(
-                      markerId: MarkerId(doc.id),
-                      position: LatLng(lat, lng),
-                      onTap: () {
-                        fetchRoute(
-                          destinationLatitude: lat,
-                          destinationLongitude: lng,
+
+                  final approvedMarkers = visibleDocs
+                      .map((doc) {
+                        final data = doc.data();
+                        final lat = (data['lat'] as num?)?.toDouble();
+                        final lng = (data['lng'] as num?)?.toDouble();
+                        if (lat == null || lng == null) {
+                          return null;
+                        }
+
+                        return Marker(
+                          markerId: MarkerId(doc.id),
+                          position: LatLng(lat, lng),
+                          onTap: () {
+                            fetchRoute(
+                              destinationLatitude: lat,
+                              destinationLongitude: lng,
+                            );
+                            _showPlaceDetails(data, doc.id);
+                          },
+                          icon: BitmapDescriptor.defaultMarkerWithHue(
+                            BitmapDescriptor.hueRed,
+                          ),
                         );
-                        _showPlaceDetails(data, doc.id);
-                      },
-                      icon: BitmapDescriptor.defaultMarkerWithHue(
-                        BitmapDescriptor.hueRed,
-                      ),
-                    );
-                  }).whereType<Marker>().toSet();
+                      })
+                      .whereType<Marker>()
+                      .toSet();
 
                   final allMarkers = <Marker>{
                     ...approvedMarkers,
@@ -1029,6 +1145,8 @@ return Column(
                         myLocationEnabled: true,
                         myLocationButtonEnabled: true,
                         zoomControlsEnabled: true,
+                        zoomGesturesEnabled: true,
+scrollGesturesEnabled: true,
                         onTap: (point) {
                           setState(() {
                             selectedPoint = point;
@@ -1042,6 +1160,7 @@ return Column(
                         markers: allMarkers,
                         polylines: _routePolylines,
                       ),
+
                       if (_isFetchingRoute ||
                           (_routeDistanceText != null &&
                               _routeDurationText != null))
@@ -1074,15 +1193,100 @@ return Column(
                             ),
                           ),
                         ),
+
                       Positioned(
                         right: 50,
-                        bottom: 50,
+                        bottom: 140,
                         child: FloatingActionButton(
                           heroTag: 'recenter_user_location_button',
                           mini: true,
                           onPressed: _recenterOnUserLocation,
                           child: const Icon(Icons.my_location),
                         ),
+                      ),
+
+                      FutureBuilder<List<RecommendedPlace>>(
+                        future: _buildRecommendedPlaces(docs),
+                        builder: (context, recommendationSnapshot) {
+                          if (!recommendationSnapshot.hasData ||
+                              recommendationSnapshot.data!.isEmpty) {
+                            return const SizedBox.shrink();
+                          }
+
+                          final recommendedPlaces =
+                              recommendationSnapshot.data!;
+
+                          return Positioned(
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            child: Container(
+                              height: 150,
+                              color: Colors.white,
+                              child: ListView.builder(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: recommendedPlaces.length,
+                                itemBuilder: (context, index) {
+                                  final item = recommendedPlaces[index];
+                                  final place = item.doc.data();
+
+                                  return GestureDetector(
+                                    onTap: () {
+                                      final lat =
+                                          (place['lat'] as num).toDouble();
+                                      final lng =
+                                          (place['lng'] as num).toDouble();
+
+                                      fetchRoute(
+                                        destinationLatitude: lat,
+                                        destinationLongitude: lng,
+                                      );
+
+                                      _showPlaceDetails(place, item.doc.id);
+                                    },
+                                    child: Card(
+                                      margin: const EdgeInsets.all(8),
+                                      child: Container(
+                                        width: 160,
+                                        padding: const EdgeInsets.all(8),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              place['name'] ?? '',
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 5),
+                                            Text(place['environmentType'] ?? ''),
+                                            const SizedBox(height: 8),
+                                            Row(
+  children: [
+    const Icon(Icons.star, color: Colors.orange, size: 16),
+    const SizedBox(width: 4),
+    Text(item.averageRating.toStringAsFixed(1)),
+  ],
+),
+const SizedBox(height: 6),
+Row(
+  children: [
+    const Icon(Icons.place, size: 16, color: Colors.blue),
+    const SizedBox(width: 4),
+    Text("${item.distanceKm.toStringAsFixed(1)} km"),
+  ],
+),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ],
                   );
@@ -1095,5 +1299,3 @@ return Column(
     );
   }
 }
-
-
