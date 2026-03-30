@@ -17,10 +17,28 @@ class GroupsPage extends StatefulWidget {
 }
 
 class _GroupsPageState extends State<GroupsPage> {
-  final GroupService _groupService = GroupService();
+  Future<List<chat.Group>> fetchUserGroups(String userId) async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('groups')
+        .where('members', arrayContains: userId)
+        .get();
+
+    final groups = snapshot.docs
+        .map(chat.Group.fromFirestore)
+        .toList(growable: false)
+      ..sort((a, b) {
+        final aDate = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final bDate = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+        return bDate.compareTo(aDate);
+      });
+
+    return groups;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+
     return Scaffold(
       appBar: appBarWithLanguage(
         tr: widget.tr,
@@ -28,77 +46,48 @@ class _GroupsPageState extends State<GroupsPage> {
         title: widget.tr.t('groups'),
         onToggleLanguage: widget.onToggleLanguage,
       ),
-      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: FirebaseFirestore.instance.collection('groups').snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            final error = snapshot.error;
-            logFirestoreReadError('groups', error);
-            if (error is FirebaseException &&
-                error.code == 'permission-denied') {
-              return Center(child: Text(widget.tr.t('permission_denied')));
-            }
-            if (error is FirebaseException) {
-              final link = extractIndexLink(error.message);
-              if (link != null) {
-                return const Center(
-                  child: Text('Groups query requires a Firestore index.'),
+      body: currentUserId == null
+          ? const Center(child: Text('Failed to load groups'))
+          : FutureBuilder<List<chat.Group>>(
+              future: fetchUserGroups(currentUserId),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (snapshot.hasError) {
+                  print(snapshot.error);
+                  return const Center(child: Text('Failed to load groups'));
+                }
+
+                final groups = snapshot.data ?? const <chat.Group>[];
+
+                if (groups.isEmpty) {
+                  return const Center(child: Text('No groups yet'));
+                }
+
+                return ListView.builder(
+                  itemCount: groups.length,
+                  itemBuilder: (context, index) {
+                    final group = groups[index];
+
+                    return ListTile(
+                      title: Text(group.name),
+                      subtitle: Text(group.description),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                chat.GroupChatPage(groupId: group.id),
+                          ),
+                        );
+                      },
+                    );
+                  },
                 );
-              }
-            }
-            return Center(child: Text(widget.tr.t('load_error')));
-          }
-          final docs = snapshot.data?.docs ?? [];
-          if (docs.isEmpty) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.groups, size: 72, color: Colors.orange),
-                    const SizedBox(height: 16),
-                    Text(
-                      widget.tr.t('no_groups_yet'),
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w700,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      widget.tr.t('groups_empty_subtitle'),
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: Colors.grey.shade700,
-                        height: 1.4,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: docs.length,
-            itemBuilder: (context, index) {
-              final data = docs[index].data();
-              return Card(
-                child: ListTile(
-                  title: Text((data['name'] ?? '').toString()),
-                  subtitle: Text((data['description'] ?? '').toString()),
-                ),
-              );
-            },
-          );
-        },
-      ),
+              },
+            ),
       floatingActionButton: Consumer<RoleProvider>(
         builder: (context, provider, child) {
           final canCreate =
@@ -115,8 +104,7 @@ class _GroupsPageState extends State<GroupsPage> {
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (_) =>
-                      AddGroupPage(tr: widget.tr, groupService: _groupService),
+                  builder: (_) => const chat.CreateGroupPage(),
                 ),
               );
             },
@@ -126,107 +114,3 @@ class _GroupsPageState extends State<GroupsPage> {
     );
   }
 }
-
-class AddGroupPage extends StatefulWidget {
-  const AddGroupPage({super.key, required this.tr, required this.groupService});
-
-  final Tr tr;
-  final GroupService groupService;
-
-  @override
-  State<AddGroupPage> createState() => _AddGroupPageState();
-}
-
-class _AddGroupPageState extends State<AddGroupPage> {
-  final _nameController = TextEditingController();
-  final _descriptionController = TextEditingController();
-  bool _saving = false;
-  String _visibility = 'public';
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _descriptionController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Add Group')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          TextFormField(
-            controller: _nameController,
-            decoration: const InputDecoration(labelText: 'Group Name'),
-          ),
-          const SizedBox(height: 12),
-          TextFormField(
-            controller: _descriptionController,
-            decoration: const InputDecoration(labelText: 'Description'),
-          ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
-            initialValue: _visibility,
-            items: const [
-              DropdownMenuItem(value: 'public', child: Text('Public')),
-              DropdownMenuItem(value: 'private', child: Text('Private')),
-            ],
-            onChanged: _saving
-                ? null
-                : (value) {
-                    if (value != null) {
-                      setState(() => _visibility = value);
-                    }
-                  },
-            decoration: const InputDecoration(labelText: 'Visibility'),
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: _saving ? null : _save,
-            child: const Text('Save Group'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _save() async {
-    if (_nameController.text.trim().isEmpty ||
-        _descriptionController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(widget.tr.t('fill_all_fields'))));
-      return;
-    }
-
-    setState(() => _saving = true);
-    try {
-      await widget.groupService.createGroup(
-        name: _nameController.text.trim(),
-        description: _descriptionController.text.trim(),
-        visibility: _visibility,
-      );
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
-    } on FirebaseException catch (e) {
-      if (mounted) {
-        showFirestoreError(context, e);
-      }
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(widget.tr.t('save_failed'))));
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _saving = false);
-      }
-    }
-  }
-}
-
-

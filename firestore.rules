@@ -1,0 +1,291 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidRole(role) {
+      return role == 'admin' || role == 'member';
+    }
+
+    function isValidMessageType(type) {
+      return type == 'text' || type == 'link' || type == 'system';
+    }
+
+    function isGroupMember(groupId) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid));
+    }
+
+    function isGroupAdmin(groupId) {
+      return isGroupMember(groupId) &&
+        get(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function validTripGroupLink(tripId) {
+      return !request.resource.data.keys().hasAny(['groupId']) ||
+        request.resource.data.groupId == null ||
+        (
+          request.resource.data.groupId is string &&
+          request.resource.data.groupId.size() > 0 &&
+          existsAfter(/databases/$(database)/documents/groups/$(request.resource.data.groupId)) &&
+          getAfter(/databases/$(database)/documents/groups/$(request.resource.data.groupId)).data.tripId == tripId
+        );
+    }
+
+    function validGroupCreateFields() {
+      return request.resource.data.keys().hasAll([
+          'tripId',
+          'name',
+          'description',
+          'members',
+          'imageUrl',
+          'createdBy',
+          'createdAt'
+        ]) &&
+        request.resource.data.keys().hasOnly([
+          'tripId',
+          'name',
+          'description',
+          'members',
+          'imageUrl',
+          'createdBy',
+          'createdAt'
+        ]) &&
+        request.resource.data.tripId is string &&
+        request.resource.data.tripId.size() > 0 &&
+        request.resource.data.name is string &&
+        request.resource.data.name.size() > 0 &&
+        request.resource.data.description is string &&
+        request.resource.data.members is list &&
+        request.resource.data.members.size() == 1 &&
+        request.resource.data.members[0] == request.auth.uid &&
+        (
+          request.resource.data.imageUrl == null ||
+          request.resource.data.imageUrl is string
+        ) &&
+        request.resource.data.createdBy == request.auth.uid &&
+        request.resource.data.createdAt is timestamp;
+    }
+
+    function validGroupBootstrap(groupId) {
+      return exists(/databases/$(database)/documents/trips/$(request.resource.data.tripId)) &&
+        getAfter(/databases/$(database)/documents/trips/$(request.resource.data.tripId)).data.groupId == groupId &&
+        existsAfter(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid)) &&
+        getAfter(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid)).data.role == 'admin' &&
+        getAfter(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid)).data.joinedAt is timestamp;
+    }
+
+    function validGroupUpdate() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'name',
+          'description',
+          'members',
+          'imageUrl'
+        ]) &&
+        request.resource.data.tripId == resource.data.tripId &&
+        request.resource.data.createdBy == resource.data.createdBy &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        request.resource.data.name is string &&
+        request.resource.data.name.size() > 0 &&
+        request.resource.data.description is string &&
+        request.resource.data.members is list &&
+        request.auth.uid in request.resource.data.members &&
+        (
+          request.resource.data.imageUrl == null ||
+          request.resource.data.imageUrl is string
+        );
+    }
+
+    function validSelfJoinGroupUpdate() {
+      let oldSet = resource.data.members.toSet();
+      let newSet = request.resource.data.members.toSet();
+      let addedSet = newSet.difference(oldSet);
+
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'members'
+        ]) &&
+        resource.data.members is list &&
+        request.resource.data.members is list &&
+        request.resource.data.tripId == resource.data.tripId &&
+        request.resource.data.name == resource.data.name &&
+        request.resource.data.description == resource.data.description &&
+        request.resource.data.imageUrl == resource.data.imageUrl &&
+        request.resource.data.createdBy == resource.data.createdBy &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        newSet.hasAll(oldSet) &&
+        addedSet.hasOnly([request.auth.uid]) &&
+        addedSet.size() == 1;
+    }
+
+    function validMemberDocument() {
+      return request.resource.data.keys().hasAll(['userId', 'role', 'joinedAt']) &&
+        request.resource.data.keys().hasOnly(['userId', 'role', 'joinedAt']) &&
+        request.resource.data.userId == request.auth.uid &&
+        isValidRole(request.resource.data.role) &&
+        request.resource.data.joinedAt is timestamp;
+    }
+
+    function validCreatorAdminBootstrap(groupId, userId) {
+      return userId == request.auth.uid &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.role == 'admin' &&
+        existsAfter(/databases/$(database)/documents/groups/$(groupId)) &&
+        getAfter(/databases/$(database)/documents/groups/$(groupId)).data.createdBy == request.auth.uid;
+    }
+
+    function validSelfJoinMember(groupId, userId) {
+      return userId == request.auth.uid &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.role == 'member' &&
+        exists(/databases/$(database)/documents/groups/$(groupId));
+    }
+
+    function validMemberRoleUpdate() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role']) &&
+        request.resource.data.userId == resource.data.userId &&
+        request.resource.data.joinedAt == resource.data.joinedAt &&
+        isValidRole(request.resource.data.role);
+    }
+
+    function validInitialReadBy() {
+      let readSet = request.resource.data.readBy.toSet();
+      return request.resource.data.readBy is list &&
+        readSet.size() == request.resource.data.readBy.size() &&
+        readSet.hasOnly([request.auth.uid]) &&
+        readSet.size() <= 1;
+    }
+
+    function validMessageCreate() {
+      return request.resource.data.keys().hasAll([
+          'senderId',
+          'type',
+          'content',
+          'createdAt',
+          'isPinned',
+          'readBy'
+        ]) &&
+        request.resource.data.keys().hasOnly([
+          'senderId',
+          'type',
+          'content',
+          'createdAt',
+          'isPinned',
+          'readBy'
+        ]) &&
+        request.resource.data.senderId is string &&
+        request.resource.data.senderId.size() > 0 &&
+        request.resource.data.senderId == request.auth.uid &&
+        isValidMessageType(request.resource.data.type) &&
+        request.resource.data.content is string &&
+        request.resource.data.createdAt is timestamp &&
+        request.resource.data.isPinned is bool &&
+        request.resource.data.isPinned == false &&
+        validInitialReadBy();
+    }
+
+    function onlyPinnedChanged() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isPinned']) &&
+        request.resource.data.senderId == resource.data.senderId &&
+        request.resource.data.type == resource.data.type &&
+        request.resource.data.content == resource.data.content &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        request.resource.data.readBy == resource.data.readBy &&
+        request.resource.data.isPinned is bool;
+    }
+
+    function onlyReadBySelfChanged() {
+      let oldSet = resource.data.readBy.toSet();
+      let newSet = request.resource.data.readBy.toSet();
+      let addedSet = newSet.difference(oldSet);
+
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy']) &&
+        request.resource.data.senderId == resource.data.senderId &&
+        request.resource.data.type == resource.data.type &&
+        request.resource.data.content == resource.data.content &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        request.resource.data.isPinned == resource.data.isPinned &&
+        request.resource.data.readBy is list &&
+        newSet.size() == request.resource.data.readBy.size() &&
+        newSet.hasAll(oldSet) &&
+        addedSet.hasOnly([request.auth.uid]) &&
+        addedSet.size() <= 1;
+    }
+
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSelf(userId);
+      allow delete: if false;
+
+      match /favorites/{favoriteId} {
+        allow read, write: if isSelf(userId);
+      }
+    }
+
+    match /places/{placeId} {
+      allow read, write: if isSignedIn();
+
+      match /reviews/{reviewId} {
+        allow read, write: if isSignedIn();
+      }
+    }
+
+    match /checklist_templates/{templateId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /trips/{tripId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && validTripGroupLink(tripId);
+      allow delete: if isSignedIn();
+
+      match /checklist/{itemId} {
+        allow read, write: if isSignedIn();
+      }
+    }
+
+    match /groups/{groupId} {
+      allow read: if isGroupMember(groupId);
+      allow create: if isSignedIn() &&
+        validGroupCreateFields() &&
+        validGroupBootstrap(groupId);
+      allow update: if
+        (isGroupAdmin(groupId) && validGroupUpdate()) ||
+        (isSignedIn() && validSelfJoinGroupUpdate());
+      allow delete: if false;
+
+      match /members/{userId} {
+        allow read: if isGroupMember(groupId) || isSelf(userId);
+        allow create: if isSignedIn() &&
+          validMemberDocument() &&
+          (
+            isGroupAdmin(groupId) ||
+            validCreatorAdminBootstrap(groupId, userId) ||
+            validSelfJoinMember(groupId, userId)
+          );
+        allow update: if isGroupAdmin(groupId) && validMemberRoleUpdate();
+        allow delete: if isGroupAdmin(groupId);
+      }
+
+      match /messages/{messageId} {
+        allow read: if isGroupMember(groupId);
+        allow create: if isGroupMember(groupId) && validMessageCreate();
+        allow update: if isGroupMember(groupId) &&
+          (
+            (isGroupAdmin(groupId) && onlyPinnedChanged()) ||
+            onlyReadBySelfChanged()
+          );
+        allow delete: if false;
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
