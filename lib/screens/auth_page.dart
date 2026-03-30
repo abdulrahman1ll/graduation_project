@@ -98,9 +98,8 @@ class _AuthPageState extends State<AuthPage> {
                       TextField(
                         controller: _emailController,
                         keyboardType: TextInputType.emailAddress,
-                        textAlign: widget.isArabic
-                            ? TextAlign.right
-                            : TextAlign.left,
+                        textAlign:
+                            widget.isArabic ? TextAlign.right : TextAlign.left,
                         decoration: InputDecoration(
                           hintText: tr.t('email'),
                           border: const OutlineInputBorder(),
@@ -110,9 +109,8 @@ class _AuthPageState extends State<AuthPage> {
                       TextField(
                         controller: _passwordController,
                         obscureText: true,
-                        textAlign: widget.isArabic
-                            ? TextAlign.right
-                            : TextAlign.left,
+                        textAlign:
+                            widget.isArabic ? TextAlign.right : TextAlign.left,
                         decoration: InputDecoration(
                           hintText: tr.t('password'),
                           border: const OutlineInputBorder(),
@@ -172,6 +170,27 @@ class _AuthPageState extends State<AuthPage> {
     );
   }
 
+  Future<void> _createDefaultUserDocument(User user) async {
+  print("🔥 FUNCTION CALLED");
+
+  await FirebaseFirestore.instance
+      .collection('users')
+      .doc(user.uid)
+      .set({
+    'email': user.email,
+    'createdAt': FieldValue.serverTimestamp(),
+    'roles': {
+      'regularUser': true,
+    },
+    'preferences': {
+      'placeType': 'desert',
+      'distancePreference': 'near',
+    },
+  }, SetOptions(merge: true));
+
+  print("🔥 FIRESTORE WRITE DONE");
+}
+
   Future<void> _signInWithEmail() async {
     final email = _emailController.text.trim();
     final pass = _passwordController.text.trim();
@@ -181,48 +200,88 @@ class _AuthPageState extends State<AuthPage> {
     }
 
     await _authRun(() async {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
+      final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: email,
         password: pass,
       );
+
+      final user = credential.user;
+      if (user != null) {
+        await _createDefaultUserDocument(user);
+      }
     });
   }
 
   Future<void> _signUpWithEmail() async {
-    final email = _emailController.text.trim();
-    final pass = _passwordController.text.trim();
-    if (email.isEmpty || pass.isEmpty) {
-      _snack(widget.tr.t('email_password_required'));
+  final email = _emailController.text.trim();
+  final pass = _passwordController.text.trim();
+
+  if (email.isEmpty || pass.isEmpty) {
+    _snack(widget.tr.t('email_password_required'));
+    return;
+  }
+
+  try {
+    final credential =
+        await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      email: email,
+      password: pass,
+    );
+
+    final user = credential.user;
+    if (user != null) {
+      print("USER CREATED FROM TRY: ${user.uid}");
+      await _createDefaultUserDocument(user);
+    }
+  } catch (e) {
+    print("SIGN UP ERROR: $e");
+
+    // workaround: أحيانًا الحساب يتسجل فعلًا ثم البلجن يرمي exception
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null && user.email == email) {
+      print("USER CREATED FROM CATCH: ${user.uid}");
+      await _createDefaultUserDocument(user);
       return;
     }
 
-    await _authRun(() async {
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: email,
-        password: pass,
-      );
-    });
+    _snack(e.toString());
   }
+}
 
   Future<void> _signInWithGoogle() async {
-    await _authRun(() async {
-      if (kIsWeb) {
-        await FirebaseAuth.instance.signInWithPopup(GoogleAuthProvider());
-        return;
-      }
+  try {
+    if (kIsWeb) {
+      await FirebaseAuth.instance.signInWithPopup(GoogleAuthProvider());
 
-      final googleUser = await GoogleSignIn().signIn();
-      if (googleUser == null) {
-        return;
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        await _createDefaultUserDocument(user);
       }
-      final googleAuth = await googleUser.authentication;
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-      await FirebaseAuth.instance.signInWithCredential(credential);
-    });
+      return;
+    }
+
+    final googleUser = await GoogleSignIn().signIn();
+    if (googleUser == null) return;
+
+    final googleAuth = await googleUser.authentication;
+
+    final credential = GoogleAuthProvider.credential(
+      accessToken: googleAuth.accessToken,
+      idToken: googleAuth.idToken,
+    );
+
+    final userCredential =
+        await FirebaseAuth.instance.signInWithCredential(credential);
+
+    final user = userCredential.user;
+    if (user != null) {
+      await _createDefaultUserDocument(user);
+    }
+  } catch (e) {
+    print("GOOGLE SIGN IN ERROR: $e");
+    _snack(e.toString());
   }
+}
 
   Future<void> _signInWithPhone() async {
     final phone = await _askInput(
@@ -239,7 +298,13 @@ class _AuthPageState extends State<AuthPage> {
       await FirebaseAuth.instance.verifyPhoneNumber(
         phoneNumber: phone.trim(),
         verificationCompleted: (credential) async {
-          await FirebaseAuth.instance.signInWithCredential(credential);
+          final userCredential =
+              await FirebaseAuth.instance.signInWithCredential(credential);
+
+          final user = userCredential.user;
+          if (user != null) {
+            await _createDefaultUserDocument(user);
+          }
         },
         verificationFailed: (e) {
           _snack('${widget.tr.t('phone_failed')}: ${e.message ?? e.code}');
@@ -253,14 +318,23 @@ class _AuthPageState extends State<AuthPage> {
             keyboardType: TextInputType.number,
           );
           codeController.dispose();
+
           if (sms == null || sms.trim().isEmpty) {
             return;
           }
+
           final credential = PhoneAuthProvider.credential(
             verificationId: verificationId,
             smsCode: sms.trim(),
           );
-          await FirebaseAuth.instance.signInWithCredential(credential);
+
+          final userCredential =
+              await FirebaseAuth.instance.signInWithCredential(credential);
+
+          final user = userCredential.user;
+          if (user != null) {
+            await _createDefaultUserDocument(user);
+          }
         },
         codeAutoRetrievalTimeout: (_) {},
       );
@@ -269,7 +343,24 @@ class _AuthPageState extends State<AuthPage> {
 
   Future<void> _signInAnonymously() async {
     await _authRun(() async {
-      await FirebaseAuth.instance.signInAnonymously();
+      final userCredential = await FirebaseAuth.instance.signInAnonymously();
+
+      final user = userCredential.user;
+      if (user != null) {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .set({
+          'createdAt': FieldValue.serverTimestamp(),
+          'roles': {
+            'regularUser': true,
+          },
+          'preferences': {
+            'placeType': 'desert',
+            'distancePreference': 'near',
+          },
+        }, SetOptions(merge: true));
+      }
     });
   }
 
@@ -303,7 +394,10 @@ class _AuthPageState extends State<AuthPage> {
   }
 
   Future<void> _authRun(Future<void> Function() action) async {
-    setState(() => _loading = true);
+    if (mounted) {
+      setState(() => _loading = true);
+    }
+
     try {
       await action();
     } on FirebaseAuthException catch (e) {
@@ -324,5 +418,3 @@ class _AuthPageState extends State<AuthPage> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 }
-
-
