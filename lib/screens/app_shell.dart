@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -29,7 +30,12 @@ part 'groups_page.dart';
 part 'profile_page.dart';
 
 class KashtaApp extends StatefulWidget {
-  const KashtaApp({super.key});
+  const KashtaApp({
+    super.key,
+    this.deepLinkService,
+  });
+
+  final chat.DeepLinkService? deepLinkService;
 
   @override
   State<KashtaApp> createState() => _KashtaAppState();
@@ -37,6 +43,25 @@ class KashtaApp extends StatefulWidget {
 
 class _KashtaAppState extends State<KashtaApp> {
   AppLanguage _lang = AppLanguage.en;
+  late final chat.DeepLinkService _deepLinkService;
+
+  @override
+  void initState() {
+    super.initState();
+    _deepLinkService = widget.deepLinkService ?? chat.DeepLinkService();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      _deepLinkService.init(context);
+    });
+  }
+
+  @override
+  void dispose() {
+    _deepLinkService.dispose();
+    super.dispose();
+  }
 
   void _toggleLanguage() {
     setState(() {
@@ -52,6 +77,7 @@ class _KashtaAppState extends State<KashtaApp> {
     return ChangeNotifierProvider<RoleProvider>(
       create: (_) => RoleProvider(),
       child: MaterialApp(
+        navigatorKey: _deepLinkService.navigatorKey,
         debugShowCheckedModeBanner: false,
         home: Directionality(
           textDirection: isArabic ? TextDirection.rtl : TextDirection.ltr,

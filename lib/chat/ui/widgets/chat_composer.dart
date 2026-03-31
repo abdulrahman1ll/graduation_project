@@ -56,10 +56,27 @@ class _ChatComposerState extends State<ChatComposer> {
                     ? 'Write a message'
                     : 'Join the group to chat',
                 filled: true,
-                fillColor: const Color(0xFFF8F8F8),
+                fillColor: const Color(0xFFF7F7F7),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(18),
-                  borderSide: BorderSide.none,
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide(
+                    color: Colors.black.withOpacity(0.1),
+                    width: 1,
+                  ),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide(
+                    color: Colors.black.withOpacity(0.1),
+                    width: 1,
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide(
+                    color: Colors.black.withOpacity(0.14),
+                    width: 1,
+                  ),
                 ),
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 16,
@@ -74,7 +91,9 @@ class _ChatComposerState extends State<ChatComposer> {
             style: FilledButton.styleFrom(
               backgroundColor: Colors.orange,
               foregroundColor: Colors.white,
-              minimumSize: const Size(52, 52),
+              minimumSize: const Size(46, 46),
+              maximumSize: const Size(46, 46),
+              padding: EdgeInsets.zero,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
@@ -88,7 +107,7 @@ class _ChatComposerState extends State<ChatComposer> {
                       color: Colors.white,
                     ),
                   )
-                : const Icon(Icons.send),
+                : const Icon(Icons.send, size: 18),
           ),
         ],
       ),

@@ -13,7 +13,7 @@ class Group {
   });
 
   final String id;
-  final String tripId;
+  final String? tripId;
   final String name;
   final String description;
   final List<String> members;
@@ -32,7 +32,7 @@ class Group {
 
     return Group(
       id: snapshot.id,
-      tripId: (data['tripId'] ?? '').toString(),
+      tripId: _readString(data['tripId']),
       name: (data['name'] ?? '').toString(),
       description: (data['description'] ?? '').toString(),
       members: members,
@@ -58,7 +58,7 @@ class Group {
 
   Group copyWith({
     String? id,
-    String? tripId,
+    Object? tripId = _copySentinel,
     String? name,
     String? description,
     List<String>? members,
@@ -68,7 +68,7 @@ class Group {
   }) {
     return Group(
       id: id ?? this.id,
-      tripId: tripId ?? this.tripId,
+      tripId: identical(tripId, _copySentinel) ? this.tripId : tripId as String?,
       name: name ?? this.name,
       description: description ?? this.description,
       members: members ?? this.members,
@@ -93,3 +93,5 @@ class Group {
     return null;
   }
 }
+
+const Object _copySentinel = Object();

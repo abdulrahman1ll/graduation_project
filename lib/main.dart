@@ -1,6 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/widgets.dart';
 
+import 'chat/chat.dart' as chat;
 import 'firebase_options.dart';
 import 'screens/app_shell.dart';
 import 'utils/bootstrap.dart';
@@ -20,5 +21,6 @@ void main() async {
     debugPrint('PACKAGE: unavailable');
   }
 
-  runApp(const KashtaApp());
+  final deepLinkService = chat.DeepLinkService();
+  runApp(KashtaApp(deepLinkService: deepLinkService));
 }

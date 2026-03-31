@@ -3,6 +3,7 @@ export 'models/chat_message_type.dart';
 export 'models/group.dart';
 export 'models/group_role.dart';
 export 'models/member.dart';
+export 'deep_link_service.dart';
 export 'services/chat_service.dart';
 export 'services/checklist_sync_service.dart';
 export 'services/group_service.dart';

@@ -39,6 +39,7 @@ dependencies:
 
   # Media
   image_picker: 1.0.4
+  app_links: 3.5.0
 
   # Map utils
   latlong2: 0.9.0
@@ -54,6 +55,7 @@ flutter:
 
   assets:
     - assets/444.jpg
+    - assets/chat_bg.jpg
 
   # To add assets to your application, add an assets section, like this:
   # assets:

@@ -83,40 +83,43 @@ class GroupService {
   }
 
   Future<String> createGroup(
-    String tripId,
+    String? tripId,
     String name,
     String description,
     String creatorId,
     String? imageUrl,
   ) async {
     _ensureSignedInUser(creatorId);
-    final trimmedTripId = tripId.trim();
+    final trimmedTripId = tripId?.trim() ?? '';
     final trimmedName = name.trim();
     final trimmedDescription = description.trim();
 
-    if (trimmedTripId.isEmpty || trimmedName.isEmpty) {
-      throw _invalidArgument('Trip ID and group name are required.');
+    if (trimmedName.isEmpty) {
+      throw _invalidArgument('Group name is required.');
     }
 
     final groupRef = _groups.doc();
     final creatorMemberRef = _memberRef(groupRef.id, creatorId);
-    final tripRef = _trips.doc(trimmedTripId);
 
     try {
-      final tripSnapshot = await tripRef.get();
-      if (!tripSnapshot.exists) {
-        throw _invalidArgument('Trip not found.');
-      }
+      DocumentReference<Map<String, dynamic>>? tripRef;
+      if (trimmedTripId.isNotEmpty) {
+        tripRef = _trips.doc(trimmedTripId);
+        final tripSnapshot = await tripRef.get();
+        if (!tripSnapshot.exists) {
+          throw _invalidArgument('Trip not found.');
+        }
 
-      final tripData = tripSnapshot.data() ?? const <String, dynamic>{};
-      final existingGroupId = (tripData['groupId'] ?? '').toString().trim();
-      if (existingGroupId.isNotEmpty) {
-        throw _invalidArgument('This trip already has a group chat.');
+        final tripData = tripSnapshot.data() ?? const <String, dynamic>{};
+        final existingGroupId = (tripData['groupId'] ?? '').toString().trim();
+        if (existingGroupId.isNotEmpty) {
+          throw _invalidArgument('This trip already has a group chat.');
+        }
       }
 
       final batch = _firestore.batch();
       batch.set(groupRef, <String, dynamic>{
-        'tripId': trimmedTripId,
+        'tripId': trimmedTripId.isEmpty ? null : trimmedTripId,
         'name': trimmedName,
         'description': trimmedDescription,
         'members': <String>[creatorId],
@@ -129,7 +132,9 @@ class GroupService {
         'role': GroupRole.admin.value,
         'joinedAt': FieldValue.serverTimestamp(),
       });
-      batch.update(tripRef, <String, dynamic>{'groupId': groupRef.id});
+      if (tripRef != null) {
+        batch.update(tripRef, <String, dynamic>{'groupId': groupRef.id});
+      }
       await batch.commit();
 
       await _notificationService.subscribeToGroup(groupRef.id);
@@ -151,6 +156,52 @@ class GroupService {
       _logFirestoreError('createGroup', error, stackTrace);
       rethrow;
     }
+  }
+
+  Future<void> linkChecklistToGroup({
+    required String groupId,
+    required String tripId,
+    required String userId,
+  }) async {
+    _ensureSignedInUser(userId);
+    final trimmedTripId = tripId.trim();
+    if (trimmedTripId.isEmpty) {
+      throw _invalidArgument('Trip ID is required.');
+    }
+
+    await _assertMember(groupId, userId);
+
+    final groupRef = _groups.doc(groupId);
+    final tripRef = _trips.doc(trimmedTripId);
+
+    final groupSnapshot = await groupRef.get();
+    if (!groupSnapshot.exists) {
+      throw _invalidArgument('Group not found.');
+    }
+
+    final tripSnapshot = await tripRef.get();
+    if (!tripSnapshot.exists) {
+      throw _invalidArgument('Trip not found.');
+    }
+
+    final tripData = tripSnapshot.data() ?? const <String, dynamic>{};
+    final linkedGroupId = (tripData['groupId'] ?? '').toString().trim();
+    if (linkedGroupId.isNotEmpty && linkedGroupId != groupId) {
+      throw _invalidArgument('This checklist is already linked to another group.');
+    }
+
+    final batch = _firestore.batch();
+    batch.update(groupRef, <String, dynamic>{
+      'tripId': trimmedTripId,
+    });
+    batch.set(
+      tripRef,
+      <String, dynamic>{'groupId': groupId},
+      SetOptions(merge: true),
+    );
+    await batch.commit();
+
+    await _chatService.sendSystemMessage(groupId, 'Checklist linked to this group');
   }
 
   Future<String> uploadGroupImage({
@@ -237,6 +288,13 @@ class GroupService {
       return null;
     }
     return Member.fromFirestore(snapshot).role;
+  }
+
+  Future<void> _assertMember(String groupId, String userId) async {
+    final role = await getUserRole(groupId, userId);
+    if (role == null) {
+      throw _permissionDenied('You must be a group member to update this group.');
+    }
   }
 
   Future<Map<String, String>> resolveUserNames(Iterable<String> userIds) async {

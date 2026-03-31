@@ -50,8 +50,8 @@ class ChatMessageBubble extends StatelessWidget {
     }
 
     final backgroundColor = _isMine
-        ? const Color(0xFFFFE0B2)
-        : const Color(0xFFF5F5F5);
+        ? const Color(0xFFFEE8C7)
+        : const Color(0xFFEEFAEE);
     final alignment =
         _isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start;
     final radius = BorderRadius.only(
@@ -132,7 +132,7 @@ class ChatMessageBubble extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      isSeenByCurrentUser ? '✔ Seen' : 'Sent',
+                      isSeenByCurrentUser ? 'Seen' : 'Sent',
                       style: const TextStyle(
                         fontSize: 11,
                         color: Color(0xFF6B7280),

@@ -11,6 +11,8 @@ import '../models/group_role.dart';
 import '../services/chat_service.dart';
 import '../services/group_service.dart';
 import '../services/invite_service.dart';
+import 'group_checklist_flow.dart';
+import 'group_details_page.dart';
 import 'widgets/chat_composer.dart';
 import 'widgets/chat_message_bubble.dart';
 
@@ -225,31 +227,67 @@ class _GroupChatPageState extends State<GroupChatPage> {
         final group = groupSnapshot.data;
         return Scaffold(
           appBar: AppBar(
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+            surfaceTintColor: Colors.transparent,
+            scrolledUnderElevation: 0,
+            elevation: 0,
             titleSpacing: 12,
-            title: Row(
-              children: [
-                CircleAvatar(
-                  radius: 20,
-                  backgroundColor: const Color(0xFFFFE0B2),
-                  backgroundImage: group?.imageUrl == null
-                      ? null
-                      : NetworkImage(group!.imageUrl!),
-                  child: group?.imageUrl == null
-                      ? const Icon(Icons.groups, color: Colors.orange)
-                      : null,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    group?.name.trim().isNotEmpty == true
-                        ? group!.name
-                        : 'Group Chat',
-                    overflow: TextOverflow.ellipsis,
+            title: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: group == null
+                  ? null
+                  : () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => GroupDetailsPage(
+                            groupId: widget.groupId,
+                            groupService: _groupService,
+                          ),
+                        ),
+                      );
+                    },
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundColor: const Color(0xFFFFE0B2),
+                    backgroundImage: group?.imageUrl == null
+                        ? null
+                        : NetworkImage(group!.imageUrl!),
+                    child: group?.imageUrl == null
+                        ? const Icon(Icons.groups, color: Colors.orange)
+                        : null,
                   ),
-                ),
-              ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      group?.name.trim().isNotEmpty == true
+                          ? group!.name
+                          : 'Group Chat',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
             ),
             actions: [
+              if (group != null)
+                IconButton(
+                  onPressed: () => openGroupChecklistFlow(
+                    context: context,
+                    group: group,
+                    groupId: widget.groupId,
+                    groupService: _groupService,
+                  ),
+                  tooltip: (group.tripId?.trim().isEmpty ?? true)
+                      ? 'Link to checklist'
+                      : 'Open checklist',
+                  icon: Icon(
+                    (group.tripId?.trim().isEmpty ?? true)
+                        ? Icons.fact_check
+                        : Icons.checklist,
+                  ),
+                ),
               IconButton(
                 onPressed: _copyInviteLink,
                 tooltip: 'Copy invite link',
@@ -257,66 +295,86 @@ class _GroupChatPageState extends State<GroupChatPage> {
               ),
             ],
           ),
-          body: Column(
+          body: Stack(
             children: [
-              _PinnedMessageBanner(
-                groupId: widget.groupId,
-                chatService: _chatService,
-                senderNames: _senderNames,
+              Positioned.fill(
+                child: Image.asset(
+                  'assets/chat_bg.jpg',
+                  fit: BoxFit.cover,
+                ),
               ),
-              Expanded(
-                child: StreamBuilder<List<ChatMessage>>(
-                  stream: _messagesStream,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    if (snapshot.hasError) {
-                      return const Center(child: Text('Unable to load messages'));
-                    }
+              Positioned.fill(
+                child: Container(
+                  color: Colors.transparent,
+                ),
+              ),
+              Column(
+                children: [
+                  _PinnedMessageBanner(
+                    groupId: widget.groupId,
+                    chatService: _chatService,
+                    senderNames: _senderNames,
+                  ),
+                  Expanded(
+                    child: StreamBuilder<List<ChatMessage>>(
+                      stream: _messagesStream,
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }
+                        if (snapshot.hasError) {
+                          return const Center(
+                            child: Text('Unable to load messages'),
+                          );
+                        }
 
-                    final messages = snapshot.data ?? const <ChatMessage>[];
-                    if (messages.isEmpty) {
-                      return const Center(
-                        child: Text('No messages yet. Start the conversation.'),
-                      );
-                    }
+                        final messages = snapshot.data ?? const <ChatMessage>[];
+                        if (messages.isEmpty) {
+                          return const Center(
+                            child: Text(
+                              'No messages yet. Start the conversation.',
+                            ),
+                          );
+                        }
 
-                    _queueAutoScroll(messages.length);
+                        _queueAutoScroll(messages.length);
 
-                    return ListView.builder(
-                      reverse: true,
-                      controller: _scrollController,
-                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
-                      itemCount: messages.length,
-                      itemBuilder: (context, index) {
-                        final message = messages[index];
-                        final senderName = message.senderId == _currentUserId
-                            ? 'You'
-                            : (_senderNames[message.senderId] ?? 'Member');
-                        return ChatMessageBubble(
-                          message: message,
-                          senderName: senderName,
-                          currentUserId: _currentUserId,
-                          isSeenByCurrentUser:
-                              _currentUserId != null &&
-                              message.hasRead(_currentUserId!),
-                          canPin: _role == GroupRole.admin &&
-                              message.type != ChatMessageType.system,
-                          onTogglePin: () => _togglePin(message),
+                        return ListView.builder(
+                          controller: _scrollController,
+                          padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+                          itemCount: messages.length,
+                          itemBuilder: (context, index) {
+                            final message = messages[index];
+                            final senderName =
+                                _senderNames[message.senderId] ?? 'Member';
+                            return ChatMessageBubble(
+                              key: ValueKey(message.id),
+                              message: message,
+                              senderName: senderName,
+                              currentUserId: _currentUserId,
+                              isSeenByCurrentUser:
+                                  _currentUserId != null &&
+                                  message.hasRead(_currentUserId!),
+                              canPin: _role == GroupRole.admin &&
+                                  message.type != ChatMessageType.system,
+                              onTogglePin: () => _togglePin(message),
+                            );
+                          },
                         );
                       },
-                    );
-                  },
-                ),
-              ),
-              SafeArea(
-                top: false,
-                child: ChatComposer(
-                  isSending: _sending,
-                  enabled: _role != null,
-                  onSend: _handleSend,
-                ),
+                    ),
+                  ),
+                  SafeArea(
+                    top: false,
+                    child: ChatComposer(
+                      isSending: _sending,
+                      enabled: _role != null,
+                      onSend: _handleSend,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -349,41 +407,25 @@ class _PinnedMessageBanner extends StatelessWidget {
 
         return Container(
           width: double.infinity,
-          margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-          padding: const EdgeInsets.all(14),
+          margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: const Color(0xFFFFF3E0),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFFFCC80)),
+            color: Colors.orange.shade100,
+            borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.push_pin, size: 18, color: Colors.orange),
-              const SizedBox(width: 10),
+              const Icon(Icons.push_pin, size: 16, color: Colors.orange),
+              const SizedBox(width: 6),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Pinned message',
-                      style: TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      senderNames[message.senderId] ?? 'Member',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF6B7280),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      message.content,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+                child: Text(
+                  'Pinned: ${message.content}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],

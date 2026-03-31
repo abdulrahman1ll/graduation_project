@@ -69,16 +69,13 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
 
   Future<void> _save() async {
     final userId = FirebaseAuth.instance.currentUser?.uid;
-    final tripId = _selectedTripId;
     if (userId == null) {
       return;
     }
-    if (tripId == null ||
-        tripId.trim().isEmpty ||
-        _nameController.text.trim().isEmpty ||
+    if (_nameController.text.trim().isEmpty ||
         _descriptionController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Trip, name, and description are required.')),
+        const SnackBar(content: Text('Name and description are required.')),
       );
       return;
     }
@@ -86,7 +83,7 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
     setState(() => _saving = true);
     try {
       final groupId = await _groupService.createGroup(
-        tripId,
+        _selectedTripId,
         _nameController.text.trim(),
         _descriptionController.text.trim(),
         userId,
@@ -174,6 +171,7 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
+                hint: const Text('Checklist trip link (optional)'),
                 initialValue: availableTrips.any((doc) => doc.id == _selectedTripId)
                     ? _selectedTripId
                     : null,
@@ -188,8 +186,10 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
                 onChanged: _saving
                     ? null
                     : (value) => setState(() => _selectedTripId = value),
-                decoration: const InputDecoration(
-                  labelText: 'Trip',
+                decoration: InputDecoration(
+                  labelText: 'Checklist trip',
+                  helperText:
+                      'Leave empty if you do not want to link this group to a checklist.',
                   border: OutlineInputBorder(),
                 ),
               ),
