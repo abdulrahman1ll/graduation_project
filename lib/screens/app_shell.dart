@@ -21,6 +21,9 @@ import '../utils/checklist_utils.dart';
 import '../utils/firestore_utils.dart';
 import '../utils/localization.dart';
 import '../widgets/language_app_bar.dart';
+import 'welcome_preferences_page.dart';
+
+
 
 part 'auth_page.dart';
 part 'main_screen.dart';
@@ -79,6 +82,10 @@ class _KashtaAppState extends State<KashtaApp> {
       child: MaterialApp(
         navigatorKey: _deepLinkService.navigatorKey,
         debugShowCheckedModeBanner: false,
+        routes: {
+    '/welcome_preferences': (context) => const WelcomePreferencesPage(),
+    
+  },
         home: Directionality(
           textDirection: isArabic ? TextDirection.rtl : TextDirection.ltr,
           child: AuthGate(
@@ -115,19 +122,39 @@ class AuthGate extends StatelessWidget {
           );
         }
 
-        if (snapshot.data == null) {
-          return AuthPage(
-            tr: tr,
-            isArabic: isArabic,
-            onToggleLanguage: onToggleLanguage,
-          );
-        }
+       if (snapshot.data == null) {
+  return AuthPage(
+    tr: tr,
+    isArabic: isArabic,
+    onToggleLanguage: onToggleLanguage,
+  );
+}
 
-        return MainScreen(
-          tr: tr,
-          isArabic: isArabic,
-          onToggleLanguage: onToggleLanguage,
-        );
+final user = snapshot.data;
+
+return FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+  future: FirebaseFirestore.instance.collection('users').doc(user!.uid).get(),
+  builder: (context, userSnap) {
+    if (userSnap.connectionState == ConnectionState.waiting) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final data = userSnap.data?.data();
+    final completed = data?['preferencesCompleted'] == true;
+
+    if (!completed) {
+      return const WelcomePreferencesPage();
+    }
+
+    return MainScreen(
+      tr: tr,
+      isArabic: isArabic,
+      onToggleLanguage: onToggleLanguage,
+    );
+  },
+);
       },
     );
   }

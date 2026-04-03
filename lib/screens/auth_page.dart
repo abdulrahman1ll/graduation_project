@@ -171,29 +171,27 @@ class _AuthPageState extends State<AuthPage> {
   }
 
   Future<void> _createDefaultUserDocument(User user) async {
-  print("🔥 FUNCTION CALLED");
-
-  await FirebaseFirestore.instance
-      .collection('users')
-      .doc(user.uid)
-      .set({
-    'email': user.email,
-    'createdAt': FieldValue.serverTimestamp(),
-    'roles': {
-      'regularUser': true,
-    },
-    'preferences': {
-      'placeType': 'desert',
-      'distancePreference': 'near',
-    },
-  }, SetOptions(merge: true));
-
-  print("🔥 FIRESTORE WRITE DONE");
-}
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .set({
+      'email': user.email,
+      'createdAt': FieldValue.serverTimestamp(),
+      'roles': {
+        'regularUser': true,
+      },
+      'preferences': {
+        'placeType': 'desert',
+        'distancePreference': 'near',
+        'temperaturePreference': 'cool',
+      },'preferencesCompleted' :false,
+    }, SetOptions(merge: true));
+  }
 
   Future<void> _signInWithEmail() async {
     final email = _emailController.text.trim();
     final pass = _passwordController.text.trim();
+
     if (email.isEmpty || pass.isEmpty) {
       _snack(widget.tr.t('email_password_required'));
       return;
@@ -208,80 +206,84 @@ class _AuthPageState extends State<AuthPage> {
       final user = credential.user;
       if (user != null) {
         await _createDefaultUserDocument(user);
+        if (!mounted) return;
+Navigator.pushReplacementNamed(context, '/welcome_preferences');
       }
     });
   }
 
   Future<void> _signUpWithEmail() async {
-  final email = _emailController.text.trim();
-  final pass = _passwordController.text.trim();
+    final email = _emailController.text.trim();
+    final pass = _passwordController.text.trim();
 
-  if (email.isEmpty || pass.isEmpty) {
-    _snack(widget.tr.t('email_password_required'));
-    return;
-  }
-
-  try {
-    final credential =
-        await FirebaseAuth.instance.createUserWithEmailAndPassword(
-      email: email,
-      password: pass,
-    );
-
-    final user = credential.user;
-    if (user != null) {
-      print("USER CREATED FROM TRY: ${user.uid}");
-      await _createDefaultUserDocument(user);
-    }
-  } catch (e) {
-    print("SIGN UP ERROR: $e");
-
-    // workaround: أحيانًا الحساب يتسجل فعلًا ثم البلجن يرمي exception
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null && user.email == email) {
-      print("USER CREATED FROM CATCH: ${user.uid}");
-      await _createDefaultUserDocument(user);
+    if (email.isEmpty || pass.isEmpty) {
+      _snack(widget.tr.t('email_password_required'));
       return;
     }
 
-    _snack(e.toString());
-  }
-}
+    try {
+      final credential =
+          await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: email,
+        password: pass,
+      );
 
-  Future<void> _signInWithGoogle() async {
-  try {
-    if (kIsWeb) {
-      await FirebaseAuth.instance.signInWithPopup(GoogleAuthProvider());
-
-      final user = FirebaseAuth.instance.currentUser;
+      final user = credential.user;
       if (user != null) {
         await _createDefaultUserDocument(user);
+        if (!mounted) return;
+Navigator.pushReplacementNamed(context, '/welcome_preferences');
       }
-      return;
+    } catch (e) {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null && user.email == email) {
+        await _createDefaultUserDocument(user);
+        if (!mounted) return;
+Navigator.pushReplacementNamed(context, '/welcome_preferences');
+        return;
+      }
+
+      _snack(e.toString());
     }
-
-    final googleUser = await GoogleSignIn().signIn();
-    if (googleUser == null) return;
-
-    final googleAuth = await googleUser.authentication;
-
-    final credential = GoogleAuthProvider.credential(
-      accessToken: googleAuth.accessToken,
-      idToken: googleAuth.idToken,
-    );
-
-    final userCredential =
-        await FirebaseAuth.instance.signInWithCredential(credential);
-
-    final user = userCredential.user;
-    if (user != null) {
-      await _createDefaultUserDocument(user);
-    }
-  } catch (e) {
-    print("GOOGLE SIGN IN ERROR: $e");
-    _snack(e.toString());
   }
-}
+
+  Future<void> _signInWithGoogle() async {
+    try {
+      if (kIsWeb) {
+        await FirebaseAuth.instance.signInWithPopup(GoogleAuthProvider());
+
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          await _createDefaultUserDocument(user);
+          if (!mounted) return;
+Navigator.pushReplacementNamed(context, '/welcome_preferences');
+        }
+        return;
+      }
+
+      final googleUser = await GoogleSignIn().signIn();
+      if (googleUser == null) return;
+
+      final googleAuth = await googleUser.authentication;
+
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      final userCredential =
+          await FirebaseAuth.instance.signInWithCredential(credential);
+
+      final user = userCredential.user;
+      if (user != null) {
+        await _createDefaultUserDocument(user);
+        if (!mounted) return;
+Navigator.pushReplacementNamed(context, '/welcome_preferences');
+      }
+    } catch (e) {
+      _snack(e.toString());
+    }
+  }
 
   Future<void> _signInWithPhone() async {
     final phone = await _askInput(
@@ -304,6 +306,8 @@ class _AuthPageState extends State<AuthPage> {
           final user = userCredential.user;
           if (user != null) {
             await _createDefaultUserDocument(user);
+            if (!mounted) return;
+Navigator.pushReplacementNamed(context, '/welcome_preferences');
           }
         },
         verificationFailed: (e) {
@@ -334,6 +338,8 @@ class _AuthPageState extends State<AuthPage> {
           final user = userCredential.user;
           if (user != null) {
             await _createDefaultUserDocument(user);
+            if (!mounted) return;
+Navigator.pushReplacementNamed(context, '/welcome_preferences');
           }
         },
         codeAutoRetrievalTimeout: (_) {},
@@ -347,19 +353,9 @@ class _AuthPageState extends State<AuthPage> {
 
       final user = userCredential.user;
       if (user != null) {
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .set({
-          'createdAt': FieldValue.serverTimestamp(),
-          'roles': {
-            'regularUser': true,
-          },
-          'preferences': {
-            'placeType': 'desert',
-            'distancePreference': 'near',
-          },
-        }, SetOptions(merge: true));
+        await _createDefaultUserDocument(user);
+        if (!mounted) return;
+Navigator.pushReplacementNamed(context, '/welcome_preferences');
       }
     });
   }
