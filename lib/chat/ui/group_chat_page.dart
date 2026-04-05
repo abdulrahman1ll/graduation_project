@@ -405,30 +405,95 @@ class _PinnedMessageBanner extends StatelessWidget {
           return const SizedBox.shrink();
         }
 
-        return Container(
-          width: double.infinity,
-          margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: Colors.orange.shade100,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.push_pin, size: 16, color: Colors.orange),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  'Pinned: ${message.content}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
+        return InkWell(
+          onTap: () => _showPinnedMessagesSheet(context),
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            width: double.infinity,
+            margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.orange.shade100,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.push_pin, size: 16, color: Colors.orange),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Pinned: ${message.content}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showPinnedMessagesSheet(BuildContext context) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: SizedBox(
+            height: MediaQuery.of(sheetContext).size.height * 0.6,
+            child: StreamBuilder<List<ChatMessage>>(
+              stream: chatService.watchPinnedMessages(groupId),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                final messages = snapshot.data ?? const <ChatMessage>[];
+                if (messages.isEmpty) {
+                  return const Center(child: Text('No pinned messages'));
+                }
+
+                return ListView.separated(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: messages.length,
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 10),
+                  itemBuilder: (context, index) {
+                    final message = messages[index];
+                    final senderName =
+                        senderNames[message.senderId] ?? 'Member';
+                    return Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF3E0),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            senderName,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF6B7280),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(message.content),
+                        ],
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
           ),
         );
       },

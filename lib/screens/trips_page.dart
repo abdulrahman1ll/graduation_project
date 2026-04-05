@@ -24,7 +24,6 @@ class TripsPage extends StatelessWidget {
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: FirebaseFirestore.instance
             .collection('trips')
-            .where('visibility', isEqualTo: 'public')
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -217,7 +216,7 @@ class _TripStatCard extends StatelessWidget {
   }
 }
 
-class AddChecklistItemsPage extends StatelessWidget {
+class AddChecklistItemsPage extends StatefulWidget {
   const AddChecklistItemsPage({
     super.key,
     required this.tr,
@@ -227,22 +226,77 @@ class AddChecklistItemsPage extends StatelessWidget {
   final Tr tr;
   final String tripId;
 
+  @override
+  State<AddChecklistItemsPage> createState() => _AddChecklistItemsPageState();
+}
+
+class _AddChecklistItemsPageState extends State<AddChecklistItemsPage> {
+  final TextEditingController _searchController = TextEditingController();
+  final Set<String> _expandedCategories = <String>{};
+
+  String _searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(_handleSearchChanged);
+  }
+
+  @override
+  void dispose() {
+    _searchController
+      ..removeListener(_handleSearchChanged)
+      ..dispose();
+    super.dispose();
+  }
+
+  void _handleSearchChanged() {
+    final nextQuery = _searchController.text.trim().toLowerCase();
+    if (nextQuery == _searchQuery) {
+      return;
+    }
+    setState(() => _searchQuery = nextQuery);
+  }
+
   Future<void> _addTemplateToTripChecklist(
     BuildContext context,
-    String templateId,
-    Map<String, dynamic> data,
+    _ChecklistTemplateGroupView group,
+    QueryDocumentSnapshot<Map<String, dynamic>> itemDoc,
   ) async {
     final userId = FirebaseAuth.instance.currentUser?.uid;
+    final itemData = itemDoc.data();
+    final itemId = itemDoc.id;
+    final itemName = checklistDisplayName(
+      tr: widget.tr,
+      data: itemData,
+      arKey: 'name_ar',
+      enKey: 'name_en',
+      fallbackKey: 'name',
+    );
+    final groupName = checklistDisplayName(
+      tr: widget.tr,
+      data: group.data,
+      arKey: 'name_ar',
+      enKey: 'name_en',
+      fallbackKey: 'category',
+    );
+
     try {
       await FirebaseFirestore.instance
           .collection('trips')
-          .doc(tripId)
+          .doc(widget.tripId)
           .collection('checklist')
-          .doc(templateId)
+          .doc(itemId)
           .set({
-            'name': (data['name'] ?? '').toString(),
-            'category': (data['category'] ?? '').toString(),
-            'icon': (data['icon'] ?? 'checklist').toString(),
+            'itemId': itemId,
+            'groupId': group.id,
+            'sourceTemplatePath': group.reference.path,
+            'name': itemName,
+            'name_ar': (itemData['name_ar'] ?? '').toString(),
+            'name_en': (itemData['name_en'] ?? '').toString(),
+            'category': groupName,
+            'category_ar': (group.data['name_ar'] ?? '').toString(),
+            'category_en': (group.data['name_en'] ?? '').toString(),
             'done': false,
             'addedBy': userId ?? 'unknown',
             'assignedTo': null,
@@ -252,7 +306,9 @@ class AddChecklistItemsPage extends StatelessWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text(tr.t('checklist_item_added'))));
+        ).showSnackBar(
+          SnackBar(content: Text(widget.tr.t('checklist_item_added'))),
+        );
       }
     } on FirebaseException catch (e) {
       if (context.mounted) {
@@ -262,7 +318,7 @@ class AddChecklistItemsPage extends StatelessWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text(tr.t('save_failed'))));
+        ).showSnackBar(SnackBar(content: Text(widget.tr.t('save_failed'))));
       }
     }
   }
@@ -270,130 +326,353 @@ class AddChecklistItemsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(tr.t('add_checklist_items'))),
+      appBar: AppBar(title: Text(widget.tr.t('add_checklist_items'))),
       backgroundColor: Colors.white,
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: FirebaseFirestore.instance
             .collection('checklist_templates')
+            .orderBy('order')
             .snapshots(),
-        builder: (context, templatesSnapshot) {
-          if (templatesSnapshot.connectionState == ConnectionState.waiting) {
+        builder: (context, groupsSnapshot) {
+          if (groupsSnapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (templatesSnapshot.hasError) {
+          if (groupsSnapshot.hasError) {
             logFirestoreReadError(
               'checklist_templates',
-              templatesSnapshot.error,
+              groupsSnapshot.error,
             );
-            return Center(child: Text(tr.t('load_error')));
+            return Center(child: Text(widget.tr.t('load_error')));
           }
 
-          final docs = templatesSnapshot.data?.docs ?? [];
-          if (docs.isEmpty) {
-            return Center(child: Text(tr.t('no_checklist_templates')));
+          final groupDocs = groupsSnapshot.data?.docs ?? [];
+          if (groupDocs.isEmpty) {
+            return Center(child: Text(widget.tr.t('no_checklist_templates')));
           }
 
           return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream: FirebaseFirestore.instance
-                .collection('trips')
-                .doc(tripId)
-                .collection('checklist')
-                .snapshots(),
-            builder: (context, checklistSnapshot) {
-              if (checklistSnapshot.hasError) {
+            stream: FirebaseFirestore.instance.collectionGroup('items').snapshots(),
+            builder: (context, itemsSnapshot) {
+              if (itemsSnapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (itemsSnapshot.hasError) {
                 logFirestoreReadError(
-                  'trips/*/checklist',
-                  checklistSnapshot.error,
+                  'checklist_templates/*/items',
+                  itemsSnapshot.error,
                 );
-              }
-              final existingIds =
-                  checklistSnapshot.data?.docs.map((doc) => doc.id).toSet() ??
-                  <String>{};
-
-              final grouped =
-                  <String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>{};
-              for (final doc in docs) {
-                final data = doc.data();
-                final category = (data['category'] ?? tr.t('other')).toString();
-                grouped.putIfAbsent(
-                  category,
-                  () => <QueryDocumentSnapshot<Map<String, dynamic>>>[],
-                );
-                grouped[category]!.add(doc);
-              }
-              final categoryCounts = categoryTemplateCounts(docs, tr);
-              final categories = grouped.keys.toList()..sort();
-              for (final category in categories) {
-                grouped[category]!.sort((a, b) {
-                  final aName = (a.data()['name'] ?? '').toString();
-                  final bName = (b.data()['name'] ?? '').toString();
-                  return aName.compareTo(bName);
-                });
+                return Center(child: Text(widget.tr.t('load_error')));
               }
 
-              return ListView.builder(
-                padding: const EdgeInsets.all(12),
-                itemCount: categories.length,
-                itemBuilder: (context, index) {
-                  final category = categories[index];
-                  final items = grouped[category]!;
-                  final count = categoryCounts[category] ?? 0;
-                  return Card(
-                    elevation: 1.2,
-                    color: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: ExpansionTile(
-                      title: Text(
-                        '$category ($count)',
-                        style: const TextStyle(fontWeight: FontWeight.w700),
+              return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: FirebaseFirestore.instance
+                    .collection('trips')
+                    .doc(widget.tripId)
+                    .collection('checklist')
+                    .snapshots(),
+                builder: (context, checklistSnapshot) {
+                  if (checklistSnapshot.hasError) {
+                    logFirestoreReadError(
+                      'trips/*/checklist',
+                      checklistSnapshot.error,
+                    );
+                  }
+
+                  final existingItemIds =
+                      checklistSnapshot.data?.docs
+                          .map((doc) {
+                            final data = doc.data();
+                            final itemId = (data['itemId'] ?? '').toString().trim();
+                            if (itemId.isNotEmpty) {
+                              return itemId;
+                            }
+                            return '';
+                          })
+                          .where((itemId) => itemId.isNotEmpty)
+                          .toSet() ??
+                      <String>{};
+
+                  final groupById = <String, QueryDocumentSnapshot<Map<String, dynamic>>>{
+                    for (final doc in groupDocs) doc.id: doc,
+                  };
+                  final groupedItems =
+                      <String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>{};
+
+                  for (final itemDoc
+                      in itemsSnapshot.data?.docs ??
+                          <QueryDocumentSnapshot<Map<String, dynamic>>>[]) {
+                    final groupRef = itemDoc.reference.parent.parent;
+                    final parentCollectionId = groupRef?.parent.id;
+                    final groupId = groupRef?.id;
+                    if (parentCollectionId != 'checklist_templates' ||
+                        groupId == null ||
+                        !groupById.containsKey(groupId)) {
+                      continue;
+                    }
+                    groupedItems.putIfAbsent(
+                      groupId,
+                      () => <QueryDocumentSnapshot<Map<String, dynamic>>>[],
+                    );
+                    groupedItems[groupId]!.add(itemDoc);
+                  }
+
+                  final groups = <_ChecklistTemplateGroupView>[];
+                  for (final groupDoc in groupDocs) {
+                    final groupId = groupDoc.id;
+                    final groupData = groupDoc.data();
+                    final groupItems = [
+                      ...(groupedItems[groupId] ??
+                          <QueryDocumentSnapshot<Map<String, dynamic>>>[]),
+                    ]
+                      ..sort((a, b) {
+                        final aOrder = (a.data()['order'] as num?)?.toInt() ?? 9999;
+                        final bOrder = (b.data()['order'] as num?)?.toInt() ?? 9999;
+                        return aOrder.compareTo(bOrder);
+                      });
+
+                    final groupNameAr = (groupData['name_ar'] ?? '').toString();
+                    final groupNameEn = (groupData['name_en'] ?? '').toString();
+                    final filteredItems = groupItems.where((itemDoc) {
+                      if (_searchQuery.isEmpty) {
+                        return true;
+                      }
+
+                      final itemData = itemDoc.data();
+                      final itemNameAr =
+                          (itemData['name_ar'] ?? '').toString().toLowerCase();
+                      final itemNameEn =
+                          (itemData['name_en'] ?? '').toString().toLowerCase();
+                      final normalizedQuery = _searchQuery.toLowerCase();
+                      final matchesItem = itemNameAr.contains(normalizedQuery) ||
+                          itemNameEn.contains(normalizedQuery);
+                      final matchesGroup =
+                          groupNameAr.toLowerCase().contains(normalizedQuery) ||
+                          groupNameEn.toLowerCase().contains(normalizedQuery);
+                      return matchesItem || matchesGroup;
+                    }).toList();
+
+                    if (filteredItems.isEmpty) {
+                      continue;
+                    }
+
+                    groups.add(
+                      _ChecklistTemplateGroupView(
+                        id: groupId,
+                        reference: groupDoc.reference,
+                        data: groupData,
+                        items: filteredItems,
                       ),
-                      children: items.map((itemDoc) {
-                        final data = itemDoc.data();
-                        final iconName = (data['icon'] ?? 'checklist')
-                            .toString();
-                        final name = (data['name'] ?? '').toString();
-                        final alreadyAdded = existingIds.contains(itemDoc.id);
-                        return ListTile(
-                          leading: Icon(
-                            iconFromName(iconName),
-                            color: Colors.orange,
+                    );
+                  }
+
+                  return Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                        child: TextField(
+                          controller: _searchController,
+                          decoration: InputDecoration(
+                            hintText: widget.tr.language == AppLanguage.ar
+                                ? 'ابحث في عناصر القائمة'
+                                : 'Search checklist items',
+                            prefixIcon: const Icon(Icons.search),
+                            filled: true,
+                            fillColor: const Color(0xFFF7F7F7),
+                            contentPadding: const EdgeInsets.symmetric(
+                              vertical: 14,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(22),
+                              borderSide: BorderSide(color: Colors.grey.shade300),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(22),
+                              borderSide: BorderSide(color: Colors.grey.shade300),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(22),
+                              borderSide: const BorderSide(color: Colors.orange),
+                            ),
                           ),
-                          title: Text(name),
-                          trailing: alreadyAdded
-                              ? Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(
-                                      Icons.check_circle,
-                                      color: Colors.green,
-                                      size: 20,
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      tr.t('added'),
-                                      style: const TextStyle(
-                                        color: Colors.green,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
-                                )
-                              : IconButton(
-                                  icon: const Icon(
-                                    Icons.add_circle,
-                                    color: Colors.orange,
-                                  ),
-                                  onPressed: () => _addTemplateToTripChecklist(
-                                    context,
-                                    itemDoc.id,
-                                    data,
-                                  ),
+                        ),
+                      ),
+                      Expanded(
+                        child: groups.isEmpty
+                            ? Center(
+                                child: Text(
+                                  widget.tr.language == AppLanguage.ar
+                                      ? 'لا توجد عناصر مطابقة'
+                                      : 'No matching items',
                                 ),
-                        );
-                      }).toList(),
-                    ),
+                              )
+                            : ListView.builder(
+                                padding: const EdgeInsets.all(12),
+                                itemCount: groups.length,
+                                itemBuilder: (context, index) {
+                                  final isArabic =
+                                      Localizations.localeOf(context)
+                                          .languageCode ==
+                                      'ar';
+                                  final group = groups[index];
+                                  final groupTitle = checklistDisplayName(
+                                    tr: widget.tr,
+                                    data: group.data,
+                                    arKey: 'name_ar',
+                                    enKey: 'name_en',
+                                    fallbackKey: 'category',
+                                  );
+                                  final groupEmoji =
+                                      emojiForChecklistGroupId(group.id);
+                                  final isExpanded = _searchQuery.isNotEmpty ||
+                                      _expandedCategories.contains(group.id);
+
+                                  return Card(
+                                    margin: const EdgeInsets.symmetric(
+                                      vertical: 8,
+                                      horizontal: 12,
+                                    ),
+                                    elevation: 1.5,
+                                    color: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                    child: ExpansionTile(
+                                      key: PageStorageKey<String>(
+                                        'checklist-group-${group.id}-${_searchQuery.isNotEmpty}',
+                                      ),
+                                      tilePadding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 10,
+                                      ),
+                                      childrenPadding: const EdgeInsets.fromLTRB(
+                                        16,
+                                        8,
+                                        16,
+                                        16,
+                                      ),
+                                      initiallyExpanded: isExpanded,
+                                      onExpansionChanged: (expanded) {
+                                        setState(() {
+                                          if (expanded) {
+                                            _expandedCategories.add(group.id);
+                                          } else {
+                                            _expandedCategories.remove(group.id);
+                                          }
+                                        });
+                                      },
+                                      title: Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.all(6),
+                                            decoration: BoxDecoration(
+                                              color:
+                                                  checklistGroupEmojiBackgroundColor(
+                                                    group.id,
+                                                  ).withValues(alpha: 0.9),
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: Text(
+                                              groupEmoji,
+                                              style: const TextStyle(fontSize: 22),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: Text(
+                                              '$groupTitle (${group.items.length})',
+                                              style: TextStyle(
+                                                fontSize: isArabic ? 15 : 16.5,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      children: group.items.map((itemDoc) {
+                                        final itemData = itemDoc.data();
+                                        final itemId = itemDoc.id;
+                                        final itemName = checklistDisplayName(
+                                          tr: widget.tr,
+                                          data: itemData,
+                                          arKey: 'name_ar',
+                                          enKey: 'name_en',
+                                          fallbackKey: 'name',
+                                        );
+                                        final alreadyAdded =
+                                            existingItemIds.contains(itemId);
+
+                                        return Padding(
+                                          padding: const EdgeInsets.only(top: 5),
+                                          child: Container(
+                                            decoration: BoxDecoration(
+                                              color: Colors.white,
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                            ),
+                                            child: ListTile(
+                                              dense: true,
+                                              contentPadding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 12,
+                                                    vertical: 4,
+                                                  ),
+                                              title: Text(
+                                                itemName,
+                                                style: TextStyle(
+                                                  fontSize: isArabic ? 16 : 17.5,
+                                                  fontWeight: isArabic
+                                                      ? FontWeight.w500
+                                                      : FontWeight.w400,
+                                                ),
+                                              ),
+                                              trailing: alreadyAdded
+                                                  ? Row(
+                                                      mainAxisSize:
+                                                          MainAxisSize.min,
+                                                      children: [
+                                                        const Icon(
+                                                          Icons.check_circle,
+                                                          color: Color(0xFF43A047),
+                                                          size: 18,
+                                                        ),
+                                                        const SizedBox(width: 6),
+                                                        Text(
+                                                          widget.tr.t('added'),
+                                                          style:
+                                                              const TextStyle(
+                                                                color: Color(
+                                                                  0xFF43A047,
+                                                                ),
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w600,
+                                                              ),
+                                                        ),
+                                                      ],
+                                                    )
+                                                  : IconButton(
+                                                      icon: const Icon(
+                                                        Icons.add_circle,
+                                                        color: Colors.orange,
+                                                        size: 18,
+                                                      ),
+                                                      onPressed: () =>
+                                                          _addTemplateToTripChecklist(
+                                                            context,
+                                                            group,
+                                                            itemDoc,
+                                                          ),
+                                                    ),
+                                            ),
+                                          ),
+                                        );
+                                      }).toList(),
+                                    ),
+                                  );
+                                },
+                              ),
+                      ),
+                    ],
                   );
                 },
               );
@@ -405,7 +684,79 @@ class AddChecklistItemsPage extends StatelessWidget {
   }
 }
 
-class TripChecklistPage extends StatelessWidget {
+class _ChecklistTemplateGroupView {
+  const _ChecklistTemplateGroupView({
+    required this.id,
+    required this.reference,
+    required this.data,
+    required this.items,
+  });
+
+  final String id;
+  final DocumentReference<Map<String, dynamic>> reference;
+  final Map<String, dynamic> data;
+  final List<QueryDocumentSnapshot<Map<String, dynamic>>> items;
+}
+
+Color _checklistAssignmentColor(String userId) {
+  const colors = [
+    Colors.blue,
+    Colors.green,
+    Colors.orange,
+    Colors.purple,
+    Colors.teal,
+  ];
+  return colors[userId.hashCode.abs() % colors.length];
+}
+
+class _ChecklistAssignmentPreview extends StatelessWidget {
+  const _ChecklistAssignmentPreview({
+    required this.assignedTo,
+    required this.currentUserId,
+  });
+
+  final String? assignedTo;
+  final String? currentUserId;
+
+  @override
+  Widget build(BuildContext context) {
+    final isUnassigned = assignedTo == null || assignedTo!.isEmpty;
+    final color = isUnassigned
+        ? Colors.grey
+        : _checklistAssignmentColor(assignedTo!).withValues(alpha: 0.8);
+    final dot = isUnassigned ? '○' : '●';
+    final label = isUnassigned
+        ? 'Unassigned'
+        : assignedTo == currentUserId
+        ? 'You'
+        : 'Member';
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          dot,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: color,
+          ),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w500,
+            color: color,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class TripChecklistPage extends StatefulWidget {
   const TripChecklistPage({
     super.key,
     required this.tr,
@@ -417,6 +768,35 @@ class TripChecklistPage extends StatelessWidget {
   final String tripId;
   final String tripTitle;
 
+  @override
+  State<TripChecklistPage> createState() => _TripChecklistPageState();
+}
+
+class _TripChecklistPageState extends State<TripChecklistPage> {
+  final Map<String, String?> _localAssignedToOverrides = <String, String?>{};
+
+  String? _effectiveAssignedTo(String itemId, String? persistedAssignedTo) {
+    if (_localAssignedToOverrides.containsKey(itemId)) {
+      return _localAssignedToOverrides[itemId];
+    }
+    return persistedAssignedTo;
+  }
+
+  void _toggleLocalAssignment({
+    required String itemId,
+    required String? currentUserId,
+    required String? assignedTo,
+  }) {
+    if (currentUserId == null || currentUserId.isEmpty) {
+      return;
+    }
+
+    setState(() {
+      _localAssignedToOverrides[itemId] =
+          assignedTo == currentUserId ? null : currentUserId;
+    });
+  }
+
   Future<void> _toggleDone(
     BuildContext context,
     String itemId,
@@ -425,7 +805,7 @@ class TripChecklistPage extends StatelessWidget {
     try {
       await FirebaseFirestore.instance
           .collection('trips')
-          .doc(tripId)
+          .doc(widget.tripId)
           .collection('checklist')
           .doc(itemId)
           .update({'done': newValue});
@@ -438,16 +818,21 @@ class TripChecklistPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+
     return Scaffold(
       appBar: AppBar(
-        title: Text('${tr.t('trip_checklist')} - $tripTitle'),
+        title: Text('${widget.tr.t('trip_checklist')} - ${widget.tripTitle}'),
         actions: [
           IconButton(
-            tooltip: tr.t('add'),
+            tooltip: widget.tr.t('add'),
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (_) => AddChecklistItemsPage(tr: tr, tripId: tripId),
+                  builder: (_) => AddChecklistItemsPage(
+                    tr: widget.tr,
+                    tripId: widget.tripId,
+                  ),
                 ),
               );
             },
@@ -459,7 +844,7 @@ class TripChecklistPage extends StatelessWidget {
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: FirebaseFirestore.instance
             .collection('trips')
-            .doc(tripId)
+            .doc(widget.tripId)
             .collection('checklist')
             .snapshots(),
         builder: (context, snapshot) {
@@ -468,10 +853,16 @@ class TripChecklistPage extends StatelessWidget {
           }
           if (snapshot.hasError) {
             logFirestoreReadError('trips/*/checklist', snapshot.error);
-            return Center(child: Text(tr.t('load_error')));
+            return Center(child: Text(widget.tr.t('load_error')));
           }
 
-          final docs = snapshot.data?.docs ?? [];
+          final docs =
+              (snapshot.data?.docs ?? [])
+                  .where((doc) {
+                    final itemId = (doc.data()['itemId'] ?? '').toString().trim();
+                    return itemId.isNotEmpty;
+                  })
+                  .toList();
           final sortedDocs = sortChecklistByCompletion(docs);
           final totalItems = sortedDocs.length;
           final doneCount = sortedDocs
@@ -488,14 +879,14 @@ class TripChecklistPage extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    tr.t('checklist_progress'),
+                    widget.tr.t('checklist_progress'),
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 6),
-                  Text('0 / 0 ${tr.t('items_completed')}'),
+                  Text('0 / 0 ${widget.tr.t('items_completed')}'),
                   const SizedBox(height: 10),
                   const LinearProgressIndicator(
                     value: 0,
@@ -504,7 +895,9 @@ class TripChecklistPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 24),
                   Expanded(
-                    child: Center(child: Text(tr.t('no_checklist_items'))),
+                    child: Center(
+                      child: Text(widget.tr.t('no_checklist_items')),
+                    ),
                   ),
                 ],
               ),
@@ -517,7 +910,7 @@ class TripChecklistPage extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
                 child: Text(
-                  tr.t('checklist_progress'),
+                  widget.tr.t('checklist_progress'),
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -527,7 +920,7 @@ class TripChecklistPage extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Text(
-                  '$doneCount / $totalItems ${tr.t('items_completed')}',
+                  '$doneCount / $totalItems ${widget.tr.t('items_completed')}',
                 ),
               ),
               Padding(
@@ -550,8 +943,24 @@ class TripChecklistPage extends StatelessWidget {
                     final doc = sortedDocs[index];
                     final data = doc.data();
                     final done = data['done'] == true;
-                    final iconName = (data['icon'] ?? 'checklist').toString();
-                    final itemName = (data['name'] ?? '').toString();
+                    final itemId = (data['itemId'] ?? '').toString();
+                    final persistedAssignedTo =
+                        (data['assignedTo'] as String?)?.trim();
+                    final assignedTo = _effectiveAssignedTo(
+                      itemId,
+                      persistedAssignedTo,
+                    );
+                    final legacyIconName = (data['icon'] ?? '').toString();
+                    final itemName = checklistDisplayName(
+                      tr: widget.tr,
+                      data: data,
+                      arKey: 'name_ar',
+                      enKey: 'name_en',
+                      fallbackKey: 'name',
+                    );
+                    final itemIcon = itemId.isNotEmpty
+                        ? iconFromChecklistItemId(itemId)
+                        : iconFromName(legacyIconName);
 
                     return Card(
                       elevation: 1.2,
@@ -571,7 +980,7 @@ class TripChecklistPage extends StatelessWidget {
                         controlAffinity: ListTileControlAffinity.leading,
                         title: Row(
                           children: [
-                            Icon(iconFromName(iconName), color: Colors.orange),
+                            Icon(itemIcon, color: Colors.orange),
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
@@ -581,6 +990,26 @@ class TripChecklistPage extends StatelessWidget {
                                       ? TextDecoration.lineThrough
                                       : TextDecoration.none,
                                 ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            _ChecklistAssignmentPreview(
+                              assignedTo: assignedTo,
+                              currentUserId: currentUserId,
+                            ),
+                            const SizedBox(width: 4),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.add_circle_outline,
+                                size: 18,
+                                color: Colors.orange,
+                              ),
+                              visualDensity: VisualDensity.compact,
+                              splashRadius: 18,
+                              onPressed: () => _toggleLocalAssignment(
+                                itemId: itemId,
+                                currentUserId: currentUserId,
+                                assignedTo: assignedTo,
                               ),
                             ),
                           ],
@@ -598,11 +1027,14 @@ class TripChecklistPage extends StatelessWidget {
         backgroundColor: Colors.orange,
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add),
-        label: Text(tr.t('add_from_template')),
+        label: Text(widget.tr.t('add_from_template')),
         onPressed: () {
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (_) => AddChecklistItemsPage(tr: tr, tripId: tripId),
+              builder: (_) => AddChecklistItemsPage(
+                tr: widget.tr,
+                tripId: widget.tripId,
+              ),
             ),
           );
         },
@@ -611,162 +1043,5 @@ class TripChecklistPage extends StatelessWidget {
   }
 }
 
-class AddTripPage extends StatefulWidget {
-  const AddTripPage({super.key, required this.tr, required this.isArabic});
-
-  final Tr tr;
-  final bool isArabic;
-
-  @override
-  State<AddTripPage> createState() => _AddTripPageState();
-}
-
-class _AddTripPageState extends State<AddTripPage> {
-  final TripService _tripService = TripService();
-  final _formKey = GlobalKey<FormState>();
-  final _titleController = TextEditingController();
-  final _descriptionController = TextEditingController();
-  final _peopleController = TextEditingController();
-  final _locationUrlController = TextEditingController();
-  String _visibility = 'public';
-  DateTime? _tripDate;
-  bool _saving = false;
-
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _descriptionController.dispose();
-    _peopleController.dispose();
-    _locationUrlController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final tr = widget.tr;
-    return Scaffold(
-      appBar: AppBar(title: Text(tr.t('add_trip'))),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            TextFormField(
-              controller: _titleController,
-              decoration: InputDecoration(labelText: tr.t('trip_name')),
-            ),
-            TextFormField(
-              controller: _descriptionController,
-              decoration: InputDecoration(labelText: tr.t('description')),
-            ),
-            TextFormField(
-              controller: _peopleController,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(labelText: tr.t('people_count')),
-            ),
-            TextFormField(
-              controller: _locationUrlController,
-              decoration: InputDecoration(labelText: tr.t('location_url')),
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              initialValue: _visibility,
-              items: const [
-                DropdownMenuItem(value: 'public', child: Text('Public')),
-                DropdownMenuItem(value: 'private', child: Text('Private')),
-              ],
-              onChanged: _saving
-                  ? null
-                  : (value) {
-                      if (value != null) {
-                        setState(() => _visibility = value);
-                      }
-                    },
-              decoration: const InputDecoration(labelText: 'Visibility'),
-            ),
-            const SizedBox(height: 12),
-            ElevatedButton(
-              onPressed: _saving ? null : _pickDate,
-              child: Text(
-                _tripDate == null
-                    ? tr.t('choose_trip_date')
-                    : _formatDate(_tripDate!),
-              ),
-            ),
-            const SizedBox(height: 12),
-            ElevatedButton(
-              onPressed: _saving ? null : _save,
-              child: Text(tr.t('save_trip')),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _pickDate() async {
-    final now = DateTime.now();
-    final selected = await showDatePicker(
-      context: context,
-      initialDate: _tripDate ?? now,
-      firstDate: DateTime(now.year - 1),
-      lastDate: DateTime(now.year + 5),
-    );
-    if (selected != null) {
-      setState(() => _tripDate = selected);
-    }
-  }
-
-  Future<void> _save() async {
-    final tr = widget.tr;
-    final count = int.tryParse(_peopleController.text.trim());
-    if (_titleController.text.trim().isEmpty ||
-        _descriptionController.text.trim().isEmpty ||
-        count == null ||
-        count <= 0 ||
-        _locationUrlController.text.trim().isEmpty ||
-        _tripDate == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(tr.t('fill_all_fields'))));
-      return;
-    }
-
-    setState(() => _saving = true);
-    try {
-      await _tripService.createTrip(
-        title: _titleController.text.trim(),
-        description: _descriptionController.text.trim(),
-        peopleCount: count,
-        locationUrl: _locationUrlController.text.trim(),
-        tripDate: _tripDate!,
-        visibility: _visibility,
-      );
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
-    } on FirebaseException catch (e) {
-      if (mounted) {
-        showFirestoreError(context, e);
-      }
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(tr.t('save_failed'))));
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _saving = false);
-      }
-    }
-  }
-
-  String _formatDate(DateTime value) {
-    final m = value.month.toString().padLeft(2, '0');
-    final d = value.day.toString().padLeft(2, '0');
-    return '${value.year}/$m/$d';
-  }
-}
 
 

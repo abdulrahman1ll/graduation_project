@@ -9,7 +9,6 @@ import 'utils/bootstrap.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  await seedChecklistTemplatesIfEmpty();
 
   final firebaseOptions = Firebase.app().options;
   debugPrint('PROJECT ID: ${firebaseOptions.projectId}');

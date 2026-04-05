@@ -63,96 +63,111 @@ class ChatMessageBubble extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Column(
-        crossAxisAlignment: alignment,
-        children: [
-          Container(
-            constraints: const BoxConstraints(maxWidth: 320),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: backgroundColor,
-              borderRadius: radius,
-              border: message.isPinned
-                  ? Border.all(color: Colors.orange, width: 1.2)
-                  : null,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (message.isPinned)
-                  const Padding(
-                    padding: EdgeInsets.only(bottom: 6),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.push_pin, size: 14, color: Colors.orange),
-                        SizedBox(width: 4),
-                        Text(
-                          'Pinned',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.orange,
-                            fontWeight: FontWeight.w700,
+      child: GestureDetector(
+        onLongPress: canPin
+            ? () async {
+                final selected = await showModalBottomSheet<String>(
+                  context: context,
+                  builder: (menuContext) {
+                    return SafeArea(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ListTile(
+                            leading: Icon(
+                              message.isPinned
+                                  ? Icons.push_pin_outlined
+                                  : Icons.push_pin,
+                            ),
+                            title: Text(message.isPinned ? 'Unpin' : 'Pin'),
+                            onTap: () => Navigator.of(menuContext).pop('toggle_pin'),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                Text(
-                  _isMine ? 'You' : senderName,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF6B7280),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                SelectableText(
-                  message.content,
-                  style: TextStyle(
-                    fontSize: 15,
-                    color: message.type == ChatMessageType.link
-                        ? Colors.blue.shade700
+                        ],
+                      ),
+                    );
+                  },
+                );
+                if (selected == 'toggle_pin') {
+                  onTogglePin();
+                }
+              }
+            : null,
+        child: Column(
+          crossAxisAlignment: alignment,
+          children: [
+            Stack(
+              children: [
+                Container(
+                  constraints: const BoxConstraints(maxWidth: 320),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: backgroundColor,
+                    borderRadius: radius,
+                    border: message.isPinned
+                        ? Border.all(color: Colors.orange, width: 1.2)
                         : null,
-                    decoration: message.type == ChatMessageType.link
-                        ? TextDecoration.underline
-                        : TextDecoration.none,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _isMine ? 'You' : senderName,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF6B7280),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      SelectableText(
+                        message.content,
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: message.type == ChatMessageType.link
+                              ? Colors.blue.shade700
+                              : null,
+                          decoration: message.type == ChatMessageType.link
+                              ? TextDecoration.underline
+                              : TextDecoration.none,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _formatTime(message.createdAt),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF6B7280),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            isSeenByCurrentUser ? 'Seen' : 'Sent',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF6B7280),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 6),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      _formatTime(message.createdAt),
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF6B7280),
-                      ),
+                if (message.isPinned)
+                  const Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Text(
+                      '📌',
+                      style: TextStyle(fontSize: 14),
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      isSeenByCurrentUser ? 'Seen' : 'Sent',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF6B7280),
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
               ],
             ),
-          ),
-          if (canPin)
-            TextButton.icon(
-              onPressed: onTogglePin,
-              icon: Icon(
-                message.isPinned ? Icons.push_pin_outlined : Icons.push_pin,
-                size: 16,
-              ),
-              label: Text(message.isPinned ? 'Unpin' : 'Pin'),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }

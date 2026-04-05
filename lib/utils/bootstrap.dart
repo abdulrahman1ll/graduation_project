@@ -1,43 +1,56 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 
-Future<void> seedChecklistTemplatesIfEmpty() async {
+import 'checklist_utils.dart';
+
+Future<void> seedChecklistTemplates() async {
+  if (kDebugMode) {
+    debugPrint('START SEED');
+  }
+
+  final firestore = FirebaseFirestore.instance;
+  final templates = firestore.collection('checklist_templates');
+
   try {
-    final templates = FirebaseFirestore.instance.collection(
-      'checklist_templates',
-    );
-    final existing = await templates.limit(1).get();
-    if (existing.docs.isNotEmpty) {
-      return;
+    final existingGroups = await templates.get();
+    for (final groupDoc in existingGroups.docs) {
+      final itemsSnapshot = await groupDoc.reference.collection('items').get();
+      for (final itemDoc in itemsSnapshot.docs) {
+        await itemDoc.reference.delete();
+      }
+      await groupDoc.reference.delete();
     }
 
-    final defaults = <String, Map<String, String>>{
-      'tent': {'name': 'Tent', 'category': 'Camping Gear', 'icon': 'tent'},
-      'bbq': {
-        'name': 'BBQ Set',
-        'category': 'Food & Cooking',
-        'icon': 'restaurant',
-      },
-      'chairs': {'name': 'Chairs', 'category': 'Comfort', 'icon': 'chair'},
-      'water': {
-        'name': 'Water',
-        'category': 'Essentials',
-        'icon': 'water_drop',
-      },
-      'flashlight': {
-        'name': 'Flashlight',
-        'category': 'Camping Gear',
-        'icon': 'flashlight_on',
-      },
-    };
-    final batch = FirebaseFirestore.instance.batch();
-    defaults.forEach((docId, data) {
-      batch.set(templates.doc(docId), data);
-    });
-    await batch.commit();
-  } catch (e) {
+    for (final group in checklistTemplateGroups) {
+      final groupRef = templates.doc(group.id);
+      await groupRef.set({
+        'id': group.id,
+        'name_ar': group.nameAr,
+        'name_en': group.nameEn,
+        'order': group.order,
+      });
+      for (final item in group.items) {
+        final itemRef = groupRef.collection('items').doc(item.id);
+        await itemRef.set({
+          'id': item.id,
+          'name_ar': item.nameAr,
+          'name_en': item.nameEn,
+          'order': item.order,
+        });
+      }
+    }
+
     if (kDebugMode) {
-      debugPrint('Checklist template seed skipped: $e');
+      debugPrint('SEED COMPLETED');
+    }
+  } catch (e, st) {
+    if (kDebugMode) {
+      debugPrint('SEED FATAL ERROR: $e');
+      debugPrintStack(stackTrace: st);
     }
   }
+}
+
+Future<void> syncChecklistTemplates() async {
+  await seedChecklistTemplates();
 }

@@ -11,13 +11,14 @@ class TripService {
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
 
-  Future<void> createTrip({
+  Future<String> createTrip({
     required String title,
     required String description,
     required int peopleCount,
     required String locationUrl,
     required DateTime tripDate,
     required String visibility,
+    String? groupId,
   }) async {
     final user = _auth.currentUser;
     if (user == null) {
@@ -35,15 +36,17 @@ class TripService {
       );
     }
 
-    await _firestore.collection('trips').add({
+    final docRef = await _firestore.collection('trips').add({
       'title': title,
       'description': description,
       'peopleCount': peopleCount,
       'locationUrl': locationUrl,
       'tripDate': Timestamp.fromDate(tripDate),
       'visibility': visibility,
+      'groupId': groupId?.trim().isEmpty ?? true ? null : groupId!.trim(),
       'createdBy': user.uid,
       'createdAt': FieldValue.serverTimestamp(),
     });
+    return docRef.id;
   }
 }
