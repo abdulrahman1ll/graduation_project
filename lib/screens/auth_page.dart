@@ -184,6 +184,7 @@ class _AuthPageState extends State<AuthPage> {
         'placeType': 'desert',
         'distancePreference': 'near',
         'temperaturePreference': 'cool',
+        'activityPreference': 'camping',
       },'preferencesCompleted' :false,
     }, SetOptions(merge: true));
   }

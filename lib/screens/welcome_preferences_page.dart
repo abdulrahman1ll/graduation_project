@@ -13,13 +13,14 @@ class _WelcomePreferencesPageState extends State<WelcomePreferencesPage> {
   String? _placeType;
   String? _distance;
   String? _temperature;
+  String? _activity;
   bool _loading = false;
 
   Future<void> _savePreferences() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    if (_placeType == null || _distance == null || _temperature == null) {
+    if (_placeType == null || _distance == null || _temperature == null || _activity == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please answer all questions')),
       );
@@ -36,6 +37,7 @@ class _WelcomePreferencesPageState extends State<WelcomePreferencesPage> {
         'placeType': _placeType,
         'distancePreference': _distance,
         'temperaturePreference': _temperature,
+        'activityPreference': _activity,
       },
       'preferencesCompleted' :true,
     }, SetOptions(merge: true));
@@ -153,6 +155,22 @@ class _WelcomePreferencesPageState extends State<WelcomePreferencesPage> {
                   (v) => setState(() => _temperature = v)),
               _buildOption("Warm", "warm", _temperature,
                   (v) => setState(() => _temperature = v)),
+
+                  const SizedBox(height: 20),
+
+const Align(
+  alignment: Alignment.centerLeft,
+  child: Text("Preferred activity"),
+),
+const SizedBox(height: 10),
+_buildOption("Camping", "camping", _activity,
+    (v) => setState(() => _activity = v)),
+_buildOption("Barbecue", "barbecue", _activity,
+    (v) => setState(() => _activity = v)),
+_buildOption("Hiking", "hiking", _activity,
+    (v) => setState(() => _activity = v)),
+_buildOption("Relaxing", "relaxing", _activity,
+    (v) => setState(() => _activity = v)),
 
               const SizedBox(height: 30),
 

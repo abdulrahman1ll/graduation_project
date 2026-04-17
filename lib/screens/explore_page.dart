@@ -69,6 +69,28 @@ class _ExplorePageState extends State<ExplorePage> {
   LatLng? selectedPoint;
   final PlaceService _placeService = PlaceService();
 
+  Future<void> _saveInteraction({
+  required String placeId,
+  required String type,
+  double? rating,
+}) async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) return;
+
+  print("CLICK SAVED: $placeId");
+
+  await FirebaseFirestore.instance
+      .collection('users')
+      .doc(user.uid)
+      .collection('interactions')
+      .add({
+    'placeId': placeId,
+    'type': type,
+    'rating': rating,
+    'createdAt': FieldValue.serverTimestamp(),
+  });
+}
+
   Future<void> _loadUserPreferences() async {
   final userId = FirebaseAuth.instance.currentUser?.uid;
   if (userId == null) return;
@@ -158,7 +180,18 @@ class _ExplorePageState extends State<ExplorePage> {
     );
   }
 
-  results.sort((a, b) => b.averageRating.compareTo(a.averageRating));
+  final topPlaces = await getMostClickedPlaces();
+
+results.sort((a, b) {
+  int aScore = topPlaces.contains(a.doc.id) ? 1 : 0;
+  int bScore = topPlaces.contains(b.doc.id) ? 1 : 0;
+
+  if (aScore != bScore) {
+    return bScore.compareTo(aScore);
+  }
+
+  return b.averageRating.compareTo(a.averageRating);
+});
 
   return results;
 }
@@ -168,6 +201,8 @@ class _ExplorePageState extends State<ExplorePage> {
     super.initState();
     _loadCurrentUserLocation();
     _loadUserPreferences();
+    _testInteractions();
+    exportInteractionsToConsole();
   }
 
   @override
@@ -618,6 +653,12 @@ class _ExplorePageState extends State<ExplorePage> {
                                 'createdAt': FieldValue.serverTimestamp(),
                               });
 
+                               await _saveInteraction(
+      placeId: placeId,
+      type: 'rating',
+      rating: selectedRating.toDouble(),
+    );
+
                           navigator.pop();
                         },
                         child: const Text("Submit Review"),
@@ -923,6 +964,91 @@ class _ExplorePageState extends State<ExplorePage> {
     );
   }
 
+  Future<List<Map<String, dynamic>>> getUserInteractions() async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) return [];
+
+  final snapshot = await FirebaseFirestore.instance
+      .collection('users')
+      .doc(user.uid)
+      .collection('interactions')
+      .get();
+
+  return snapshot.docs.map((doc) => doc.data()).toList();
+}
+
+Future<List<String>> getMostClickedPlaces() async {
+  final interactions = await getUserInteractions();
+
+  Map<String, int> counts = {};
+
+  for (var i in interactions) {
+    final placeId = i['placeId'];
+    if (placeId != null) {
+      counts[placeId] = (counts[placeId] ?? 0) + 1;
+    }
+  }
+
+  // ترتيب حسب الأكثر ضغط
+  var sorted = counts.entries.toList()
+    ..sort((a, b) => b.value.compareTo(a.value));
+
+  return sorted.map((e) => e.key).toList();
+}
+
+
+Future<void> exportInteractionsToConsole() async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) return;
+
+  final prefsSnap = await FirebaseFirestore.instance
+      .collection('users')
+      .doc(user.uid)
+      .get();
+
+  final prefsData = prefsSnap.data();
+  final prefs = (prefsData?['preferences'] as Map<String, dynamic>?) ?? {};
+
+  final interactionsSnap = await FirebaseFirestore.instance
+      .collection('users')
+      .doc(user.uid)
+      .collection('interactions')
+      .get();
+
+  print('userId,placeType,distancePreference,temperaturePreference,activityPreference,placeId,type,rating');
+
+  for (final doc in interactionsSnap.docs) {
+    final data = doc.data();
+
+    final placeType = prefs['placeType'] ?? '';
+    final distancePreference = prefs['distancePreference'] ?? '';
+    final temperaturePreference = prefs['temperaturePreference'] ?? '';
+    final activityPreference = prefs['activityPreference'] ?? '';
+    final placeId = data['placeId'] ?? '';
+    final type = data['type'] ?? '';
+    final rating = data['rating'] ?? '';
+
+    print(
+      '${user.uid},'
+      '$placeType,'
+      '$distancePreference,'
+      '$temperaturePreference,'
+      '$activityPreference,'
+      '$placeId,'
+      '$type,'
+      '$rating',
+    );
+  }
+}
+
+
+
+
+void _testInteractions() async {
+    final topPlaces = await getMostClickedPlaces();
+  print("TOP PLACES: $topPlaces");
+}
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -1095,17 +1221,26 @@ class _ExplorePageState extends State<ExplorePage> {
                         return Marker(
                           markerId: MarkerId(doc.id),
                           position: LatLng(lat, lng),
-                          onTap: () {
-                            fetchRoute(
-                              destinationLatitude: lat,
-                              destinationLongitude: lng,
-                            );
-                            _showPlaceDetails(data, doc.id);
-                          },
+                          onTap: () async {
+  await _saveInteraction(
+    placeId: doc.id,
+    type: 'click',
+  );
+
+  fetchRoute(
+    destinationLatitude: lat,
+    destinationLongitude: lng,
+  );
+  _showPlaceDetails(data, doc.id);
+}
+
+,
+
                           icon: BitmapDescriptor.defaultMarkerWithHue(
                             BitmapDescriptor.hueRed,
                           ),
                         );
+                        
                       })
                       .whereType<Marker>()
                       .toSet();
