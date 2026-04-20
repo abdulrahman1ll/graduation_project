@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
-import '../../models/app_language.dart';
-import '../../screens/app_shell.dart';
-import '../../utils/localization.dart';
+import '../../../models/app_language.dart';
+import '../../../utils/localization.dart';
 import '../models/group.dart';
 import '../services/group_service.dart';
-import 'link_group_checklist_page.dart';
+import '../../trips/trips.dart';
+import '../ui/link_group_checklist_page.dart';
 
 Future<void> openGroupChecklistFlow({
   required BuildContext context,

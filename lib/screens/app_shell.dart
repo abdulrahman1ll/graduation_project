@@ -1,36 +1,14 @@
-import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:google_sign_in/google_sign_in.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
-import 'dart:convert';
-import 'dart:math' as math;
-import 'package:http/http.dart' as http;
-import '../chat/chat.dart' as chat;
+import '../features/groups/groups.dart' as chat;
+import '../features/auth/ui/auth_page.dart';
+import '../features/auth/ui/welcome_preferences_page.dart';
 import '../models/app_language.dart';
 import '../providers/role_provider.dart';
-import '../services/place_service.dart';
-import '../services/weather_service.dart';
-import 'add_trip_page.dart';
-import '../utils/checklist_utils.dart';
-import '../utils/firestore_utils.dart';
 import '../utils/localization.dart';
-import '../widgets/language_app_bar.dart';
-import 'welcome_preferences_page.dart';
-
-
-
-part 'auth_page.dart';
-part 'main_screen.dart';
-part 'explore_page.dart';
-part 'trips_page.dart';
-part 'groups_page.dart';
-part 'profile_page.dart';
+import 'main_screen.dart';
 
 class KashtaApp extends StatefulWidget {
   const KashtaApp({

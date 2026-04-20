@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import 'chat_message_type.dart';
+import 'chat_types.dart';
 
 class ChatMessage {
   const ChatMessage({

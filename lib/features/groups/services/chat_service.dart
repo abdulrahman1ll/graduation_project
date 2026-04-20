@@ -3,8 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
 import '../models/chat_message.dart';
-import '../models/chat_message_type.dart';
-import '../models/group_role.dart';
+import '../models/chat_types.dart';
 
 class ChatService {
   ChatService({

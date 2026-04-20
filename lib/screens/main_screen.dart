@@ -1,4 +1,11 @@
-part of 'app_shell.dart';
+import 'package:flutter/material.dart';
+
+import '../features/admin/ui/admin_dashboard_page.dart';
+import '../features/groups/ui/groups_page.dart';
+import '../features/profile/ui/profile_page.dart';
+import '../features/trips/ui/trips_page.dart';
+import '../utils/localization.dart';
+import 'explore_page.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({

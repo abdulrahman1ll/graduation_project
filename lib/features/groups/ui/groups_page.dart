@@ -1,4 +1,13 @@
-part of 'app_shell.dart';
+import 'dart:async';
+
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../groups.dart' as chat;
+import '../../../providers/role_provider.dart';
+import '../../../utils/localization.dart';
+import '../../../widgets/language_app_bar.dart';
 
 class GroupsPage extends StatefulWidget {
   const GroupsPage({

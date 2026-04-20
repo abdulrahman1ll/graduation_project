@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../models/group.dart';
-import '../models/group_role.dart';
+import '../models/chat_types.dart';
 import '../models/member.dart';
 import 'chat_service.dart';
 import 'notification_service.dart';

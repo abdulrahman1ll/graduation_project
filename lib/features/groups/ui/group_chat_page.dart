@@ -5,13 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../models/chat_message.dart';
-import '../models/chat_message_type.dart';
+import '../models/chat_types.dart';
 import '../models/group.dart';
-import '../models/group_role.dart';
 import '../services/chat_service.dart';
 import '../services/group_service.dart';
 import '../services/invite_service.dart';
-import 'group_checklist_flow.dart';
+import '../helpers/group_checklist_flow.dart';
 import 'group_details_page.dart';
 import 'widgets/chat_composer.dart';
 import 'widgets/chat_message_bubble.dart';

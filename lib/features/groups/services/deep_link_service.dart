@@ -5,8 +5,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-import 'services/invite_service.dart';
-import 'ui/group_chat_page.dart';
+import 'invite_service.dart';
+import '../ui/group_chat_page.dart';
 
 class DeepLinkService {
   DeepLinkService({

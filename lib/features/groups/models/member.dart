@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import 'group_role.dart';
+import 'chat_types.dart';
 
 class Member {
   const Member({

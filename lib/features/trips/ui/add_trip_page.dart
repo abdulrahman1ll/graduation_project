@@ -2,10 +2,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-import '../chat/services/group_service.dart';
+import '../../groups/services/group_service.dart';
 import '../services/trip_service.dart';
-import '../utils/firestore_utils.dart';
-import '../utils/localization.dart';
+import '../../../utils/firestore_utils.dart';
+import '../../../utils/localization.dart';
 
 class AddTripPage extends StatefulWidget {
   const AddTripPage({

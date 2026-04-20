@@ -1,4 +1,21 @@
-part of 'app_shell.dart';
+import 'dart:convert';
+import 'dart:math' as math;
+import 'dart:typed_data';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:http/http.dart' as http;
+
+import '../features/explore/ui/widgets/add_place_sheet.dart';
+import '../features/explore/ui/widgets/place_details_sheet.dart';
+import '../services/place_service.dart';
+import '../services/weather_service.dart';
+import '../utils/firestore_utils.dart';
+import '../utils/localization.dart';
+import '../widgets/language_app_bar.dart';
 
 class ExplorePage extends StatefulWidget {
   const ExplorePage({
@@ -463,10 +480,6 @@ results.sort((a, b) {
   }
 
   void _showPlaceDetails(Map<String, dynamic> data, String placeId) {
-    int selectedRating = 0;
-    final commentController = TextEditingController();
-    Uint8List? selectedImageBytes;
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -474,351 +487,47 @@ results.sort((a, b) {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) {
-        return DraggableScrollableSheet(
-          expand: false,
-          initialChildSize: 0.75,
-          minChildSize: 0.5,
-          maxChildSize: 0.95,
-          builder: (context, controller) {
-            return StatefulBuilder(
-              builder: (context, setModalState) {
-                Future<void> pickImage() async {
-                  final picker = ImagePicker();
-                  final image = await picker.pickImage(
-                    source: ImageSource.gallery,
-                  );
+      builder: (context) => PlaceDetailsSheet(
+        data: data,
+        placeId: placeId,
+        weatherFuture: _weatherService.getWeather(
+          (data['lat'] as num).toDouble(),
+          (data['lng'] as num).toDouble(),
+        ),
+        reviewsStream: FirebaseFirestore.instance
+            .collection('places')
+            .doc(placeId)
+            .collection('reviews')
+            .snapshots(),
+        onSubmitReview: ({
+          required int rating,
+          required String comment,
+          required Uint8List? selectedImageBytes,
+        }) async {
+          final navigator = Navigator.of(context);
+          await FirebaseFirestore.instance
+              .collection('places')
+              .doc(placeId)
+              .collection('reviews')
+              .add({
+                'userId': FirebaseAuth.instance.currentUser?.uid,
+                'rating': rating,
+                'comment': comment,
+                'imageBase64': selectedImageBytes == null
+                    ? null
+                    : base64Encode(selectedImageBytes),
+                'createdAt': FieldValue.serverTimestamp(),
+              });
 
-                  if (image == null) return;
+          await _saveInteraction(
+            placeId: placeId,
+            type: 'rating',
+            rating: rating.toDouble(),
+          );
 
-                  final bytes = await image.readAsBytes();
-
-                  setModalState(() {
-                    selectedImageBytes = bytes;
-                  });
-                }
-
-                return SingleChildScrollView(
-                  controller: controller,
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        data['name'] ?? '',
-                        style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text("Environment: ${data['environmentType'] ?? '-'}"),
-                      const SizedBox(height: 8),
-
-                      FutureBuilder<Map<String, dynamic>?>(
-                        future: _weatherService.getWeather(
-                          (data['lat'] as num).toDouble(),
-                          (data['lng'] as num).toDouble(),
-                        ),
-                        builder: (context, snapshot) {
-                          if (snapshot.connectionState ==
-                              ConnectionState.waiting) {
-                            return const Text("Loading weather...");
-                          }
-
-                          if (!snapshot.hasData) {
-                            return const Text("Weather unavailable");
-                          }
-
-                          final temp = snapshot.data!["temp"];
-                          final weather = snapshot.data!["weather"];
-                          final wind = snapshot.data!["wind"];
-
-                          String kashtaCondition = "Good";
-                          if (weather == "Rain" || wind > 8) {
-                            kashtaCondition = "Bad";
-                          }
-
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  const Icon(
-                                    Icons.thermostat,
-                                    color: Colors.orange,
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text("${temp.toStringAsFixed(1)} °C"),
-                                ],
-                              ),
-                              Row(
-                                children: [
-                                  const Icon(Icons.cloud, color: Colors.grey),
-                                  const SizedBox(width: 6),
-                                  Text("Weather: $weather"),
-                                ],
-                              ),
-                              Row(
-                                children: [
-                                  const Icon(Icons.air, color: Colors.blue),
-                                  const SizedBox(width: 6),
-                                  Text("Wind: $wind m/s"),
-                                ],
-                              ),
-                              Row(
-                                children: [
-                                  const Icon(
-                                    Icons.emoji_nature,
-                                    color: Colors.green,
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text("Kashta conditions: $kashtaCondition"),
-                                ],
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-
-                      const SizedBox(height: 20),
-
-                      const Text(
-                        "Rate this place",
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 8),
-
-                      Row(
-                        children: List.generate(5, (index) {
-                          return IconButton(
-                            icon: Icon(
-                              index < selectedRating
-                                  ? Icons.star
-                                  : Icons.star_border,
-                              color: Colors.orange,
-                            ),
-                            onPressed: () {
-                              setModalState(() {
-                                selectedRating = index + 1;
-                              });
-                            },
-                          );
-                        }),
-                      ),
-
-                      const SizedBox(height: 10),
-
-                      TextField(
-                        controller: commentController,
-                        maxLines: 3,
-                        decoration: const InputDecoration(
-                          hintText: "Write your comment...",
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-
-                      const SizedBox(height: 10),
-
-                      ElevatedButton(
-                        onPressed: pickImage,
-                        child: const Text("Add Image (Optional)"),
-                      ),
-
-                      if (selectedImageBytes != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 10),
-                          child: Image.memory(selectedImageBytes!, height: 120),
-                        ),
-
-                      const SizedBox(height: 15),
-
-                      ElevatedButton(
-                        onPressed: () async {
-                          if (selectedRating == 0) return;
-
-                          final navigator = Navigator.of(context);
-                          await FirebaseFirestore.instance
-                              .collection('places')
-                              .doc(placeId)
-                              .collection('reviews')
-                              .add({
-                                'userId':
-                                    FirebaseAuth.instance.currentUser?.uid,
-                                'rating': selectedRating,
-                                'comment': commentController.text.trim(),
-                                'imageBase64': selectedImageBytes == null
-                                    ? null
-                                    : base64Encode(selectedImageBytes!),
-                                'createdAt': FieldValue.serverTimestamp(),
-                              });
-
-                               await _saveInteraction(
-      placeId: placeId,
-      type: 'rating',
-      rating: selectedRating.toDouble(),
-    );
-
-                          navigator.pop();
-                        },
-                        child: const Text("Submit Review"),
-                      ),
-
-                      const SizedBox(height: 25),
-                      const Divider(),
-                      const SizedBox(height: 10),
-
-                      StreamBuilder<QuerySnapshot>(
-                        stream: FirebaseFirestore.instance
-                            .collection('places')
-                            .doc(placeId)
-                            .collection('reviews')
-                            .snapshots(),
-                        builder: (context, snapshot) {
-                          if (!snapshot.hasData) {
-                            return const CircularProgressIndicator();
-                          }
-
-                          final reviews = snapshot.data!.docs;
-
-                          double avgRating = 0;
-                          if (reviews.isNotEmpty) {
-                            final total = reviews.fold<double>(
-                              0,
-                              (total, doc) =>
-                                  total +
-                                  ((doc.data()
-                                          as Map<String, dynamic>)['rating'] ??
-                                      0),
-                            );
-                            avgRating = total / reviews.length;
-                          }
-
-                          if (reviews.isEmpty) {
-                            return const Text("No reviews yet.");
-                          }
-
-                          final images = reviews
-                              .map(
-                                (doc) =>
-                                    (doc.data()
-                                        as Map<String, dynamic>)['imageBase64'],
-                              )
-                              .where((e) => e != null && e != '')
-                              .toList();
-
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                             mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                "Average rating: ${avgRating.toStringAsFixed(1)} ⭐",
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-
-                              if (images.isNotEmpty) ...[
-                                const Text(
-                                  "Photos",
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                                GridView.builder(
-                                  shrinkWrap: true,
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  gridDelegate:
-                                      const SliverGridDelegateWithFixedCrossAxisCount(
-                                        crossAxisCount: 3,
-                                        crossAxisSpacing: 6,
-                                        mainAxisSpacing: 6,
-                                      ),
-                                  itemCount: images.length,
-                                  itemBuilder: (context, index) {
-                                    final img = images[index];
-
-                                    return GestureDetector(
-                                      onTap: () {
-                                        showDialog(
-                                          context: context,
-                                          builder: (_) => Dialog(
-                                            child: InteractiveViewer(
-                                              child: Image.memory(
-                                                base64Decode(img),
-                                                fit: BoxFit.contain,
-                                              ),
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: Image.memory(
-                                          base64Decode(img),
-                                          fit: BoxFit.cover,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                                const SizedBox(height: 20),
-                              ],
-
-                              const Text(
-                                "Reviews",
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-
-                              ...reviews.map((doc) {
-                                final review =
-                                    doc.data() as Map<String, dynamic>;
-
-                                return Card(
-                                  margin: const EdgeInsets.only(bottom: 10),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(10),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: List.generate(
-                                            review['rating'] ?? 0,
-                                            (index) => const Icon(
-                                              Icons.star,
-                                              color: Colors.orange,
-                                              size: 18,
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 5),
-                                        Text(review['comment'] ?? ''),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              }),
-                            ],
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                );
-              },
-            );
-          },
-        );
-      },
+          navigator.pop();
+        },
+      ),
     );
   }
 
@@ -837,130 +546,59 @@ results.sort((a, b) {
   }
 
   void _openAddPlaceForm(double lat, double lng) {
-    final nameController = TextEditingController();
-    String environmentType = 'desert';
-    Uint8List? selectedImageBytes;
-
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (sheetContext) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            Future<void> pickImage() async {
-              final picker = ImagePicker();
-              final image = await picker.pickImage(source: ImageSource.gallery);
-              if (image == null) {
-                return;
-              }
-              final bytes = await image.readAsBytes();
-              setModalState(() {
-                selectedImageBytes = bytes;
-              });
-            }
-
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom,
-                left: 16,
-                right: 16,
-                top: 16,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text('Add New Place'),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: nameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Place Name',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    initialValue: environmentType,
-                    items: const [
-                      DropdownMenuItem(value: 'desert', child: Text('Desert')),
-                      DropdownMenuItem(value: 'nature', child: Text('Nature')),
-                      DropdownMenuItem(value: 'beach', child: Text('Beach')),
-                    ],
-                    onChanged: (value) {
-                      if (value == null) {
-                        return;
-                      }
-                      setModalState(() {
-                        environmentType = value;
-                      });
-                    },
-                    decoration: const InputDecoration(
-                      labelText: 'Environment Type',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  ElevatedButton(
-                    onPressed: pickImage,
-                    child: const Text('Pick Image (Optional)'),
-                  ),
-                  const SizedBox(height: 10),
-                  if (selectedImageBytes != null)
-                    Image.memory(selectedImageBytes!, height: 120),
-                  const SizedBox(height: 15),
-                  ElevatedButton(
-                    onPressed: () async {
-                      if (nameController.text.trim().isEmpty) {
-                        showFirestoreError(
-                          sheetContext,
-                          FirebaseException(
-                            plugin: 'cloud_firestore',
-                            code: 'invalid-argument',
-                            message: widget.tr.t('fill_all_fields'),
-                          ),
-                        );
-                        return;
-                      }
-
-                      try {
-                        await _placeService.addPlace(
-                          name: nameController.text.trim(),
-                          environmentType: environmentType,
-                          latitude: lat,
-                          longitude: lng,
-                          imageBase64: selectedImageBytes == null
-                              ? null
-                              : base64Encode(selectedImageBytes!),
-                        );
-                        if (sheetContext.mounted) {
-                          Navigator.of(sheetContext).pop();
-                        }
-                      } on FirebaseException catch (e) {
-                        if (sheetContext.mounted) {
-                          showFirestoreError(sheetContext, e);
-                        }
-                      } catch (_) {
-                        if (sheetContext.mounted) {
-                          showFirestoreError(
-                            sheetContext,
-                            FirebaseException(
-                              plugin: 'cloud_firestore',
-                              code: 'unknown',
-                              message: widget.tr.t('save_failed'),
-                            ),
-                          );
-                        }
-                      }
-                    },
-                    child: const Text('Submit'),
-                  ),
-                  const SizedBox(height: 20),
-                ],
+      builder: (sheetContext) => AddPlaceSheet(
+        onSubmit: ({
+          required BuildContext sheetContext,
+          required String name,
+          required String environmentType,
+          required Uint8List? selectedImageBytes,
+        }) async {
+          if (name.trim().isEmpty) {
+            showFirestoreError(
+              sheetContext,
+              FirebaseException(
+                plugin: 'cloud_firestore',
+                code: 'invalid-argument',
+                message: widget.tr.t('fill_all_fields'),
               ),
             );
-          },
-        );
-      },
+            return;
+          }
+
+          try {
+            await _placeService.addPlace(
+              name: name.trim(),
+              environmentType: environmentType,
+              latitude: lat,
+              longitude: lng,
+              imageBase64: selectedImageBytes == null
+                  ? null
+                  : base64Encode(selectedImageBytes),
+            );
+            if (sheetContext.mounted) {
+              Navigator.of(sheetContext).pop();
+            }
+          } on FirebaseException catch (e) {
+            if (sheetContext.mounted) {
+              showFirestoreError(sheetContext, e);
+            }
+          } catch (_) {
+            if (sheetContext.mounted) {
+              showFirestoreError(
+                sheetContext,
+                FirebaseException(
+                  plugin: 'cloud_firestore',
+                  code: 'unknown',
+                  message: widget.tr.t('save_failed'),
+                ),
+              );
+            }
+          }
+        },
+      ),
     );
   }
 
@@ -1040,9 +678,6 @@ Future<void> exportInteractionsToConsole() async {
     );
   }
 }
-
-
-
 
 void _testInteractions() async {
     final topPlaces = await getMostClickedPlaces();
@@ -1329,16 +964,7 @@ scrollGesturesEnabled: true,
                           ),
                         ),
 
-                      Positioned(
-                        right: 50,
-                        bottom: 140,
-                        child: FloatingActionButton(
-                          heroTag: 'recenter_user_location_button',
-                          mini: true,
-                          onPressed: _recenterOnUserLocation,
-                          child: const Icon(Icons.my_location),
-                        ),
-                      ),
+
 
                       FutureBuilder<List<RecommendedPlace>>(
                         future: _buildRecommendedPlaces(docs),
@@ -1434,3 +1060,6 @@ Row(
     );
   }
 }
+
+
+

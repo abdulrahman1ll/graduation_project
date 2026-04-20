@@ -5,11 +5,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../models/group.dart';
 import '../models/member.dart';
 import '../services/group_service.dart';
-import 'group_checklist_flow.dart';
-import '../../models/app_language.dart';
-import '../../screens/add_trip_page.dart';
-import '../../utils/firestore_utils.dart';
-import '../../utils/localization.dart';
+import '../helpers/group_checklist_flow.dart';
+import '../../../models/app_language.dart';
+import '../../trips/ui/add_trip_page.dart';
+import '../../../utils/firestore_utils.dart';
+import '../../../utils/localization.dart';
 
 class GroupDetailsPage extends StatelessWidget {
   const GroupDetailsPage({
