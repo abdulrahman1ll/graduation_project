@@ -2,10 +2,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-import '../../../models/app_language.dart';
-import '../../../utils/firestore_utils.dart';
-import '../../../utils/localization.dart';
-import '../../../widgets/language_app_bar.dart';
+import '../../../core/models/app_language.dart';
+import '../../../core/utils/firestore_utils.dart';
+import '../../../core/utils/localization.dart';
+import '../../../core/widgets/language_app_bar.dart';
 import '../helpers/checklist_utils.dart';
 import 'add_trip_page.dart';
 

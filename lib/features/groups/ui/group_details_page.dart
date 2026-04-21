@@ -6,10 +6,10 @@ import '../models/group.dart';
 import '../models/member.dart';
 import '../services/group_service.dart';
 import '../helpers/group_checklist_flow.dart';
-import '../../../models/app_language.dart';
+import '../../../core/models/app_language.dart';
 import '../../trips/ui/add_trip_page.dart';
-import '../../../utils/firestore_utils.dart';
-import '../../../utils/localization.dart';
+import '../../../core/utils/firestore_utils.dart';
+import '../../../core/utils/localization.dart';
 
 class GroupDetailsPage extends StatelessWidget {
   const GroupDetailsPage({

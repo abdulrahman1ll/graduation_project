@@ -4,9 +4,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../../providers/role_provider.dart';
-import '../../../services/place_service.dart';
-import '../../../utils/firestore_utils.dart';
+import '../../../core/providers/role_provider.dart';
+import '../../explore/services/place_service.dart';
+import '../../../core/utils/firestore_utils.dart';
 
 class PendingPlacesPage extends StatefulWidget {
   const PendingPlacesPage({super.key});

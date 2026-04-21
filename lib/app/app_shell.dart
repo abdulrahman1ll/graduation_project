@@ -5,9 +5,9 @@ import 'package:provider/provider.dart';
 import '../features/groups/groups.dart' as chat;
 import '../features/auth/ui/auth_page.dart';
 import '../features/auth/ui/welcome_preferences_page.dart';
-import '../models/app_language.dart';
-import '../providers/role_provider.dart';
-import '../utils/localization.dart';
+import '../core/utils/localization.dart';
+import '../core/models/app_language.dart';
+import '../core/providers/role_provider.dart';
 import 'main_screen.dart';
 
 class KashtaApp extends StatefulWidget {

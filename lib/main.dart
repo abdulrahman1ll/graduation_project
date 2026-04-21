@@ -1,10 +1,9 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/widgets.dart';
 
+import 'core/config/firebase_options.dart';
 import 'features/groups/groups.dart' as chat;
-import 'firebase_options.dart';
-import 'screens/app_shell.dart';
-import 'utils/bootstrap.dart';
+import 'app/app_shell.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

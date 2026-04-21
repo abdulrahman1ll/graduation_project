@@ -1,8 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
-import '../../../models/app_language.dart';
-import '../../../utils/localization.dart';
+import '../../../core/models/app_language.dart';
+import '../../../core/utils/localization.dart';
 
 class ChecklistTemplateItemSeed {
   const ChecklistTemplateItemSeed({

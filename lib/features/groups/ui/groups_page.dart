@@ -5,9 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../groups.dart' as chat;
-import '../../../providers/role_provider.dart';
-import '../../../utils/localization.dart';
-import '../../../widgets/language_app_bar.dart';
+import '../../../core/providers/role_provider.dart';
+import '../../../core/utils/localization.dart';
+import '../../../core/widgets/language_app_bar.dart';
 
 class GroupsPage extends StatefulWidget {
   const GroupsPage({

@@ -2,9 +2,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../../providers/role_provider.dart';
-import '../../../utils/localization.dart';
-import '../../../widgets/language_app_bar.dart';
+import '../../../core/providers/role_provider.dart';
+import '../../../core/utils/localization.dart';
+import '../../../core/widgets/language_app_bar.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({

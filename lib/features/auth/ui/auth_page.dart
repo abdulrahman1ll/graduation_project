@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
-import '../../../utils/localization.dart';
+import '../../../core/utils/localization.dart';
 
 class AuthPage extends StatefulWidget {
   const AuthPage({

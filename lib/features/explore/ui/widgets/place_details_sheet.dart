@@ -94,7 +94,7 @@ class _PlaceDetailsSheetState extends State<PlaceDetailsSheet> {
                   }
 
                   final temp = snapshot.data!["temp"];
-                  final weather = snapshot.data!["weather"];
+                  final weather = snapshot.data!["weather"].toString().trim();
                   final wind = snapshot.data!["wind"];
 
                   String kashtaCondition = "Good";
@@ -112,7 +112,7 @@ class _PlaceDetailsSheetState extends State<PlaceDetailsSheet> {
                             color: Colors.orange,
                           ),
                           const SizedBox(width: 6),
-                          Text("${temp.toStringAsFixed(1)} Â°C"),
+                          Text('${temp.toStringAsFixed(1)} \u00B0C'),
                         ],
                       ),
                       Row(
@@ -238,7 +238,7 @@ class _PlaceDetailsSheetState extends State<PlaceDetailsSheet> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        "Average rating: ${avgRating.toStringAsFixed(1)} â­",
+                        'Average rating: ${avgRating.toStringAsFixed(1)}',
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,

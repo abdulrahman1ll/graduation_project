@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 
 import '../../groups/services/group_service.dart';
 import '../services/trip_service.dart';
-import '../../../utils/firestore_utils.dart';
-import '../../../utils/localization.dart';
+import '../../../core/utils/firestore_utils.dart';
+import '../../../core/utils/localization.dart';
 
 class AddTripPage extends StatefulWidget {
   const AddTripPage({

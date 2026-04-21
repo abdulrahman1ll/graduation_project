@@ -9,13 +9,16 @@ import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
 
-import '../features/explore/ui/widgets/add_place_sheet.dart';
-import '../features/explore/ui/widgets/place_details_sheet.dart';
+import '../../../core/utils/firestore_utils.dart';
+import '../../../core/utils/localization.dart';
+import '../../../core/widgets/language_app_bar.dart';
+import '../models/recommended_place.dart';
 import '../services/place_service.dart';
 import '../services/weather_service.dart';
-import '../utils/firestore_utils.dart';
-import '../utils/localization.dart';
-import '../widgets/language_app_bar.dart';
+import 'widgets/add_place_sheet.dart';
+import 'widgets/explore_filter_bar.dart';
+import 'widgets/place_details_sheet.dart';
+import 'widgets/route_info_card.dart';
 
 class ExplorePage extends StatefulWidget {
   const ExplorePage({
@@ -31,18 +34,6 @@ class ExplorePage extends StatefulWidget {
 
   @override
   State<ExplorePage> createState() => _ExplorePageState();
-}
-
-class RecommendedPlace {
-  final QueryDocumentSnapshot<Map<String, dynamic>> doc;
-  final double averageRating;
-  final double distanceKm;
-
-  RecommendedPlace({
-    required this.doc,
-    required this.averageRating,
-    required this.distanceKm,
-  });
 }
 
 class _ExplorePageState extends State<ExplorePage> {
@@ -284,24 +275,6 @@ results.sort((a, b) {
       ),
     );
     _hasCenteredOnUserLocation = true;
-  }
-
-  Future<void> _recenterOnUserLocation() async {
-    if (_userLocation == null) {
-      await _loadCurrentUserLocation();
-    }
-
-    final controller = _mapController;
-    final userLocation = _userLocation;
-    if (controller == null || userLocation == null) {
-      return;
-    }
-
-    await controller.animateCamera(
-      CameraUpdate.newCameraPosition(
-        CameraPosition(target: userLocation, zoom: 15),
-      ),
-    );
   }
 
   Future<void> fetchRoute({
@@ -694,123 +667,20 @@ void _testInteractions() async {
           title: widget.tr.t('explore'),
           onToggleLanguage: widget.onToggleLanguage,
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
-          child: SizedBox(
-            height: 44,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              children: [
-                FilterChip(
-                  selected: _showOnlyFavorites,
-                  onSelected: (_) {
-                    setState(() {
-                      _showOnlyFavorites = !_showOnlyFavorites;
-                    });
-                  },
-                  avatar: Icon(
-                    _showOnlyFavorites ? Icons.star : Icons.star_border,
-                    size: 18,
-                    color: _showOnlyFavorites ? Colors.orange : Colors.black54,
-                  ),
-                  label: Text(widget.tr.t('favorites')),
-                  selectedColor: Colors.orange.withValues(alpha: 0.16),
-                  checkmarkColor: Colors.orange,
-                  side: BorderSide(
-                    color: _showOnlyFavorites
-                        ? Colors.orange
-                        : Colors.orange.shade200,
-                  ),
-                  backgroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  labelStyle: TextStyle(
-                    color: _showOnlyFavorites ? Colors.orange : Colors.black87,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                FilterChip(
-                  selected: _selectedCategoryChip == 'desert',
-                  onSelected: (_) {
-                    setState(() {
-                      _selectedCategoryChip = _selectedCategoryChip == 'desert'
-                          ? null
-                          : 'desert';
-                    });
-                  },
-                  label: Text(widget.tr.t('desert')),
-                  selectedColor: Colors.orange.withValues(alpha: 0.16),
-                  checkmarkColor: Colors.orange,
-                  side: BorderSide(
-                    color: _selectedCategoryChip == 'desert'
-                        ? Colors.orange
-                        : Colors.orange.shade200,
-                  ),
-                  backgroundColor: Colors.white,
-                  labelStyle: TextStyle(
-                    color: _selectedCategoryChip == 'desert'
-                        ? Colors.orange
-                        : Colors.black87,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                FilterChip(
-                  selected: _selectedCategoryChip == 'beach',
-                  onSelected: (_) {
-                    setState(() {
-                      _selectedCategoryChip = _selectedCategoryChip == 'beach'
-                          ? null
-                          : 'beach';
-                    });
-                  },
-                  label: Text(widget.tr.t('beach')),
-                  selectedColor: Colors.orange.withValues(alpha: 0.16),
-                  checkmarkColor: Colors.orange,
-                  side: BorderSide(
-                    color: _selectedCategoryChip == 'beach'
-                        ? Colors.orange
-                        : Colors.orange.shade200,
-                  ),
-                  backgroundColor: Colors.white,
-                  labelStyle: TextStyle(
-                    color: _selectedCategoryChip == 'beach'
-                        ? Colors.orange
-                        : Colors.black87,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                FilterChip(
-                  selected: _selectedCategoryChip == 'family',
-                  onSelected: (_) {
-                    setState(() {
-                      _selectedCategoryChip = _selectedCategoryChip == 'family'
-                          ? null
-                          : 'family';
-                    });
-                  },
-                  label: Text(widget.tr.t('family')),
-                  selectedColor: Colors.orange.withValues(alpha: 0.16),
-                  checkmarkColor: Colors.orange,
-                  side: BorderSide(
-                    color: _selectedCategoryChip == 'family'
-                        ? Colors.orange
-                        : Colors.orange.shade200,
-                  ),
-                  backgroundColor: Colors.white,
-                  labelStyle: TextStyle(
-                    color: _selectedCategoryChip == 'family'
-                        ? Colors.orange
-                        : Colors.black87,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
+        ExploreFilterBar(
+          tr: widget.tr,
+          showOnlyFavorites: _showOnlyFavorites,
+          selectedCategoryChip: _selectedCategoryChip,
+          onFavoritesChanged: (_) {
+            setState(() {
+              _showOnlyFavorites = !_showOnlyFavorites;
+            });
+          },
+          onCategorySelected: (category) {
+            setState(() {
+              _selectedCategoryChip = category;
+            });
+          },
         ),
         Expanded(
           flex: 2,
@@ -931,38 +801,11 @@ scrollGesturesEnabled: true,
                         polylines: _routePolylines,
                       ),
 
-                      if (_isFetchingRoute ||
-                          (_routeDistanceText != null &&
-                              _routeDurationText != null))
-                        Positioned(
-                          top: 16,
-                          left: 16,
-                          right: 16,
-                          child: Card(
-                            color: Colors.white,
-                            elevation: 4,
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 10,
-                              ),
-                              child: _isFetchingRoute
-                                  ? const Text('Loading route...')
-                                  : Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text('Distance: $_routeDistanceText'),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          'Estimated time: $_routeDurationText',
-                                        ),
-                                      ],
-                                    ),
-                            ),
-                          ),
-                        ),
+                      RouteInfoCard(
+                        isFetchingRoute: _isFetchingRoute,
+                        routeDistanceText: _routeDistanceText,
+                        routeDurationText: _routeDurationText,
+                      ),
 
 
 

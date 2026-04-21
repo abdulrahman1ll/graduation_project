@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../../providers/role_provider.dart';
+import '../../../core/providers/role_provider.dart';
 import 'pending_places_page.dart';
 
 class AdminDashboardPage extends StatelessWidget {

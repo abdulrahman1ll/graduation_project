@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 
-import '../features/trips/helpers/checklist_utils.dart';
+import '../../features/trips/helpers/checklist_utils.dart';
 
 Future<void> seedChecklistTemplates() async {
   if (kDebugMode) {

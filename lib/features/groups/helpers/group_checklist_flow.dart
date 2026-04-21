@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../../models/app_language.dart';
-import '../../../utils/localization.dart';
+import '../../../core/models/app_language.dart';
+import '../../../core/utils/localization.dart';
 import '../models/group.dart';
 import '../services/group_service.dart';
 import '../../trips/trips.dart';
