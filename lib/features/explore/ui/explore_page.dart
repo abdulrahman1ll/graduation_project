@@ -800,41 +800,42 @@ void _testInteractions() async {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Color(0xFFF7E6CF),
-            Color(0xFFFDF7EF),
-            Color(0xFFE8CBA6),
-          ],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: Image.asset(
+            'assets/kas.png',
+            fit: BoxFit.cover,
+          ),
         ),
-      ),
-      child: Column(
-        children: [
-          _buildExploreHeader(),
-          Expanded(
-            flex: 2,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 0),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF4E3CA),
-                  borderRadius: BorderRadius.circular(32),
-                  border: Border.all(color: const Color(0xFFE2C59F)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF6F421D).withValues(alpha: 0.14),
-                      blurRadius: 24,
-                      offset: const Offset(0, 12),
+        Positioned.fill(
+          child: Container(
+            color: const Color(0xFFF8EFE2).withValues(alpha: 0.72),
+          ),
+        ),
+        SafeArea(
+          child: Column(
+            children: [
+              _buildExploreHeader(),
+              Expanded(
+                flex: 2,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 6, 16, 16),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(28),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF6F421D)
+                              .withValues(alpha: 0.16),
+                          blurRadius: 28,
+                          offset: const Offset(0, 14),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(31),
-                  child: StreamBuilder<Set<String>>(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(28),
+                      child: StreamBuilder<Set<String>>(
             stream: _favoritePlaceIdsStream(),
             builder: (context, favoritesSnapshot) {
               if (favoritesSnapshot.hasError) {
@@ -1004,7 +1005,7 @@ scrollGesturesEnabled: true,
                                 left: 0,
                                 right: 0,
                                 child: Container(
-                                  height: 300,
+                                  height: 292,
                                   padding: const EdgeInsets.fromLTRB(
                                     16,
                                     14,
@@ -1012,22 +1013,27 @@ scrollGesturesEnabled: true,
                                     16,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFFFFAF2)
-                                        .withValues(alpha: 0.98),
-                                    borderRadius: const BorderRadius.vertical(
-                                      top: Radius.circular(32),
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        const Color(0xFFFFFBF5)
+                                            .withValues(alpha: 0.92),
+                                        const Color(0xFFFFFBF5)
+                                            .withValues(alpha: 0.74),
+                                        const Color(0xFFFFFBF5)
+                                            .withValues(alpha: 0.18),
+                                      ],
+                                      begin: Alignment.bottomCenter,
+                                      end: Alignment.topCenter,
                                     ),
-                                    border: const Border(
-                                      top: BorderSide(
-                                        color: Color(0xFFE6CFB2),
-                                      ),
+                                    borderRadius: const BorderRadius.vertical(
+                                      top: Radius.circular(28),
                                     ),
                                     boxShadow: [
                                       BoxShadow(
                                         color: const Color(0xFF3B2415)
-                                            .withValues(alpha: 0.18),
-                                        blurRadius: 26,
-                                        offset: const Offset(0, -10),
+                                            .withValues(alpha: 0.10),
+                                        blurRadius: 22,
+                                        offset: const Offset(0, -8),
                                       ),
                                     ],
                                   ),
@@ -1125,16 +1131,15 @@ scrollGesturesEnabled: true,
                                 ),
                               ),
                               Positioned(
-                                bottom: 226,
+                                bottom: 222,
                                 right: 12,
                                 child: IconButton(
                                   icon: const Icon(Icons.close_rounded),
                                   style: IconButton.styleFrom(
-                                    backgroundColor: const Color(0xFFFFFAF2),
+                                    backgroundColor: const Color(0xFFFFFBF5)
+                                        .withValues(alpha: 0.86),
                                     foregroundColor: const Color(0xFF5B3922),
-                                    side: const BorderSide(
-                                      color: Color(0xFFE1CCB2),
-                                    ),
+                                    elevation: 2,
                                   ),
                                   onPressed: () {
                                     setState(() {
@@ -1153,41 +1158,20 @@ scrollGesturesEnabled: true,
               );
             },
           ),
+                    ),
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
   Widget _buildExploreHeader() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-      padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [
-            Color(0xFF7C421F),
-            Color(0xFFC37B3E),
-            Color(0xFFE9B978),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: const BorderRadius.vertical(
-          top: Radius.circular(28),
-          bottom: Radius.circular(18),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF6F421D).withValues(alpha: 0.18),
-            blurRadius: 22,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1198,7 +1182,7 @@ scrollGesturesEnabled: true,
                   widget.tr.t('explore'),
                   textAlign: widget.isArabic ? TextAlign.right : TextAlign.left,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: Color(0xFF2F2118),
                     fontSize: 28,
                     fontWeight: FontWeight.w900,
                     height: 1,
@@ -1209,8 +1193,9 @@ scrollGesturesEnabled: true,
               TextButton(
                 onPressed: widget.onToggleLanguage,
                 style: TextButton.styleFrom(
-                  foregroundColor: Colors.white,
-                  backgroundColor: Colors.white.withValues(alpha: 0.17),
+                  foregroundColor: const Color(0xFF8B4A23),
+                  backgroundColor:
+                      const Color(0xFFFFFBF5).withValues(alpha: 0.74),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 15,
                     vertical: 8,
@@ -1218,7 +1203,7 @@ scrollGesturesEnabled: true,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(999),
                     side: BorderSide(
-                      color: Colors.white.withValues(alpha: 0.28),
+                      color: Colors.white.withValues(alpha: 0.45),
                     ),
                   ),
                 ),
@@ -1234,13 +1219,13 @@ scrollGesturesEnabled: true,
             'Find warm escapes, smart picks, and nearby places.',
             textAlign: widget.isArabic ? TextAlign.right : TextAlign.left,
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.88),
+              color: const Color(0xFF7B6653).withValues(alpha: 0.94),
               fontSize: 13,
               height: 1.35,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 16),
           _buildExploreSearchPill(),
           ExploreFilterBar(
             tr: widget.tr,
@@ -1319,13 +1304,12 @@ scrollGesturesEnabled: true,
       top: 18,
       left: 16,
       child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: const Color(0xFFFFFAF2).withValues(alpha: 0.94),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0xFFE6CFB2)),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF3B2415).withValues(alpha: 0.12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFBF5).withValues(alpha: 0.82),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF3B2415).withValues(alpha: 0.12),
               blurRadius: 16,
               offset: const Offset(0, 8),
             ),
@@ -1385,16 +1369,13 @@ scrollGesturesEnabled: true,
       width: 224,
       margin: const EdgeInsets.only(right: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFFCF7),
+        color: const Color(0xFFFFFBF5).withValues(alpha: 0.82),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: rank == 1 ? const Color(0xFFD9A35D) : const Color(0xFFE8D7C0),
-        ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF6F421D).withValues(alpha: 0.10),
-            blurRadius: 18,
-            offset: const Offset(0, 10),
+            color: const Color(0xFF6F421D).withValues(alpha: 0.12),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
           ),
         ],
       ),

@@ -56,6 +56,7 @@ flutter:
   assets:
     - assets/444.jpg
     - assets/chat_bg.jpg
+    - assets/kas.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:
