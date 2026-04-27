@@ -23,13 +23,18 @@ class AuthPage extends StatefulWidget {
 }
 
 class _AuthPageState extends State<AuthPage> {
+  final _fullNameController = TextEditingController();
+  final _usernameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _phoneController = TextEditingController();
+  bool _isSignUp = false;
   bool _loading = false;
 
   @override
   void dispose() {
+    _fullNameController.dispose();
+    _usernameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _phoneController.dispose();
@@ -184,7 +189,7 @@ class _AuthPageState extends State<AuthPage> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            tr.t('sign_in'),
+            _isSignUp ? tr.t('sign_up') : tr.t('sign_in'),
             textAlign: TextAlign.start,
             style: const TextStyle(
               color: Color(0xFF2F2118),
@@ -204,11 +209,52 @@ class _AuthPageState extends State<AuthPage> {
             ),
           ),
           const SizedBox(height: 22),
+          Row(
+            children: [
+              Expanded(
+                child: _authModeButton(
+                  label: tr.t('sign_in'),
+                  selected: !_isSignUp,
+                  onPressed: _loading
+                      ? null
+                      : () => setState(() => _isSignUp = false),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _authModeButton(
+                  label: tr.t('sign_up'),
+                  selected: _isSignUp,
+                  onPressed: _loading
+                      ? null
+                      : () => setState(() => _isSignUp = true),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          if (_isSignUp) ...[
+            _authTextField(
+              controller: _fullNameController,
+              hintText: 'Full name',
+              icon: Icons.badge_outlined,
+              textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: 12),
+            _authTextField(
+              controller: _usernameController,
+              hintText: 'Username',
+              icon: Icons.alternate_email_rounded,
+              textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: 12),
+          ],
           _authTextField(
             controller: _emailController,
             hintText: tr.t('email'),
             icon: Icons.mail_outline_rounded,
             keyboardType: TextInputType.emailAddress,
+            textInputAction: TextInputAction.next,
           ),
           const SizedBox(height: 12),
           _authTextField(
@@ -218,72 +264,51 @@ class _AuthPageState extends State<AuthPage> {
             obscureText: true,
           ),
           const SizedBox(height: 18),
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: _loading ? null : _signInWithEmail,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF8B4A23),
-                    foregroundColor: Colors.white,
-                    disabledBackgroundColor:
-                        const Color(0xFF8B4A23).withValues(alpha: 0.48),
-                    minimumSize: const Size.fromHeight(54),
-                    elevation: 0,
-                    shadowColor: Colors.transparent,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    textStyle: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  child: Text(tr.t('sign_in')),
-                ),
+          ElevatedButton(
+            onPressed: _loading
+                ? null
+                : (_isSignUp ? _signUpWithEmail : _signInWithEmail),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF8B4A23),
+              foregroundColor: Colors.white,
+              disabledBackgroundColor:
+                  const Color(0xFF8B4A23).withValues(alpha: 0.48),
+              minimumSize: const Size.fromHeight(54),
+              elevation: 0,
+              shadowColor: Colors.transparent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: _loading ? null : _signUpWithEmail,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF5B3922),
-                    side: const BorderSide(color: Color(0xFFD9BE9C)),
-                    minimumSize: const Size.fromHeight(54),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    textStyle: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  child: Text(tr.t('sign_up')),
-                ),
+              textStyle: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
               ),
-            ],
+            ),
+            child: Text(_isSignUp ? tr.t('sign_up') : tr.t('sign_in')),
           ),
           const SizedBox(height: 16),
-          _secondaryAuthButton(
-            onPressed: _loading ? null : _signInWithGoogle,
-            icon: Icons.g_mobiledata_rounded,
-            label: tr.t('continue_google'),
-          ),
-          const SizedBox(height: 10),
-          _secondaryAuthButton(
-            onPressed: _loading ? null : _signInWithPhone,
-            icon: Icons.phone_rounded,
-            label: tr.t('sign_in_phone'),
-          ),
-          const SizedBox(height: 6),
-          TextButton(
-            onPressed: _loading ? null : _signInAnonymously,
-            style: TextButton.styleFrom(
-              foregroundColor: const Color(0xFF8B4A23),
-              textStyle: const TextStyle(fontWeight: FontWeight.w800),
+          if (!_isSignUp) ...[
+            _secondaryAuthButton(
+              onPressed: _loading ? null : _signInWithGoogle,
+              icon: Icons.g_mobiledata_rounded,
+              label: tr.t('continue_google'),
             ),
-            child: Text(tr.t('continue_guest')),
-          ),
+            const SizedBox(height: 10),
+            _secondaryAuthButton(
+              onPressed: _loading ? null : _signInWithPhone,
+              icon: Icons.phone_rounded,
+              label: tr.t('sign_in_phone'),
+            ),
+            const SizedBox(height: 6),
+            TextButton(
+              onPressed: _loading ? null : _signInAnonymously,
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF8B4A23),
+                textStyle: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+              child: Text(tr.t('continue_guest')),
+            ),
+          ],
           if (_loading)
             const Padding(
               padding: EdgeInsets.only(top: 10),
@@ -308,11 +333,13 @@ class _AuthPageState extends State<AuthPage> {
     required String hintText,
     required IconData icon,
     TextInputType? keyboardType,
+    TextInputAction? textInputAction,
     bool obscureText = false,
   }) {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
+      textInputAction: textInputAction,
       obscureText: obscureText,
       textAlign: widget.isArabic ? TextAlign.right : TextAlign.left,
       decoration: InputDecoration(
@@ -340,6 +367,29 @@ class _AuthPageState extends State<AuthPage> {
     );
   }
 
+  Widget _authModeButton({
+    required String label,
+    required bool selected,
+    required VoidCallback? onPressed,
+  }) {
+    return OutlinedButton(
+      onPressed: onPressed,
+      style: OutlinedButton.styleFrom(
+        foregroundColor: selected ? Colors.white : const Color(0xFF5B3922),
+        backgroundColor: selected ? const Color(0xFF8B4A23) : Colors.white,
+        side: BorderSide(
+          color: selected ? const Color(0xFF8B4A23) : const Color(0xFFD9BE9C),
+        ),
+        minimumSize: const Size.fromHeight(46),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        textStyle: const TextStyle(fontWeight: FontWeight.w800),
+      ),
+      child: Text(label),
+    );
+  }
+
   Widget _secondaryAuthButton({
     required VoidCallback? onPressed,
     required IconData icon,
@@ -362,22 +412,105 @@ class _AuthPageState extends State<AuthPage> {
     );
   }
 
-  Future<void> _createDefaultUserDocument(User user) async {
-    await FirebaseFirestore.instance
+  Future<void> _createDefaultUserDocument(
+    User user, {
+    String? fullName,
+    String? username,
+    String? usernameLower,
+  }) async {
+    final userDocRef = FirebaseFirestore.instance
         .collection('users')
-        .doc(user.uid)
-        .set({
+        .doc(user.uid);
+    final existingDoc = await userDocRef.get();
+    final profileData = <String, dynamic>{
+      if (fullName != null) 'fullName': fullName,
+      if (username != null) 'username': username,
+      if (usernameLower != null) 'usernameLower': usernameLower,
+    };
+    final defaultPreferences = {
+      'placeType': 'desert',
+      'distancePreference': 'near',
+      'temperaturePreference': 'cool',
+      'activityPreference': 'camping',
+    };
+
+    if (existingDoc.exists) {
+      if (profileData.isEmpty) {
+        return;
+      }
+
+      final existingData = existingDoc.data() ?? const <String, dynamic>{};
+      await userDocRef.set({
+        ...profileData,
+        if (!existingData.containsKey('email')) 'email': user.email,
+        if (!existingData.containsKey('createdAt'))
+          'createdAt': FieldValue.serverTimestamp(),
+        if (!existingData.containsKey('roles'))
+          'roles': {
+            'regularUser': true,
+          },
+        if (!existingData.containsKey('preferences'))
+          'preferences': defaultPreferences,
+        if (!existingData.containsKey('preferencesCompleted'))
+          'preferencesCompleted': false,
+      }, SetOptions(merge: true));
+      return;
+    }
+
+    await userDocRef.set({
+      ...profileData,
       'email': user.email,
       'createdAt': FieldValue.serverTimestamp(),
       'roles': {
         'regularUser': true,
       },
-      'preferences': {
-        'placeType': 'desert',
-        'distancePreference': 'near',
-        'temperaturePreference': 'cool',
-        'activityPreference': 'camping',
-      },'preferencesCompleted' :false,
+      'preferences': defaultPreferences,
+      'preferencesCompleted': false,
+    });
+  }
+
+  Future<bool> _isUsernameTaken(String usernameLower) async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .where('usernameLower', isEqualTo: usernameLower)
+        .limit(1)
+        .get();
+
+    return snapshot.docs.isNotEmpty;
+  }
+
+  Future<void> _saveEmailSignUpUserProfile({
+    required User user,
+    required String fullName,
+    required String username,
+    required String usernameLower,
+  }) async {
+    final userDocRef = FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid);
+    final existingDoc = await userDocRef.get();
+    final existingData = existingDoc.data() ?? const <String, dynamic>{};
+    final defaultPreferences = {
+      'placeType': 'desert',
+      'distancePreference': 'near',
+      'temperaturePreference': 'cool',
+      'activityPreference': 'camping',
+    };
+
+    await userDocRef.set({
+      'fullName': fullName,
+      'username': username,
+      'usernameLower': usernameLower,
+      'email': user.email,
+      'roles': {
+        'regularUser': true,
+      },
+      if (!existingDoc.exists || !existingData.containsKey('createdAt'))
+        'createdAt': FieldValue.serverTimestamp(),
+      if (!existingData.containsKey('preferences'))
+        'preferences': defaultPreferences,
+      if (!existingData.containsKey('preferencesCompleted'))
+        'preferencesCompleted': false,
     }, SetOptions(merge: true));
   }
 
@@ -400,44 +533,139 @@ class _AuthPageState extends State<AuthPage> {
       if (user != null) {
         await _createDefaultUserDocument(user);
         if (!mounted) return;
-Navigator.pushReplacementNamed(context, '/welcome_preferences');
+
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+        final completed = userDoc.data()?['preferencesCompleted'] == true;
+
+        if (!mounted) return;
+        Navigator.pushReplacementNamed(
+          context,
+          completed ? '/' : '/welcome_preferences',
+        );
       }
     });
   }
 
   Future<void> _signUpWithEmail() async {
+    final fullName = _fullNameController.text.trim();
+    final username = _usernameController.text.trim();
+    final usernameLower = username.trim().toLowerCase();
     final email = _emailController.text.trim();
     final pass = _passwordController.text.trim();
+
+    debugPrint('SIGN UP fullName: $fullName');
+    debugPrint('SIGN UP username: $username');
+    debugPrint('SIGN UP usernameLower: $usernameLower');
+
+    if (fullName.isEmpty) {
+      _snack('Full name is required');
+      return;
+    }
+
+    if (username.isEmpty) {
+      _snack('Username is required');
+      return;
+    }
 
     if (email.isEmpty || pass.isEmpty) {
       _snack(widget.tr.t('email_password_required'));
       return;
     }
 
-    try {
-      final credential =
-          await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: email,
-        password: pass,
-      );
-
-      final user = credential.user;
-      if (user != null) {
-        await _createDefaultUserDocument(user);
-        if (!mounted) return;
-Navigator.pushReplacementNamed(context, '/welcome_preferences');
-      }
-    } catch (e) {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null && user.email == email) {
-        await _createDefaultUserDocument(user);
-        if (!mounted) return;
-Navigator.pushReplacementNamed(context, '/welcome_preferences');
+    await _authRun(() async {
+      final usernameTaken = await _isUsernameTaken(usernameLower);
+      if (usernameTaken) {
+        _snack('This username is already taken. Please choose another one.');
         return;
       }
 
-      _snack(e.toString());
-    }
+      User? user;
+
+      try {
+        debugPrint('SIGNUP_BEFORE_AUTH');
+
+        final credential =
+            await FirebaseAuth.instance.createUserWithEmailAndPassword(
+          email: email,
+          password: pass,
+        );
+
+        user = credential.user ?? FirebaseAuth.instance.currentUser;
+        debugPrint('SIGNUP_AFTER_AUTH user=${user?.uid}');
+      } on FirebaseAuthException catch (e) {
+        debugPrint('SIGNUP_AUTH_EXCEPTION: ${e.code} ${e.message}');
+
+        if (e.code == 'email-already-in-use') {
+          _snack('This email is already registered. Please sign in instead.');
+          return;
+        }
+
+        user = FirebaseAuth.instance.currentUser;
+        debugPrint('SIGNUP_CURRENT_USER_AFTER_EXCEPTION user=${user?.uid}');
+
+        if (user == null) {
+          _snack(e.message ?? e.code);
+          return;
+        }
+      } catch (e) {
+        debugPrint('SIGNUP_AUTH_EXCEPTION: $e');
+
+        user = FirebaseAuth.instance.currentUser;
+        debugPrint('SIGNUP_CURRENT_USER_AFTER_EXCEPTION user=${user?.uid}');
+
+        if (user == null) {
+          _snack(e.toString());
+          return;
+        }
+      }
+
+      final signedUpUser = user;
+
+      if (signedUpUser == null) {
+        _snack('Could not create user profile. Please try again.');
+        return;
+      }
+
+      debugPrint('SIGNUP_PROFILE_WRITE_START uid=${signedUpUser.uid}');
+
+      final userRef =
+          FirebaseFirestore.instance.collection('users').doc(signedUpUser.uid);
+
+      final existingDoc = await userRef.get();
+      final existingData = existingDoc.data() ?? <String, dynamic>{};
+
+      await userRef.set({
+        'fullName': fullName,
+        'username': username,
+        'usernameLower': usernameLower,
+        'email': signedUpUser.email ?? email,
+        'roles': {
+          'regularUser': true,
+        },
+        if (!existingData.containsKey('createdAt'))
+          'createdAt': FieldValue.serverTimestamp(),
+        if (!existingData.containsKey('preferences'))
+          'preferences': {
+            'placeType': 'desert',
+            'distancePreference': 'near',
+            'temperaturePreference': 'cool',
+            'activityPreference': 'camping',
+          },
+        if (!existingData.containsKey('preferencesCompleted'))
+          'preferencesCompleted': false,
+      }, SetOptions(merge: true));
+
+      debugPrint('SIGNUP_PROFILE_WRITE_DONE uid=${signedUpUser.uid}');
+
+      final checkDoc = await userRef.get();
+      debugPrint('SIGNUP_PROFILE_DOC_DATA: ${checkDoc.data()}');
+
+      if (!mounted) return;
+      Navigator.pushReplacementNamed(context, '/welcome_preferences');
+    });
   }
 
   Future<void> _signInWithGoogle() async {
@@ -449,7 +677,7 @@ Navigator.pushReplacementNamed(context, '/welcome_preferences');
         if (user != null) {
           await _createDefaultUserDocument(user);
           if (!mounted) return;
-Navigator.pushReplacementNamed(context, '/welcome_preferences');
+          Navigator.pushReplacementNamed(context, '/welcome_preferences');
         }
         return;
       }
@@ -471,7 +699,7 @@ Navigator.pushReplacementNamed(context, '/welcome_preferences');
       if (user != null) {
         await _createDefaultUserDocument(user);
         if (!mounted) return;
-Navigator.pushReplacementNamed(context, '/welcome_preferences');
+        Navigator.pushReplacementNamed(context, '/welcome_preferences');
       }
     } catch (e) {
       _snack(e.toString());
@@ -500,7 +728,7 @@ Navigator.pushReplacementNamed(context, '/welcome_preferences');
           if (user != null) {
             await _createDefaultUserDocument(user);
             if (!mounted) return;
-Navigator.pushReplacementNamed(context, '/welcome_preferences');
+            Navigator.pushReplacementNamed(context, '/welcome_preferences');
           }
         },
         verificationFailed: (e) {
@@ -532,7 +760,7 @@ Navigator.pushReplacementNamed(context, '/welcome_preferences');
           if (user != null) {
             await _createDefaultUserDocument(user);
             if (!mounted) return;
-Navigator.pushReplacementNamed(context, '/welcome_preferences');
+            Navigator.pushReplacementNamed(context, '/welcome_preferences');
           }
         },
         codeAutoRetrievalTimeout: (_) {},
@@ -548,7 +776,7 @@ Navigator.pushReplacementNamed(context, '/welcome_preferences');
       if (user != null) {
         await _createDefaultUserDocument(user);
         if (!mounted) return;
-Navigator.pushReplacementNamed(context, '/welcome_preferences');
+        Navigator.pushReplacementNamed(context, '/welcome_preferences');
       }
     });
   }
