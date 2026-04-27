@@ -39,30 +39,70 @@ class _AuthPageState extends State<AuthPage> {
   @override
   Widget build(BuildContext context) {
     final tr = widget.tr;
+    final size = MediaQuery.sizeOf(context);
+    final heroHeight = (size.height * 0.42).clamp(300.0, 380.0);
 
     return Scaffold(
-      body: Stack(
+      backgroundColor: const Color(0xFFF8EFE2),
+      body: SafeArea(
+        bottom: false,
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              _buildHero(context, tr, heroHeight),
+              Transform.translate(
+                offset: const Offset(0, -34),
+                child: _buildAuthCard(context, tr),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHero(BuildContext context, Tr tr, double height) {
+    return SizedBox(
+      height: height,
+      width: double.infinity,
+      child: Stack(
+        fit: StackFit.expand,
         children: [
-          Positioned.fill(
-            child: Image.asset(
-              'assets/444.jpg',
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFFF7D7AF), Color(0xFFE1C39B)],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                  ),
+          Image.asset(
+            'assets/444.jpg',
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) => Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Color(0xFF8F4E24),
+                    Color(0xFFD38A48),
+                    Color(0xFFF4C88F),
+                  ],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
                 ),
               ),
             ),
           ),
-          Positioned.fill(
-            child: Container(color: Colors.white.withValues(alpha: 0.32)),
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  const Color(0xFF2D1A10).withValues(alpha: 0.62),
+                  const Color(0xFF9B5628).withValues(alpha: 0.28),
+                  const Color(0xFFF8EFE2).withValues(alpha: 0.94),
+                ],
+                stops: const [0.0, 0.55, 1.0],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+            ),
           ),
-          SafeArea(
+          Padding(
+            padding: const EdgeInsets.fromLTRB(22, 14, 22, 58),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Align(
                   alignment: widget.isArabic
@@ -70,108 +110,254 @@ class _AuthPageState extends State<AuthPage> {
                       : Alignment.topRight,
                   child: TextButton(
                     onPressed: widget.onToggleLanguage,
-                    child: Text(widget.isArabic ? 'EN' : 'AR'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      backgroundColor: Colors.white.withValues(alpha: 0.18),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(999),
+                        side: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.32),
+                        ),
+                      ),
+                    ),
+                    child: Text(
+                      widget.isArabic ? 'EN' : 'AR',
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
                   ),
                 ),
                 const Spacer(),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(18),
-                  decoration: const BoxDecoration(
+                Text(
+                  tr.t('welcome_title'),
+                  textAlign: TextAlign.start,
+                  style: const TextStyle(
                     color: Colors.white,
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(24),
-                    ),
+                    fontSize: 34,
+                    fontWeight: FontWeight.w900,
+                    height: 1.05,
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        tr.t('welcome_title'),
-                        textAlign: TextAlign.start,
-                        style: const TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        tr.t('welcome_subtitle'),
-                        textAlign: TextAlign.start,
-                        style: TextStyle(color: Colors.grey.shade700),
-                      ),
-                      const SizedBox(height: 14),
-                      TextField(
-                        controller: _emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        textAlign:
-                            widget.isArabic ? TextAlign.right : TextAlign.left,
-                        decoration: InputDecoration(
-                          hintText: tr.t('email'),
-                          border: const OutlineInputBorder(),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      TextField(
-                        controller: _passwordController,
-                        obscureText: true,
-                        textAlign:
-                            widget.isArabic ? TextAlign.right : TextAlign.left,
-                        decoration: InputDecoration(
-                          hintText: tr.t('password'),
-                          border: const OutlineInputBorder(),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: _loading ? null : _signInWithEmail,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.orange,
-                                foregroundColor: Colors.white,
-                              ),
-                              child: Text(tr.t('sign_in')),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: _loading ? null : _signUpWithEmail,
-                              child: Text(tr.t('sign_up')),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      OutlinedButton.icon(
-                        onPressed: _loading ? null : _signInWithGoogle,
-                        icon: const Icon(Icons.g_mobiledata, size: 24),
-                        label: Text(tr.t('continue_google')),
-                      ),
-                      const SizedBox(height: 8),
-                      OutlinedButton.icon(
-                        onPressed: _loading ? null : _signInWithPhone,
-                        icon: const Icon(Icons.phone),
-                        label: Text(tr.t('sign_in_phone')),
-                      ),
-                      TextButton(
-                        onPressed: _loading ? null : _signInAnonymously,
-                        child: Text(tr.t('continue_guest')),
-                      ),
-                      if (_loading)
-                        const Padding(
-                          padding: EdgeInsets.only(top: 8),
-                          child: Center(child: CircularProgressIndicator()),
-                        ),
-                    ],
+                ),
+                const SizedBox(height: 12),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 360),
+                  child: Text(
+                    tr.t('welcome_subtitle'),
+                    textAlign: TextAlign.start,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.9),
+                      fontSize: 16,
+                      height: 1.45,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildAuthCard(BuildContext context, Tr tr) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(horizontal: 18),
+      padding: const EdgeInsets.fromLTRB(20, 22, 20, 24),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFBF5),
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(color: const Color(0xFFE9D7BF)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF6F421D).withValues(alpha: 0.14),
+            blurRadius: 30,
+            offset: const Offset(0, 18),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            tr.t('sign_in'),
+            textAlign: TextAlign.start,
+            style: const TextStyle(
+              color: Color(0xFF2F2118),
+              fontSize: 24,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            tr.t('welcome_subtitle'),
+            textAlign: TextAlign.start,
+            style: const TextStyle(
+              color: Color(0xFF7B6653),
+              fontSize: 14,
+              height: 1.4,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 22),
+          _authTextField(
+            controller: _emailController,
+            hintText: tr.t('email'),
+            icon: Icons.mail_outline_rounded,
+            keyboardType: TextInputType.emailAddress,
+          ),
+          const SizedBox(height: 12),
+          _authTextField(
+            controller: _passwordController,
+            hintText: tr.t('password'),
+            icon: Icons.lock_outline_rounded,
+            obscureText: true,
+          ),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: _loading ? null : _signInWithEmail,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF8B4A23),
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor:
+                        const Color(0xFF8B4A23).withValues(alpha: 0.48),
+                    minimumSize: const Size.fromHeight(54),
+                    elevation: 0,
+                    shadowColor: Colors.transparent,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    textStyle: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  child: Text(tr.t('sign_in')),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: _loading ? null : _signUpWithEmail,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF5B3922),
+                    side: const BorderSide(color: Color(0xFFD9BE9C)),
+                    minimumSize: const Size.fromHeight(54),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    textStyle: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  child: Text(tr.t('sign_up')),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _secondaryAuthButton(
+            onPressed: _loading ? null : _signInWithGoogle,
+            icon: Icons.g_mobiledata_rounded,
+            label: tr.t('continue_google'),
+          ),
+          const SizedBox(height: 10),
+          _secondaryAuthButton(
+            onPressed: _loading ? null : _signInWithPhone,
+            icon: Icons.phone_rounded,
+            label: tr.t('sign_in_phone'),
+          ),
+          const SizedBox(height: 6),
+          TextButton(
+            onPressed: _loading ? null : _signInAnonymously,
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFF8B4A23),
+              textStyle: const TextStyle(fontWeight: FontWeight.w800),
+            ),
+            child: Text(tr.t('continue_guest')),
+          ),
+          if (_loading)
+            const Padding(
+              padding: EdgeInsets.only(top: 10),
+              child: Center(
+                child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.6,
+                    color: Color(0xFF8B4A23),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _authTextField({
+    required TextEditingController controller,
+    required String hintText,
+    required IconData icon,
+    TextInputType? keyboardType,
+    bool obscureText = false,
+  }) {
+    return TextField(
+      controller: controller,
+      keyboardType: keyboardType,
+      obscureText: obscureText,
+      textAlign: widget.isArabic ? TextAlign.right : TextAlign.left,
+      decoration: InputDecoration(
+        hintText: hintText,
+        hintStyle: const TextStyle(
+          color: Color(0xFF9C8672),
+          fontWeight: FontWeight.w500,
+        ),
+        prefixIcon: Icon(icon, color: const Color(0xFF9B6B43)),
+        filled: true,
+        fillColor: const Color(0xFFF8EFE4),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 18,
+          vertical: 18,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: const BorderSide(color: Color(0xFFE8D7C0)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: const BorderSide(color: Color(0xFFB6783F), width: 1.4),
+        ),
+      ),
+    );
+  }
+
+  Widget _secondaryAuthButton({
+    required VoidCallback? onPressed,
+    required IconData icon,
+    required String label,
+  }) {
+    return OutlinedButton.icon(
+      onPressed: onPressed,
+      icon: Icon(icon, size: 24),
+      label: Text(label),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: const Color(0xFF5B3922),
+        backgroundColor: Colors.white.withValues(alpha: 0.62),
+        side: const BorderSide(color: Color(0xFFE1CCB2)),
+        minimumSize: const Size.fromHeight(50),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        textStyle: const TextStyle(fontWeight: FontWeight.w700),
       ),
     );
   }

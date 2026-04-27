@@ -21,40 +21,46 @@ class ExploreFilterBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
+      padding: const EdgeInsets.fromLTRB(0, 14, 0, 0),
       child: SizedBox(
-        height: 44,
+        height: 46,
         child: ListView(
           scrollDirection: Axis.horizontal,
           children: [
             FilterChip(
               selected: showOnlyFavorites,
               onSelected: onFavoritesChanged,
+              showCheckmark: false,
+              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
               avatar: Icon(
                 showOnlyFavorites ? Icons.star : Icons.star_border,
                 size: 18,
-                color: showOnlyFavorites ? Colors.orange : Colors.black54,
+                color: showOnlyFavorites
+                    ? Colors.white
+                    : const Color(0xFF6D482B),
               ),
               label: Text(tr.t('favorites')),
-              selectedColor: Colors.orange.withValues(alpha: 0.16),
-              checkmarkColor: Colors.orange,
+              selectedColor: const Color(0xFF8B4A23),
               side: BorderSide(
                 color: showOnlyFavorites
-                    ? Colors.orange
-                    : Colors.orange.shade200,
+                    ? const Color(0xFF8B4A23)
+                    : Colors.white.withValues(alpha: 0.50),
               ),
-              backgroundColor: Colors.white,
+              backgroundColor: Colors.white.withValues(alpha: 0.78),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(999),
               ),
               labelStyle: TextStyle(
-                color: showOnlyFavorites ? Colors.orange : Colors.black87,
-                fontWeight: FontWeight.w600,
+                color: showOnlyFavorites
+                    ? Colors.white
+                    : const Color(0xFF5B3922),
+                fontWeight: FontWeight.w800,
               ),
             ),
             const SizedBox(width: 8),
             _CategoryChip(
               label: tr.t('desert'),
+              icon: Icons.local_florist_rounded,
               isSelected: selectedCategoryChip == 'desert',
               onSelected: () => onCategorySelected(
                 selectedCategoryChip == 'desert' ? null : 'desert',
@@ -63,6 +69,7 @@ class ExploreFilterBar extends StatelessWidget {
             const SizedBox(width: 8),
             _CategoryChip(
               label: tr.t('beach'),
+              icon: Icons.waves_rounded,
               isSelected: selectedCategoryChip == 'beach',
               onSelected: () => onCategorySelected(
                 selectedCategoryChip == 'beach' ? null : 'beach',
@@ -71,6 +78,7 @@ class ExploreFilterBar extends StatelessWidget {
             const SizedBox(width: 8),
             _CategoryChip(
               label: tr.t('family'),
+              icon: Icons.family_restroom_rounded,
               isSelected: selectedCategoryChip == 'family',
               onSelected: () => onCategorySelected(
                 selectedCategoryChip == 'family' ? null : 'family',
@@ -86,11 +94,13 @@ class ExploreFilterBar extends StatelessWidget {
 class _CategoryChip extends StatelessWidget {
   const _CategoryChip({
     required this.label,
+    required this.icon,
     required this.isSelected,
     required this.onSelected,
   });
 
   final String label;
+  final IconData icon;
   final bool isSelected;
   final VoidCallback onSelected;
 
@@ -99,16 +109,27 @@ class _CategoryChip extends StatelessWidget {
     return FilterChip(
       selected: isSelected,
       onSelected: (_) => onSelected(),
-      label: Text(label),
-      selectedColor: Colors.orange.withValues(alpha: 0.16),
-      checkmarkColor: Colors.orange,
-      side: BorderSide(
-        color: isSelected ? Colors.orange : Colors.orange.shade200,
+      showCheckmark: false,
+      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+      avatar: Icon(
+        icon,
+        size: 18,
+        color: isSelected ? Colors.white : const Color(0xFF7A6656),
       ),
-      backgroundColor: Colors.white,
+      label: Text(label),
+      selectedColor: const Color(0xFF8B4A23),
+      side: BorderSide(
+        color: isSelected
+            ? const Color(0xFF8B4A23)
+            : Colors.white.withValues(alpha: 0.50),
+      ),
+      backgroundColor: Colors.white.withValues(alpha: 0.78),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(999),
+      ),
       labelStyle: TextStyle(
-        color: isSelected ? Colors.orange : Colors.black87,
-        fontWeight: FontWeight.w600,
+        color: isSelected ? Colors.white : const Color(0xFF5B3922),
+        fontWeight: FontWeight.w800,
       ),
     );
   }

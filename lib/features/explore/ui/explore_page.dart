@@ -8,10 +8,9 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
-
+import '../services/ai_recommendation_service.dart';
 import '../../../core/utils/firestore_utils.dart';
 import '../../../core/utils/localization.dart';
-import '../../../core/widgets/language_app_bar.dart';
 import '../models/recommended_place.dart';
 import '../services/place_service.dart';
 import '../services/weather_service.dart';
@@ -38,6 +37,10 @@ class ExplorePage extends StatefulWidget {
 
 class _ExplorePageState extends State<ExplorePage> {
 
+  bool _showRecommendations = true;
+
+  int _recommendationRefreshKey = 0;
+
   double _calculateDistanceKm({
   required double startLat,
   required double startLng,
@@ -56,6 +59,11 @@ class _ExplorePageState extends State<ExplorePage> {
   bool _showOnlyFavorites = false;
   String? _selectedCategoryChip;
   String? _preferredPlaceType;
+  String? _temperaturePreference;
+String? _activityPreference;
+
+final AiRecommendationService _aiRecommendationService =
+    AiRecommendationService();
 
   final WeatherService _weatherService = WeatherService();
 
@@ -119,6 +127,8 @@ class _ExplorePageState extends State<ExplorePage> {
   setState(() {
     _preferredPlaceType = prefs?['placeType']?.toString();
     _distancePreference = prefs?['distancePreference']?.toString();
+      _temperaturePreference = prefs?['temperaturePreference']?.toString();
+  _activityPreference = prefs?['activityPreference']?.toString();
   });
 
   print("PREFERRED PLACE TYPE: $_preferredPlaceType");
@@ -155,12 +165,42 @@ class _ExplorePageState extends State<ExplorePage> {
   if (userPref == null || userLocation == null) return [];
 
   final results = <RecommendedPlace>[];
+  final clickCounts = <String, int>{};
+  final positivelyRatedPlaceIds = <String>{};
+  final lowRatedPlaceIds = <String>{};
+
+  final interactions = await getUserInteractions();
+  for (final i in interactions) {
+    final placeId = i['placeId'];
+    if (placeId == null) continue;
+
+    if (i['type'] == 'click') {
+      clickCounts[placeId] = (clickCounts[placeId] ?? 0) + 1;
+    }
+
+    final ratingValue = (i['rating'] as num?)?.toDouble();
+    if (i['type'] == 'rating' && ratingValue != null) {
+      if (ratingValue <= 2) {
+        lowRatedPlaceIds.add(placeId);
+      } else if (ratingValue >= 4) {
+        positivelyRatedPlaceIds.add(placeId);
+      }
+    }
+  }
 
   for (final doc in docs) {
     final data = doc.data();
+    final placeEnvironmentType =
+        data['environmentType']?.toString().toLowerCase() ?? '';
+    final matchesPreferredType = placeEnvironmentType == userPref;
+    final clickCount = clickCounts[doc.id] ?? 0;
+    final hasLowRating = lowRatedPlaceIds.contains(doc.id);
+    final hasPositiveRating = positivelyRatedPlaceIds.contains(doc.id);
+    final hasStrongInteraction =
+        clickCount >= 2 || hasPositiveRating == true;
 
-    final placeType = data['environmentType']?.toString().toLowerCase();
-    if (placeType != userPref) continue;
+    if (hasLowRating) continue;
+    if (!matchesPreferredType && !hasStrongInteraction) continue;
 
     final lat = (data['lat'] as num?)?.toDouble();
     final lng = (data['lng'] as num?)?.toDouble();
@@ -174,8 +214,8 @@ class _ExplorePageState extends State<ExplorePage> {
     );
 
     // فلترة حسب near / far
-    if (distancePref == 'near' && distanceKm > 20) continue;
-    if (distancePref == 'far' && distanceKm < 20) continue;
+    // if (distancePref == 'near' && distanceKm > 20) continue;
+    // if (distancePref == 'far' && distanceKm < 20) continue;
 
     final avgRating = await _getAverageRatingForPlace(doc.id);
 
@@ -188,18 +228,113 @@ class _ExplorePageState extends State<ExplorePage> {
     );
   }
 
-  final topPlaces = await getMostClickedPlaces();
+  
+
+  final predictedScores = <String, double>{};
+
+final seenPlaceIds = <String>{};
+
+for (final item in results) {
+
+ if (seenPlaceIds.contains(item.doc.id)) continue;
+  seenPlaceIds.add(item.doc.id);
+
+  final placeData = item.doc.data() as Map<String, dynamic>;
+
+final placeEnvironmentType =
+    placeData['environmentType']?.toString().toLowerCase() ?? 'desert';
+
+final distanceKm = (item.distanceKm);
+final placeDistanceBucket =
+    distanceKm <= 10 ? 'near' : (distanceKm <= 25 ? 'medium' : 'far');
+
+final placeAverageRating = item.averageRating;
+final placeRatingCount =
+    ((placeData['ratingCount'] as num?)?.toInt()) ?? 0;
+
+final userClickCountForPlace = clickCounts[item.doc.id] ?? 0;
+
+print('RECOMMENDED PLACE -> ${placeData['name']} | ${item.doc.id}');
+print('CLICK COUNT -> ${placeData['name']} | ${item.doc.id}: $userClickCountForPlace');
+print('AVG RATING -> ${placeData['name']} | ${item.doc.id}: $placeAverageRating');
+
+final predicted = await _aiRecommendationService.predictRating(
+  preferredPlaceType: _preferredPlaceType?.toLowerCase() ?? 'desert',
+  distancePreference: _distancePreference?.toLowerCase() ?? 'near',
+  temperaturePreference: _temperaturePreference?.toLowerCase() ?? 'cool',
+  placeEnvironmentType: placeEnvironmentType,
+  placeDistanceBucket: placeDistanceBucket,
+  placeAverageRating: placeAverageRating,
+  placeRatingCount: placeRatingCount,
+  userClickCountForPlace: userClickCountForPlace,
+);
+
+final matchesPreference = placeEnvironmentType == userPref;
+final finalOrderingValue =
+    '(${matchesPreference ? 1 : 0}, ${predicted ?? 'null'}, $placeAverageRating)';
+
+print('''
+DEBUG PLACE
+NAME: ${placeData['name']}
+ID: ${item.doc.id}
+USER preferredPlaceType: ${_preferredPlaceType?.toLowerCase() ?? 'desert'}
+USER distancePreference: ${_distancePreference?.toLowerCase() ?? 'near'}
+USER temperaturePreference: ${_temperaturePreference?.toLowerCase() ?? 'cool'}
+PLACE environmentType: $placeEnvironmentType
+PLACE distanceBucket: $placeDistanceBucket
+PLACE averageRating: $placeAverageRating
+PLACE ratingCount: $placeRatingCount
+USER clickCountForPlace: $userClickCountForPlace
+MATCHES_PREFERENCE: $matchesPreference
+RAW_AI_SCORE: ${predicted ?? 'null'}
+FINAL_ORDERING_VALUE: $finalOrderingValue
+''');
+
+  if (predicted != null) {
+  predictedScores[item.doc.id] = predicted;
+ print('AI SCORE -> ${placeData['name']} | ${item.doc.id}: $predicted');
+} else {
+  print('AI SCORE -> ${item.doc.id}: null');
+}
+}
 
 results.sort((a, b) {
-  int aScore = topPlaces.contains(a.doc.id) ? 1 : 0;
-  int bScore = topPlaces.contains(b.doc.id) ? 1 : 0;
+  final aEnvironmentType =
+      a.doc.data()['environmentType']?.toString().toLowerCase() ?? '';
+  final bEnvironmentType =
+      b.doc.data()['environmentType']?.toString().toLowerCase() ?? '';
+  final aMatchesPreference = aEnvironmentType == userPref;
+  final bMatchesPreference = bEnvironmentType == userPref;
 
-  if (aScore != bScore) {
-    return bScore.compareTo(aScore);
+  if (aMatchesPreference != bMatchesPreference) {
+    return bMatchesPreference ? 1 : -1;
   }
+
+  final aPred = predictedScores[a.doc.id];
+  final bPred = predictedScores[b.doc.id];
+
+  if (aPred != null && bPred != null && aPred != bPred) {
+    return bPred.compareTo(aPred);
+  }
+
+  
 
   return b.averageRating.compareTo(a.averageRating);
 });
+
+print('FINAL ORDER AFTER SORT:');
+for (final item in results) {
+  final placeData = item.doc.data() as Map<String, dynamic>;
+  final rawAiScore = predictedScores[item.doc.id];
+  final placeEnvironmentType =
+      placeData['environmentType']?.toString().toLowerCase() ?? '';
+  final matchesPreference = placeEnvironmentType == userPref;
+  final finalOrderingValue =
+      '(${matchesPreference ? 1 : 0}, ${rawAiScore ?? 'null'}, ${item.averageRating})';
+  print(
+    'PLACE -> ${placeData['name']} | RAW AI SCORE -> $rawAiScore | MATCHES PREFERENCE -> $matchesPreference | FINAL ORDERING VALUE -> $finalOrderingValue | RATING -> ${item.averageRating}',
+  );
+}
 
   return results;
 }
@@ -498,6 +633,12 @@ results.sort((a, b) {
             rating: rating.toDouble(),
           );
 
+          if (mounted) {
+  setState(() {
+    _recommendationRefreshKey++;
+  });
+}
+
           navigator.pop();
         },
       ),
@@ -659,32 +800,41 @@ void _testInteractions() async {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        appBarWithLanguage(
-          tr: widget.tr,
-          isArabic: widget.isArabic,
-          title: widget.tr.t('explore'),
-          onToggleLanguage: widget.onToggleLanguage,
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Color(0xFFF7E6CF),
+            Color(0xFFFDF7EF),
+            Color(0xFFE8CBA6),
+          ],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
         ),
-        ExploreFilterBar(
-          tr: widget.tr,
-          showOnlyFavorites: _showOnlyFavorites,
-          selectedCategoryChip: _selectedCategoryChip,
-          onFavoritesChanged: (_) {
-            setState(() {
-              _showOnlyFavorites = !_showOnlyFavorites;
-            });
-          },
-          onCategorySelected: (category) {
-            setState(() {
-              _selectedCategoryChip = category;
-            });
-          },
-        ),
-        Expanded(
-          flex: 2,
-          child: StreamBuilder<Set<String>>(
+      ),
+      child: Column(
+        children: [
+          _buildExploreHeader(),
+          Expanded(
+            flex: 2,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 0),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF4E3CA),
+                  borderRadius: BorderRadius.circular(32),
+                  border: Border.all(color: const Color(0xFFE2C59F)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF6F421D).withValues(alpha: 0.14),
+                      blurRadius: 24,
+                      offset: const Offset(0, 12),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(31),
+                  child: StreamBuilder<Set<String>>(
             stream: _favoritePlaceIdsStream(),
             builder: (context, favoritesSnapshot) {
               if (favoritesSnapshot.hasError) {
@@ -727,19 +877,24 @@ void _testInteractions() async {
                           markerId: MarkerId(doc.id),
                           position: LatLng(lat, lng),
                           onTap: () async {
+                            print('MARKER CLICKED -> ${data['name']} | ${doc.id}');
   await _saveInteraction(
     placeId: doc.id,
     type: 'click',
   );
+
+  if (mounted) {
+    setState(() {
+      _recommendationRefreshKey++;
+    });
+  }
 
   fetchRoute(
     destinationLatitude: lat,
     destinationLongitude: lng,
   );
   _showPlaceDetails(data, doc.id);
-}
-
-,
+},
 
                           icon: BitmapDescriptor.defaultMarkerWithHue(
                             BitmapDescriptor.hueRed,
@@ -772,7 +927,7 @@ void _testInteractions() async {
                   };
 
                   return Stack(
-                    children: [
+                  children: [
                       GoogleMap(
                         initialCameraPosition: const CameraPosition(
                           target: LatLng(21.5433, 39.1728),
@@ -784,7 +939,7 @@ void _testInteractions() async {
                         },
                         myLocationEnabled: true,
                         myLocationButtonEnabled: true,
-                        zoomControlsEnabled: true,
+                        zoomControlsEnabled: false,
                         zoomGesturesEnabled: true,
 scrollGesturesEnabled: true,
                         onTap: (point) {
@@ -807,10 +962,13 @@ scrollGesturesEnabled: true,
                         routeDurationText: _routeDurationText,
                       ),
 
+                      _buildMapZoomControls(),
+
 
 
                       FutureBuilder<List<RecommendedPlace>>(
-                        future: _buildRecommendedPlaces(docs),
+  key: ValueKey(_recommendationRefreshKey),
+  future: _buildRecommendedPlaces(docs),
                         builder: (context, recommendationSnapshot) {
                           if (!recommendationSnapshot.hasData ||
                               recommendationSnapshot.data!.isEmpty) {
@@ -820,75 +978,172 @@ scrollGesturesEnabled: true,
                           final recommendedPlaces =
                               recommendationSnapshot.data!;
 
-                          return Positioned(
-                            bottom: 0,
-                            left: 0,
-                            right: 0,
-                            child: Container(
-                              height: 150,
-                              color: Colors.white,
-                              child: ListView.builder(
-                                scrollDirection: Axis.horizontal,
-                                itemCount: recommendedPlaces.length,
-                                itemBuilder: (context, index) {
-                                  final item = recommendedPlaces[index];
-                                  final place = item.doc.data();
+                          if (!_showRecommendations) {
+                            return Positioned(
+                              bottom: 18,
+                              right: 18,
+                              child: FloatingActionButton(
+                                mini: true,
+                                backgroundColor: const Color(0xFF8B4A23),
+                                foregroundColor: Colors.white,
+                                elevation: 4,
+                                onPressed: () {
+                                  setState(() {
+                                    _showRecommendations = true;
+                                  });
+                                },
+                                child: const Icon(Icons.auto_awesome),
+                              ),
+                            );
+                          }
 
-                                  return GestureDetector(
-                                    onTap: () {
-                                      final lat =
-                                          (place['lat'] as num).toDouble();
-                                      final lng =
-                                          (place['lng'] as num).toDouble();
-
-                                      fetchRoute(
-                                        destinationLatitude: lat,
-                                        destinationLongitude: lng,
-                                      );
-
-                                      _showPlaceDetails(place, item.doc.id);
-                                    },
-                                    child: Card(
-                                      margin: const EdgeInsets.all(8),
-                                      child: Container(
-                                        width: 160,
-                                        padding: const EdgeInsets.all(8),
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              place['name'] ?? '',
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 5),
-                                            Text(place['environmentType'] ?? ''),
-                                            const SizedBox(height: 8),
-                                            Row(
-  children: [
-    const Icon(Icons.star, color: Colors.orange, size: 16),
-    const SizedBox(width: 4),
-    Text(item.averageRating.toStringAsFixed(1)),
-  ],
-),
-const SizedBox(height: 6),
-Row(
-  children: [
-    const Icon(Icons.place, size: 16, color: Colors.blue),
-    const SizedBox(width: 4),
-    Text("${item.distanceKm.toStringAsFixed(1)} km"),
-  ],
-),
-                                          ],
-                                        ),
+                          return Stack(
+                            children: [
+                              Positioned(
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+                                child: Container(
+                                  height: 300,
+                                  padding: const EdgeInsets.fromLTRB(
+                                    16,
+                                    14,
+                                    16,
+                                    16,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFFFAF2)
+                                        .withValues(alpha: 0.98),
+                                    borderRadius: const BorderRadius.vertical(
+                                      top: Radius.circular(32),
+                                    ),
+                                    border: const Border(
+                                      top: BorderSide(
+                                        color: Color(0xFFE6CFB2),
                                       ),
                                     ),
-                                  );
-                                },
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(0xFF3B2415)
+                                            .withValues(alpha: 0.18),
+                                        blurRadius: 26,
+                                        offset: const Offset(0, -10),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.all(8),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFF8B4A23)
+                                                  .withValues(alpha: 0.11),
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                            ),
+                                            child: const Icon(
+                                              Icons.auto_awesome_rounded,
+                                              color: Color(0xFF8B4A23),
+                                              size: 18,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          const Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  'Recommended for you',
+                                                  style: TextStyle(
+                                                    color: Color(0xFF2F2118),
+                                                    fontSize: 17,
+                                                    fontWeight:
+                                                        FontWeight.w900,
+                                                  ),
+                                                ),
+                                                SizedBox(height: 2),
+                                                Text(
+                                                  'Based on your preferences',
+                                                  style: TextStyle(
+                                                    color: Color(0xFF7B6653),
+                                                    fontSize: 12,
+                                                    fontWeight:
+                                                        FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Expanded(
+                                        child: ListView.builder(
+                                          scrollDirection: Axis.horizontal,
+                                          padding: EdgeInsets.zero,
+                                          itemCount: recommendedPlaces.length,
+                                          itemBuilder: (context, index) {
+                                            final item =
+                                                recommendedPlaces[index];
+                                            final place = item.doc.data();
+
+                                            return GestureDetector(
+                                              onTap: () {
+                                                final lat =
+                                                    (place['lat'] as num)
+                                                        .toDouble();
+                                                final lng =
+                                                    (place['lng'] as num)
+                                                        .toDouble();
+
+                                                fetchRoute(
+                                                  destinationLatitude: lat,
+                                                  destinationLongitude: lng,
+                                                );
+
+                                                _showPlaceDetails(
+                                                  place,
+                                                  item.doc.id,
+                                                );
+                                              },
+                                              child: _buildRecommendationCard(
+                                                place: place,
+                                                item: item,
+                                                rank: index + 1,
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
-                            ),
+                              Positioned(
+                                bottom: 226,
+                                right: 12,
+                                child: IconButton(
+                                  icon: const Icon(Icons.close_rounded),
+                                  style: IconButton.styleFrom(
+                                    backgroundColor: const Color(0xFFFFFAF2),
+                                    foregroundColor: const Color(0xFF5B3922),
+                                    side: const BorderSide(
+                                      color: Color(0xFFE1CCB2),
+                                    ),
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      _showRecommendations = false;
+                                    });
+                                  },
+                                ),
+                              ),
+                            ],
                           );
                         },
                       ),
@@ -898,9 +1153,428 @@ Row(
               );
             },
           ),
-        ),
-      ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
+  }
+
+  Widget _buildExploreHeader() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [
+            Color(0xFF7C421F),
+            Color(0xFFC37B3E),
+            Color(0xFFE9B978),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(28),
+          bottom: Radius.circular(18),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF6F421D).withValues(alpha: 0.18),
+            blurRadius: 22,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  widget.tr.t('explore'),
+                  textAlign: widget.isArabic ? TextAlign.right : TextAlign.left,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 28,
+                    fontWeight: FontWeight.w900,
+                    height: 1,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              TextButton(
+                onPressed: widget.onToggleLanguage,
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  backgroundColor: Colors.white.withValues(alpha: 0.17),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 15,
+                    vertical: 8,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(999),
+                    side: BorderSide(
+                      color: Colors.white.withValues(alpha: 0.28),
+                    ),
+                  ),
+                ),
+                child: Text(
+                  widget.isArabic ? 'EN' : 'AR',
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Find warm escapes, smart picks, and nearby places.',
+            textAlign: widget.isArabic ? TextAlign.right : TextAlign.left,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.88),
+              fontSize: 13,
+              height: 1.35,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 18),
+          _buildExploreSearchPill(),
+          ExploreFilterBar(
+            tr: widget.tr,
+            showOnlyFavorites: _showOnlyFavorites,
+            selectedCategoryChip: _selectedCategoryChip,
+            onFavoritesChanged: (_) {
+              setState(() {
+                _showOnlyFavorites = !_showOnlyFavorites;
+              });
+            },
+            onCategorySelected: (category) {
+              setState(() {
+                _selectedCategoryChip = category;
+              });
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildExploreSearchPill() {
+    return Container(
+      height: 58,
+      padding: const EdgeInsets.symmetric(horizontal: 18),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFAF2).withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.64)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF6F421D).withValues(alpha: 0.12),
+            blurRadius: 18,
+            offset: const Offset(0, 9),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.search_rounded,
+            color: Color(0xFF6D482B),
+            size: 28,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Search places, activities, or regions',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: const Color(0xFF5B3922).withValues(alpha: 0.78),
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Container(
+            width: 1,
+            height: 30,
+            color: const Color(0xFFE3C9A8),
+          ),
+          const SizedBox(width: 12),
+          const Icon(
+            Icons.tune_rounded,
+            color: Color(0xFF6D482B),
+            size: 25,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMapZoomControls() {
+    return Positioned(
+      top: 18,
+      left: 16,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFFAF2).withValues(alpha: 0.94),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFE6CFB2)),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF3B2415).withValues(alpha: 0.12),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _mapZoomButton(
+              icon: Icons.add_rounded,
+              onPressed: () {
+                _mapController?.animateCamera(CameraUpdate.zoomIn());
+              },
+            ),
+            Container(
+              width: 30,
+              height: 1,
+              color: const Color(0xFFE6CFB2),
+            ),
+            _mapZoomButton(
+              icon: Icons.remove_rounded,
+              onPressed: () {
+                _mapController?.animateCamera(CameraUpdate.zoomOut());
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _mapZoomButton({
+    required IconData icon,
+    required VoidCallback onPressed,
+  }) {
+    return IconButton(
+      onPressed: onPressed,
+      icon: Icon(icon),
+      color: const Color(0xFF5B3922),
+      iconSize: 22,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints.tightFor(width: 42, height: 40),
+      splashRadius: 22,
+    );
+  }
+
+  Widget _buildRecommendationCard({
+    required Map<String, dynamic> place,
+    required RecommendedPlace item,
+    required int rank,
+  }) {
+    final environmentType = place['environmentType']?.toString() ?? '';
+    final imageProvider =
+        _placeImageProvider(place['imageBase64']?.toString());
+
+    return Container(
+      width: 224,
+      margin: const EdgeInsets.only(right: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFCF7),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: rank == 1 ? const Color(0xFFD9A35D) : const Color(0xFFE8D7C0),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF6F421D).withValues(alpha: 0.10),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ClipRRect(
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(21),
+            ),
+            child: SizedBox(
+              height: 82,
+              width: double.infinity,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (imageProvider != null)
+                    Image(
+                      image: imageProvider,
+                      fit: BoxFit.cover,
+                    )
+                  else
+                    const DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Color(0xFFE19B52),
+                            Color(0xFFB96127),
+                            Color(0xFFF2C58A),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                      ),
+                    ),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.black.withValues(alpha: 0.12),
+                          Colors.transparent,
+                        ],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    top: 10,
+                    left: 10,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 9,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE27622),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        '#$rank',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    top: 9,
+                    right: 10,
+                    child: Icon(
+                      Icons.favorite_border_rounded,
+                      color: Colors.white.withValues(alpha: 0.95),
+                      size: 25,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    place['name']?.toString() ?? '',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF2F2118),
+                      fontSize: 15,
+                      height: 1.12,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF2E4CF),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          environmentType,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xFF6D482B),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      const Spacer(),
+                      const Icon(
+                        Icons.star_rounded,
+                        color: Color(0xFFE27622),
+                        size: 17,
+                      ),
+                      const SizedBox(width: 3),
+                      Text(
+                        item.averageRating.toStringAsFixed(1),
+                        style: const TextStyle(
+                          color: Color(0xFF3C2A1D),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Spacer(),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.location_on_outlined,
+                        size: 16,
+                        color: Color(0xFF8B6A52),
+                      ),
+                      const SizedBox(width: 3),
+                      Expanded(
+                        child: Text(
+                          '${item.distanceKm.toStringAsFixed(1)} km away',
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xFF75604C),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  ImageProvider? _placeImageProvider(String? imageBase64) {
+    if (imageBase64 == null || imageBase64.isEmpty) {
+      return null;
+    }
+
+    try {
+      return MemoryImage(base64Decode(imageBase64));
+    } catch (_) {
+      return null;
+    }
   }
 }
 
