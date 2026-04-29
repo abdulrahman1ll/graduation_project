@@ -968,16 +968,49 @@ Map<String, int> categoryTemplateCounts(
 List<QueryDocumentSnapshot<Map<String, dynamic>>> sortChecklistByCompletion(
   List<QueryDocumentSnapshot<Map<String, dynamic>>> items,
 ) {
-  final sorted = [...items];
-  sorted.sort((a, b) {
-    final aDone = a.data()['done'] == true;
-    final bDone = b.data()['done'] == true;
-    if (aDone == bDone) {
-      return 0;
+  final unassignedItems = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+  final assignedItemsByUserId =
+      <String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>{};
+
+  for (final item in items) {
+    final assignedTo = (item.data()['assignedTo'] as String?)?.trim();
+    if (assignedTo == null || assignedTo.isEmpty) {
+      unassignedItems.add(item);
+      continue;
     }
-    return aDone ? 1 : -1;
-  });
+
+    assignedItemsByUserId.putIfAbsent(assignedTo, () => []).add(item);
+  }
+
+  final sorted = <QueryDocumentSnapshot<Map<String, dynamic>>>[
+    ..._sortChecklistGroupByCompletion(unassignedItems),
+  ];
+  for (final userItems in assignedItemsByUserId.values) {
+    sorted.addAll(_sortChecklistGroupByCompletion(userItems));
+  }
+
   return sorted;
+}
+
+List<QueryDocumentSnapshot<Map<String, dynamic>>>
+    _sortChecklistGroupByCompletion(
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> items,
+) {
+  final incompleteItems = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+  final completedItems = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+
+  for (final item in items) {
+    if (item.data()['done'] == true) {
+      completedItems.add(item);
+    } else {
+      incompleteItems.add(item);
+    }
+  }
+
+  return <QueryDocumentSnapshot<Map<String, dynamic>>>[
+    ...incompleteItems,
+    ...completedItems,
+  ];
 }
 
 double checklistProgressValue({

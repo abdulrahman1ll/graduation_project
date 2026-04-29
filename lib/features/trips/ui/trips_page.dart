@@ -7,7 +7,10 @@ import '../../../core/utils/firestore_utils.dart';
 import '../../../core/utils/localization.dart';
 import '../../../core/widgets/language_app_bar.dart';
 import '../helpers/checklist_utils.dart';
+import '../services/checklist_assignment_service.dart';
+import '../services/checklist_user_resolver.dart';
 import 'add_trip_page.dart';
+import 'widgets/checklist_item_tile.dart';
 
 class TripsPage extends StatelessWidget {
   const TripsPage({
@@ -31,9 +34,7 @@ class TripsPage extends StatelessWidget {
         onToggleLanguage: onToggleLanguage,
       ),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: FirebaseFirestore.instance
-            .collection('trips')
-            .snapshots(),
+        stream: FirebaseFirestore.instance.collection('trips').snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -153,8 +154,8 @@ class TripsPage extends StatelessWidget {
                                     builder: (_) => TripChecklistPage(
                                       tr: tr,
                                       tripId: doc.id,
-                                      tripTitle: (data['title'] ?? '')
-                                          .toString(),
+                                      tripTitle:
+                                          (data['title'] ?? '').toString(),
                                     ),
                                   ),
                                 );
@@ -297,20 +298,20 @@ class _AddChecklistItemsPageState extends State<AddChecklistItemsPage> {
           .collection('checklist')
           .doc(itemId)
           .set({
-            'itemId': itemId,
-            'groupId': group.id,
-            'sourceTemplatePath': group.reference.path,
-            'name': itemName,
-            'name_ar': (itemData['name_ar'] ?? '').toString(),
-            'name_en': (itemData['name_en'] ?? '').toString(),
-            'category': groupName,
-            'category_ar': (group.data['name_ar'] ?? '').toString(),
-            'category_en': (group.data['name_en'] ?? '').toString(),
-            'done': false,
-            'addedBy': userId ?? 'unknown',
-            'assignedTo': null,
-            'createdAt': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
+        'itemId': itemId,
+        'groupId': group.id,
+        'sourceTemplatePath': group.reference.path,
+        'name': itemName,
+        'name_ar': (itemData['name_ar'] ?? '').toString(),
+        'name_en': (itemData['name_en'] ?? '').toString(),
+        'category': groupName,
+        'category_ar': (group.data['name_ar'] ?? '').toString(),
+        'category_en': (group.data['name_en'] ?? '').toString(),
+        'done': false,
+        'addedBy': userId ?? 'unknown',
+        'assignedTo': null,
+        'createdAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
 
       if (context.mounted) {
         ScaffoldMessenger.of(
@@ -360,7 +361,8 @@ class _AddChecklistItemsPageState extends State<AddChecklistItemsPage> {
           }
 
           return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream: FirebaseFirestore.instance.collectionGroup('items').snapshots(),
+            stream:
+                FirebaseFirestore.instance.collectionGroup('items').snapshots(),
             builder: (context, itemsSnapshot) {
               if (itemsSnapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
@@ -387,11 +389,11 @@ class _AddChecklistItemsPageState extends State<AddChecklistItemsPage> {
                     );
                   }
 
-                  final existingItemIds =
-                      checklistSnapshot.data?.docs
+                  final existingItemIds = checklistSnapshot.data?.docs
                           .map((doc) {
                             final data = doc.data();
-                            final itemId = (data['itemId'] ?? '').toString().trim();
+                            final itemId =
+                                (data['itemId'] ?? '').toString().trim();
                             if (itemId.isNotEmpty) {
                               return itemId;
                             }
@@ -401,15 +403,15 @@ class _AddChecklistItemsPageState extends State<AddChecklistItemsPage> {
                           .toSet() ??
                       <String>{};
 
-                  final groupById = <String, QueryDocumentSnapshot<Map<String, dynamic>>>{
+                  final groupById =
+                      <String, QueryDocumentSnapshot<Map<String, dynamic>>>{
                     for (final doc in groupDocs) doc.id: doc,
                   };
-                  final groupedItems =
-                      <String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>{};
+                  final groupedItems = <String,
+                      List<QueryDocumentSnapshot<Map<String, dynamic>>>>{};
 
-                  for (final itemDoc
-                      in itemsSnapshot.data?.docs ??
-                          <QueryDocumentSnapshot<Map<String, dynamic>>>[]) {
+                  for (final itemDoc in itemsSnapshot.data?.docs ??
+                      <QueryDocumentSnapshot<Map<String, dynamic>>>[]) {
                     final groupRef = itemDoc.reference.parent.parent;
                     final parentCollectionId = groupRef?.parent.id;
                     final groupId = groupRef?.id;
@@ -432,10 +434,11 @@ class _AddChecklistItemsPageState extends State<AddChecklistItemsPage> {
                     final groupItems = [
                       ...(groupedItems[groupId] ??
                           <QueryDocumentSnapshot<Map<String, dynamic>>>[]),
-                    ]
-                      ..sort((a, b) {
-                        final aOrder = (a.data()['order'] as num?)?.toInt() ?? 9999;
-                        final bOrder = (b.data()['order'] as num?)?.toInt() ?? 9999;
+                    ]..sort((a, b) {
+                        final aOrder =
+                            (a.data()['order'] as num?)?.toInt() ?? 9999;
+                        final bOrder =
+                            (b.data()['order'] as num?)?.toInt() ?? 9999;
                         return aOrder.compareTo(bOrder);
                       });
 
@@ -452,10 +455,12 @@ class _AddChecklistItemsPageState extends State<AddChecklistItemsPage> {
                       final itemNameEn =
                           (itemData['name_en'] ?? '').toString().toLowerCase();
                       final normalizedQuery = _searchQuery.toLowerCase();
-                      final matchesItem = itemNameAr.contains(normalizedQuery) ||
-                          itemNameEn.contains(normalizedQuery);
-                      final matchesGroup =
-                          groupNameAr.toLowerCase().contains(normalizedQuery) ||
+                      final matchesItem =
+                          itemNameAr.contains(normalizedQuery) ||
+                              itemNameEn.contains(normalizedQuery);
+                      final matchesGroup = groupNameAr
+                              .toLowerCase()
+                              .contains(normalizedQuery) ||
                           groupNameEn.toLowerCase().contains(normalizedQuery);
                       return matchesItem || matchesGroup;
                     }).toList();
@@ -492,15 +497,18 @@ class _AddChecklistItemsPageState extends State<AddChecklistItemsPage> {
                             ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(22),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
+                              borderSide:
+                                  BorderSide(color: Colors.grey.shade300),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(22),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
+                              borderSide:
+                                  BorderSide(color: Colors.grey.shade300),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(22),
-                              borderSide: const BorderSide(color: Colors.orange),
+                              borderSide:
+                                  const BorderSide(color: Colors.orange),
                             ),
                           ),
                         ),
@@ -520,8 +528,8 @@ class _AddChecklistItemsPageState extends State<AddChecklistItemsPage> {
                                 itemBuilder: (context, index) {
                                   final isArabic =
                                       Localizations.localeOf(context)
-                                          .languageCode ==
-                                      'ar';
+                                              .languageCode ==
+                                          'ar';
                                   final group = groups[index];
                                   final groupTitle = checklistDisplayName(
                                     tr: widget.tr,
@@ -553,7 +561,8 @@ class _AddChecklistItemsPageState extends State<AddChecklistItemsPage> {
                                         horizontal: 16,
                                         vertical: 10,
                                       ),
-                                      childrenPadding: const EdgeInsets.fromLTRB(
+                                      childrenPadding:
+                                          const EdgeInsets.fromLTRB(
                                         16,
                                         8,
                                         16,
@@ -565,7 +574,8 @@ class _AddChecklistItemsPageState extends State<AddChecklistItemsPage> {
                                           if (expanded) {
                                             _expandedCategories.add(group.id);
                                           } else {
-                                            _expandedCategories.remove(group.id);
+                                            _expandedCategories
+                                                .remove(group.id);
                                           }
                                         });
                                       },
@@ -576,13 +586,14 @@ class _AddChecklistItemsPageState extends State<AddChecklistItemsPage> {
                                             decoration: BoxDecoration(
                                               color:
                                                   checklistGroupEmojiBackgroundColor(
-                                                    group.id,
-                                                  ).withValues(alpha: 0.9),
+                                                group.id,
+                                              ).withValues(alpha: 0.9),
                                               shape: BoxShape.circle,
                                             ),
                                             child: Text(
                                               groupEmoji,
-                                              style: const TextStyle(fontSize: 22),
+                                              style:
+                                                  const TextStyle(fontSize: 22),
                                             ),
                                           ),
                                           const SizedBox(width: 10),
@@ -611,7 +622,8 @@ class _AddChecklistItemsPageState extends State<AddChecklistItemsPage> {
                                             existingItemIds.contains(itemId);
 
                                         return Padding(
-                                          padding: const EdgeInsets.only(top: 5),
+                                          padding:
+                                              const EdgeInsets.only(top: 5),
                                           child: Container(
                                             decoration: BoxDecoration(
                                               color: Colors.white,
@@ -622,13 +634,14 @@ class _AddChecklistItemsPageState extends State<AddChecklistItemsPage> {
                                               dense: true,
                                               contentPadding:
                                                   const EdgeInsets.symmetric(
-                                                    horizontal: 12,
-                                                    vertical: 4,
-                                                  ),
+                                                horizontal: 12,
+                                                vertical: 4,
+                                              ),
                                               title: Text(
                                                 itemName,
                                                 style: TextStyle(
-                                                  fontSize: isArabic ? 16 : 17.5,
+                                                  fontSize:
+                                                      isArabic ? 16 : 17.5,
                                                   fontWeight: isArabic
                                                       ? FontWeight.w500
                                                       : FontWeight.w400,
@@ -641,21 +654,22 @@ class _AddChecklistItemsPageState extends State<AddChecklistItemsPage> {
                                                       children: [
                                                         const Icon(
                                                           Icons.check_circle,
-                                                          color: Color(0xFF43A047),
+                                                          color:
+                                                              Color(0xFF43A047),
                                                           size: 18,
                                                         ),
-                                                        const SizedBox(width: 6),
+                                                        const SizedBox(
+                                                            width: 6),
                                                         Text(
                                                           widget.tr.t('added'),
                                                           style:
                                                               const TextStyle(
-                                                                color: Color(
-                                                                  0xFF43A047,
-                                                                ),
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .w600,
-                                                              ),
+                                                            color: Color(
+                                                              0xFF43A047,
+                                                            ),
+                                                            fontWeight:
+                                                                FontWeight.w600,
+                                                          ),
                                                         ),
                                                       ],
                                                     )
@@ -667,10 +681,10 @@ class _AddChecklistItemsPageState extends State<AddChecklistItemsPage> {
                                                       ),
                                                       onPressed: () =>
                                                           _addTemplateToTripChecklist(
-                                                            context,
-                                                            group,
-                                                            itemDoc,
-                                                          ),
+                                                        context,
+                                                        group,
+                                                        itemDoc,
+                                                      ),
                                                     ),
                                             ),
                                           ),
@@ -707,64 +721,6 @@ class _ChecklistTemplateGroupView {
   final List<QueryDocumentSnapshot<Map<String, dynamic>>> items;
 }
 
-Color _checklistAssignmentColor(String userId) {
-  const colors = [
-    Colors.blue,
-    Colors.green,
-    Colors.orange,
-    Colors.purple,
-    Colors.teal,
-  ];
-  return colors[userId.hashCode.abs() % colors.length];
-}
-
-class _ChecklistAssignmentPreview extends StatelessWidget {
-  const _ChecklistAssignmentPreview({
-    required this.assignedTo,
-    required this.currentUserId,
-  });
-
-  final String? assignedTo;
-  final String? currentUserId;
-
-  @override
-  Widget build(BuildContext context) {
-    final isUnassigned = assignedTo == null || assignedTo!.isEmpty;
-    final color = isUnassigned
-        ? Colors.grey
-        : _checklistAssignmentColor(assignedTo!).withValues(alpha: 0.8);
-    final dot = isUnassigned ? '○' : '●';
-    final label = isUnassigned
-        ? 'Unassigned'
-        : assignedTo == currentUserId
-        ? 'You'
-        : 'Member';
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          dot,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-            color: color,
-          ),
-        ),
-        const SizedBox(width: 4),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 13.5,
-            fontWeight: FontWeight.w500,
-            color: color,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class TripChecklistPage extends StatefulWidget {
   const TripChecklistPage({
     super.key,
@@ -782,29 +738,10 @@ class TripChecklistPage extends StatefulWidget {
 }
 
 class _TripChecklistPageState extends State<TripChecklistPage> {
-  final Map<String, String?> _localAssignedToOverrides = <String, String?>{};
-
-  String? _effectiveAssignedTo(String itemId, String? persistedAssignedTo) {
-    if (_localAssignedToOverrides.containsKey(itemId)) {
-      return _localAssignedToOverrides[itemId];
-    }
-    return persistedAssignedTo;
-  }
-
-  void _toggleLocalAssignment({
-    required String itemId,
-    required String? currentUserId,
-    required String? assignedTo,
-  }) {
-    if (currentUserId == null || currentUserId.isEmpty) {
-      return;
-    }
-
-    setState(() {
-      _localAssignedToOverrides[itemId] =
-          assignedTo == currentUserId ? null : currentUserId;
-    });
-  }
+  final ChecklistAssignmentService _assignmentService =
+      ChecklistAssignmentService();
+  final ChecklistUserResolver _userResolver = ChecklistUserResolver();
+  final Set<String> _assignmentInProgressIds = <String>{};
 
   Future<void> _toggleDone(
     BuildContext context,
@@ -825,232 +762,241 @@ class _TripChecklistPageState extends State<TripChecklistPage> {
     }
   }
 
+  Future<void> _toggleAssignment(
+    BuildContext context, {
+    required String itemId,
+    required String currentUserId,
+    required String? assignedTo,
+  }) async {
+    setState(() {
+      _assignmentInProgressIds.add(itemId);
+    });
+
+    try {
+      await _assignmentService.toggleAssignment(
+        tripId: widget.tripId,
+        itemId: itemId,
+        currentUserId: currentUserId,
+        assignedTo: assignedTo,
+      );
+    } on FirebaseException catch (e) {
+      if (context.mounted) {
+        showFirestoreError(context, e);
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _assignmentInProgressIds.remove(itemId);
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    void openAddChecklistItems() {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => AddChecklistItemsPage(
+            tr: widget.tr,
+            tripId: widget.tripId,
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
         title: Text('${widget.tr.t('trip_checklist')} - ${widget.tripTitle}'),
         actions: [
           IconButton(
-            tooltip: widget.tr.t('add'),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => AddChecklistItemsPage(
-                    tr: widget.tr,
-                    tripId: widget.tripId,
-                  ),
-                ),
-              );
-            },
-            icon: const Icon(Icons.add),
+            tooltip: 'Add from templates',
+            onPressed: openAddChecklistItems,
+            icon: const Icon(
+              Icons.playlist_add,
+              color: Colors.orange,
+              size: 26,
+            ),
           ),
         ],
       ),
-      backgroundColor: Colors.white,
-      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: FirebaseFirestore.instance
-            .collection('trips')
-            .doc(widget.tripId)
-            .collection('checklist')
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            logFirestoreReadError('trips/*/checklist', snapshot.error);
-            return Center(child: Text(widget.tr.t('load_error')));
-          }
+      backgroundColor: const Color(0xFFF8EFE2),
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: Image.asset(
+              'assets/chat_bg.jpg',
+              fit: BoxFit.cover,
+            ),
+          ),
+          Positioned.fill(
+            child: Container(
+              color: const Color(0xFFF8EFE2).withValues(alpha: 0.2),
+            ),
+          ),
+          StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: FirebaseFirestore.instance
+                .collection('trips')
+                .doc(widget.tripId)
+                .collection('checklist')
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasError) {
+                logFirestoreReadError('trips/*/checklist', snapshot.error);
+                return Center(child: Text(widget.tr.t('load_error')));
+              }
 
-          final docs =
-              (snapshot.data?.docs ?? [])
-                  .where((doc) {
-                    final itemId = (doc.data()['itemId'] ?? '').toString().trim();
-                    return itemId.isNotEmpty;
-                  })
-                  .toList();
-          final sortedDocs = sortChecklistByCompletion(docs);
-          final totalItems = sortedDocs.length;
-          final doneCount = sortedDocs
-              .where((doc) => doc.data()['done'] == true)
-              .length;
-          final progress = checklistProgressValue(
-            doneCount: doneCount,
-            totalCount: totalItems,
-          );
-          if (docs.isEmpty) {
-            return Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
+              final docs = (snapshot.data?.docs ?? []).where((doc) {
+                final itemId = (doc.data()['itemId'] ?? '').toString().trim();
+                return itemId.isNotEmpty;
+              }).toList();
+              final sortedDocs = sortChecklistByCompletion(docs);
+              final totalItems = sortedDocs.length;
+              final doneCount =
+                  sortedDocs.where((doc) => doc.data()['done'] == true).length;
+              final progress = checklistProgressValue(
+                doneCount: doneCount,
+                totalCount: totalItems,
+              );
+              if (docs.isEmpty) {
+                return Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.tr.t('checklist_progress'),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text('0 / 0 ${widget.tr.t('items_completed')}'),
+                      const SizedBox(height: 10),
+                      Container(
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F1F1),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Expanded(
+                        child: Center(
+                          child: Text(widget.tr.t('no_checklist_items')),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    widget.tr.t('checklist_progress'),
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text('0 / 0 ${widget.tr.t('items_completed')}'),
-                  const SizedBox(height: 10),
-                  const LinearProgressIndicator(
-                    value: 0,
-                    color: Colors.orange,
-                    backgroundColor: Color(0xFFF5F5F5),
-                  ),
-                  const SizedBox(height: 24),
-                  Expanded(
-                    child: Center(
-                      child: Text(widget.tr.t('no_checklist_items')),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
-                child: Text(
-                  widget.tr.t('checklist_progress'),
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text(
-                  '$doneCount / $totalItems ${widget.tr.t('items_completed')}',
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    minHeight: 8,
-                    color: Colors.orange,
-                    backgroundColor: const Color(0xFFF1F1F1),
-                  ),
-                ),
-              ),
-              Expanded(
-                child: ListView.builder(
-                  padding: const EdgeInsets.all(12),
-                  itemCount: sortedDocs.length,
-                  itemBuilder: (context, index) {
-                    final doc = sortedDocs[index];
-                    final data = doc.data();
-                    final done = data['done'] == true;
-                    final itemId = (data['itemId'] ?? '').toString();
-                    final persistedAssignedTo =
-                        (data['assignedTo'] as String?)?.trim();
-                    final assignedTo = _effectiveAssignedTo(
-                      itemId,
-                      persistedAssignedTo,
-                    );
-                    final legacyIconName = (data['icon'] ?? '').toString();
-                    final itemName = checklistDisplayName(
-                      tr: widget.tr,
-                      data: data,
-                      arKey: 'name_ar',
-                      enKey: 'name_en',
-                      fallbackKey: 'name',
-                    );
-                    final itemIcon = itemId.isNotEmpty
-                        ? iconFromChecklistItemId(itemId)
-                        : iconFromName(legacyIconName);
-
-                    return Card(
-                      elevation: 1.2,
-                      color: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
+                    child: Text(
+                      widget.tr.t('checklist_progress'),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
                       ),
-                      child: CheckboxListTile(
-                        value: done,
-                        onChanged: (value) {
-                          if (value == null) {
-                            return;
-                          }
-                          _toggleDone(context, doc.id, value);
-                        },
-                        activeColor: Colors.orange,
-                        controlAffinity: ListTileControlAffinity.leading,
-                        title: Row(
-                          children: [
-                            Icon(itemIcon, color: Colors.orange),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                itemName,
-                                style: TextStyle(
-                                  decoration: done
-                                      ? TextDecoration.lineThrough
-                                      : TextDecoration.none,
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Text(
+                      '$doneCount / $totalItems ${widget.tr.t('items_completed')}',
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+                    child: Container(
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F1F1),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(999),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: FractionallySizedBox(
+                            widthFactor: progress,
+                            child: Container(
+                              decoration: const BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    Color(0xFFFFC15A),
+                                    Color(0xFFFF8A3D),
+                                  ],
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 10),
-                            _ChecklistAssignmentPreview(
-                              assignedTo: assignedTo,
-                              currentUserId: currentUserId,
-                            ),
-                            const SizedBox(width: 4),
-                            IconButton(
-                              icon: const Icon(
-                                Icons.add_circle_outline,
-                                size: 18,
-                                color: Colors.orange,
-                              ),
-                              visualDensity: VisualDensity.compact,
-                              splashRadius: 18,
-                              onPressed: () => _toggleLocalAssignment(
-                                itemId: itemId,
-                                currentUserId: currentUserId,
-                                assignedTo: assignedTo,
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
                       ),
-                    );
-                  },
-                ),
-              ),
-            ],
-          );
-        },
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: Colors.orange,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add),
-        label: Text(widget.tr.t('add_from_template')),
-        onPressed: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => AddChecklistItemsPage(
-                tr: widget.tr,
-                tripId: widget.tripId,
-              ),
-            ),
-          );
-        },
+                    ),
+                  ),
+                  Expanded(
+                    child: ListView.builder(
+                      padding: const EdgeInsets.all(12),
+                      itemCount: sortedDocs.length,
+                      itemBuilder: (context, index) {
+                        final doc = sortedDocs[index];
+                        final data = doc.data();
+                        final done = data['done'] == true;
+                        final itemId = doc.id;
+                        final assignedTo =
+                            (data['assignedTo'] as String?)?.trim();
+                        final runtimeItemId = (data['itemId'] ?? '').toString();
+                        final legacyIconName = (data['icon'] ?? '').toString();
+                        final itemName = checklistDisplayName(
+                          tr: widget.tr,
+                          data: data,
+                          arKey: 'name_ar',
+                          enKey: 'name_en',
+                          fallbackKey: 'name',
+                        );
+                        final itemIcon = runtimeItemId.isNotEmpty
+                            ? iconFromChecklistItemId(runtimeItemId)
+                            : iconFromName(legacyIconName);
+
+                        return ChecklistItemTile(
+                          itemName: itemName,
+                          itemIcon: itemIcon,
+                          done: done,
+                          assignedTo: assignedTo,
+                          currentUserId: currentUserId,
+                          userResolver: _userResolver,
+                          assignmentInProgress:
+                              _assignmentInProgressIds.contains(itemId),
+                          onDoneChanged: (value) =>
+                              _toggleDone(context, itemId, value),
+                          onAssignPressed: currentUserId == null
+                              ? () {}
+                              : () => _toggleAssignment(
+                                    context,
+                                    itemId: itemId,
+                                    currentUserId: currentUserId,
+                                    assignedTo: assignedTo,
+                                  ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
       ),
     );
   }
 }
-
-
-
