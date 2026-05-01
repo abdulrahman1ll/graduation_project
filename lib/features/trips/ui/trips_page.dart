@@ -7,12 +7,15 @@ import '../../../core/utils/firestore_utils.dart';
 import '../../../core/utils/localization.dart';
 import '../../../core/widgets/language_app_bar.dart';
 import '../helpers/checklist_utils.dart';
+import '../models/trip_member.dart';
 import '../services/checklist_assignment_service.dart';
 import '../services/checklist_user_resolver.dart';
+import '../services/trip_service.dart';
 import 'add_trip_page.dart';
+import 'trip_details_page.dart';
 import 'widgets/checklist_item_tile.dart';
 
-class TripsPage extends StatelessWidget {
+class TripsPage extends StatefulWidget {
   const TripsPage({
     super.key,
     required this.tr,
@@ -25,83 +28,110 @@ class TripsPage extends StatelessWidget {
   final VoidCallback onToggleLanguage;
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: appBarWithLanguage(
-        tr: tr,
-        isArabic: isArabic,
-        title: tr.t('trips'),
-        onToggleLanguage: onToggleLanguage,
-      ),
-      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: FirebaseFirestore.instance.collection('trips').snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            final error = snapshot.error;
-            logFirestoreReadError('trips', error);
-            if (error is FirebaseException &&
-                error.code == 'permission-denied') {
-              return Center(child: Text(tr.t('permission_denied')));
-            }
-            if (error is FirebaseException) {
-              final link = extractIndexLink(error.message);
-              if (link != null) {
-                return const Center(
-                  child: Text('Trips query requires a Firestore index.'),
-                );
-              }
-            }
-            return Center(child: Text(tr.t('load_error')));
-          }
-          final docs = snapshot.data?.docs ?? [];
-          final today = DateTime.now();
-          final todayStart = DateTime(today.year, today.month, today.day);
-          int upcomingCount = 0;
-          int pastCount = 0;
-          for (final doc in docs) {
-            final data = doc.data();
-            final tripDateValue = data['tripDate'];
-            if (tripDateValue is! Timestamp) {
-              continue;
-            }
-            final tripDate = tripDateValue.toDate();
-            if (tripDate.isBefore(todayStart)) {
-              pastCount++;
-            } else {
-              upcomingCount++;
-            }
-          }
+  State<TripsPage> createState() => _TripsPageState();
+}
 
-          if (docs.isEmpty) {
-            return Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: _TripStatCard(
-                          title: tr.t('upcoming'),
-                          value: upcomingCount,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _TripStatCard(
-                          title: tr.t('past'),
-                          value: pastCount,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Expanded(child: Center(child: Text(tr.t('no_trips')))),
-              ],
-            );
+class _TripsPageState extends State<TripsPage> {
+  final TripService _tripService = TripService();
+  bool _showPastTrips = false;
+
+  void _openAddTrip() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AddTripPage(
+          tr: widget.tr,
+          isArabic: widget.isArabic,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTripCard(
+    QueryDocumentSnapshot<Map<String, dynamic>> doc, {
+    bool isPast = false,
+  }) {
+    final data = doc.data();
+    final title = (data['title'] ?? '').toString().trim();
+    final groupId = (data['groupId'] ?? '').toString().trim();
+    final tripDate = (data['tripDate'] as Timestamp?)?.toDate();
+    final fallbackMemberCount = (data['peopleCount'] as num?)?.toInt() ?? 0;
+
+    return _TripDecisionCard(
+      tr: widget.tr,
+      title: title.isEmpty ? 'Untitled trip' : title,
+      groupId: groupId,
+      tripDate: tripDate,
+      fallbackMemberCount: fallbackMemberCount,
+      membersStream: _tripService.watchTripMembers(doc.id),
+      isPast: isPast,
+      onOpenChecklist: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => TripChecklistPage(
+              tr: widget.tr,
+              tripId: doc.id,
+              tripTitle: title.isEmpty ? 'Untitled trip' : title,
+            ),
+          ),
+        );
+      },
+      onViewDetails: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => TripDetailsPage(tripId: doc.id),
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final body = StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance.collection('trips').snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          final error = snapshot.error;
+          logFirestoreReadError('trips', error);
+          if (error is FirebaseException && error.code == 'permission-denied') {
+            return Center(child: Text(widget.tr.t('permission_denied')));
           }
+          if (error is FirebaseException) {
+            final link = extractIndexLink(error.message);
+            if (link != null) {
+              return const Center(
+                child: Text('Trips query requires a Firestore index.'),
+              );
+            }
+          }
+          return Center(child: Text(widget.tr.t('load_error')));
+        }
+        final docs = snapshot.data?.docs ?? [];
+        final today = DateTime.now();
+        final todayStart = DateTime(today.year, today.month, today.day);
+        final upcomingDocs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+        final pastDocs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+        for (final doc in docs) {
+          final data = doc.data();
+          final tripDateValue = data['tripDate'];
+          if (tripDateValue is! Timestamp) {
+            upcomingDocs.add(doc);
+            continue;
+          }
+          final tripDate = tripDateValue.toDate();
+          if (tripDate.isBefore(todayStart)) {
+            pastDocs.add(doc);
+          } else {
+            upcomingDocs.add(doc);
+          }
+        }
+        final upcomingCount = upcomingDocs.length;
+        final pastCount = pastDocs.length;
+
+        if (docs.isEmpty) {
           return Column(
             children: [
               Padding(
@@ -110,90 +140,533 @@ class TripsPage extends StatelessWidget {
                   children: [
                     Expanded(
                       child: _TripStatCard(
-                        title: tr.t('upcoming'),
+                        title: 'Upcoming Trips',
                         value: upcomingCount,
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: _TripStatCard(
-                        title: tr.t('past'),
+                        title: 'Past Trips',
                         value: pastCount,
+                        action: IconButton(
+                          tooltip: _showPastTrips
+                              ? 'Hide past trips'
+                              : 'Show past trips',
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                            minWidth: 32,
+                            minHeight: 32,
+                          ),
+                          iconSize: 22,
+                          color: Colors.grey.shade700,
+                          onPressed: pastCount == 0
+                              ? null
+                              : () {
+                                  setState(() {
+                                    _showPastTrips = !_showPastTrips;
+                                  });
+                                },
+                          icon: Icon(
+                            _showPastTrips
+                                ? Icons.expand_less
+                                : Icons.history,
+                          ),
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
-              Expanded(
-                child: ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                  itemCount: docs.length,
-                  itemBuilder: (context, index) {
-                    final doc = docs[index];
-                    final data = docs[index].data();
-                    return Card(
-                      child: ListTile(
-                        title: Text((data['title'] ?? '').toString()),
-                        subtitle: Text((data['description'] ?? '').toString()),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              '${tr.t('members')} ${(data['peopleCount'] ?? 0)}',
-                            ),
-                            const SizedBox(width: 8),
-                            IconButton(
-                              tooltip: tr.t('trip_checklist'),
-                              icon: const Icon(
-                                Icons.checklist,
-                                color: Colors.orange,
-                              ),
-                              onPressed: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => TripChecklistPage(
-                                      tr: tr,
-                                      tripId: doc.id,
-                                      tripTitle:
-                                          (data['title'] ?? '').toString(),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
+              Expanded(child: Center(child: Text(widget.tr.t('no_trips')))),
             ],
           );
-        },
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => AddTripPage(tr: tr, isArabic: isArabic),
+        }
+        return Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _TripStatCard(
+                      title: 'Upcoming Trips',
+                      value: upcomingCount,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _TripStatCard(
+                      title: 'Past Trips',
+                      value: pastCount,
+                      action: IconButton(
+                        tooltip:
+                            _showPastTrips ? 'Hide past trips' : 'Show past trips',
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                          minWidth: 32,
+                          minHeight: 32,
+                        ),
+                        iconSize: 22,
+                        color: Colors.grey.shade700,
+                        onPressed: pastCount == 0
+                            ? null
+                            : () {
+                                setState(() {
+                                  _showPastTrips = !_showPastTrips;
+                                });
+                              },
+                        icon: Icon(
+                          _showPastTrips ? Icons.expand_less : Icons.history,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          );
-        },
-        backgroundColor: Colors.orange,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add),
-        label: Text(tr.t('new_trip')),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                children: [
+                  if (upcomingDocs.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 32),
+                      child: Center(
+                        child: Text(
+                          'No upcoming trips.',
+                          style: TextStyle(color: Colors.grey.shade700),
+                        ),
+                      ),
+                    )
+                  else
+                    ...upcomingDocs.map((doc) => _buildTripCard(doc)),
+                  if (pastCount > 0) ...[
+                    const SizedBox(height: 8),
+                    const Divider(height: 24),
+                    _PastTripsSection(
+                      trips: pastDocs,
+                      isExpanded: _showPastTrips,
+                      buildTripCard: (doc) =>
+                          _buildTripCard(doc, isPast: true),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    return Scaffold(
+      appBar: appBarWithLanguage(
+        tr: widget.tr,
+        isArabic: widget.isArabic,
+        title: widget.tr.t('trips'),
+        onToggleLanguage: widget.onToggleLanguage,
+        actions: [
+          IconButton(
+            tooltip: widget.tr.t('new_trip'),
+            icon: const Icon(Icons.add),
+            onPressed: _openAddTrip,
+          ),
+        ],
+      ),
+      body: body,
+    );
+  }
+}
+
+class _PastTripsSection extends StatelessWidget {
+  const _PastTripsSection({
+    required this.trips,
+    required this.isExpanded,
+    required this.buildTripCard,
+  });
+
+  final List<QueryDocumentSnapshot<Map<String, dynamic>>> trips;
+  final bool isExpanded;
+  final Widget Function(QueryDocumentSnapshot<Map<String, dynamic>> doc)
+      buildTripCard;
+
+  @override
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: 0.78,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Past Trips',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: Colors.grey.shade700,
+                ),
+          ),
+          if (isExpanded) ...[
+            const SizedBox(height: 10),
+            ...trips.map(buildTripCard),
+          ] else ...[
+            const SizedBox(height: 6),
+            Text(
+              '${trips.length} past trip${trips.length == 1 ? '' : 's'} hidden',
+              style: TextStyle(
+                color: Colors.grey.shade600,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
 }
 
+class _TripDecisionCard extends StatelessWidget {
+  const _TripDecisionCard({
+    required this.tr,
+    required this.title,
+    required this.groupId,
+    required this.tripDate,
+    required this.fallbackMemberCount,
+    required this.membersStream,
+    this.isPast = false,
+    required this.onOpenChecklist,
+    required this.onViewDetails,
+  });
+
+  final Tr tr;
+  final String title;
+  final String groupId;
+  final DateTime? tripDate;
+  final int fallbackMemberCount;
+  final Stream<List<TripMember>> membersStream;
+  final bool isPast;
+  final VoidCallback onOpenChecklist;
+  final VoidCallback onViewDetails;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<TripMember>>(
+      stream: membersStream,
+      builder: (context, snapshot) {
+        final members = snapshot.data ?? const <TripMember>[];
+        final memberCount =
+            members.isEmpty ? fallbackMemberCount : members.length;
+        final status = _TripReadyStatus.fromMembers(members);
+        final pendingCount =
+            members.where((member) => member.status == 'pending').length;
+
+        return Card(
+          elevation: isPast ? 0.5 : 1.5,
+          color: isPast ? const Color(0xFFFAFAFA) : Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: isPast
+                ? const BorderSide(color: Color(0xFFE0E0E0))
+                : BorderSide.none,
+          ),
+          margin: const EdgeInsets.only(bottom: 12),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    if (status != null) ...[
+                      const SizedBox(width: 12),
+                      _ReadyBadge(status: status),
+                    ],
+                  ],
+                ),
+                _TripGroupSubtitle(tr: tr, groupId: groupId),
+                const SizedBox(height: 14),
+                Wrap(
+                  spacing: 18,
+                  runSpacing: 8,
+                  children: [
+                    _TripInfoChip(
+                      icon: Icons.calendar_today_outlined,
+                      text: _formatTripDate(tripDate),
+                    ),
+                    _TripInfoChip(
+                      icon: Icons.group_outlined,
+                      text: '$memberCount ${tr.t('members')}',
+                    ),
+                  ],
+                ),
+                if (pendingCount > 0) ...[
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        size: 17,
+                        color: Colors.grey.shade500,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          pendingCount == 1
+                              ? '1 member not confirmed'
+                              : '$pendingCount members not confirmed',
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontWeight: FontWeight.w500,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    TextButton.icon(
+                      onPressed: onOpenChecklist,
+                      icon: const Icon(Icons.checklist, size: 18),
+                      label: const Text('Open Checklist'),
+                      style: isPast
+                          ? TextButton.styleFrom(
+                              foregroundColor: Colors.grey.shade500,
+                            )
+                          : null,
+                    ),
+                    const SizedBox(width: 8),
+                    TextButton.icon(
+                      onPressed: onViewDetails,
+                      icon: const Icon(Icons.info_outline, size: 18),
+                      label: const Text('View Details'),
+                      style: isPast
+                          ? TextButton.styleFrom(
+                              foregroundColor: Colors.grey.shade500,
+                            )
+                          : null,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _TripGroupSubtitle extends StatelessWidget {
+  const _TripGroupSubtitle({required this.tr, required this.groupId});
+
+  final Tr tr;
+  final String groupId;
+
+  @override
+  Widget build(BuildContext context) {
+    if (groupId.isEmpty) {
+      return _TripGroupText(text: _noGroupText);
+    }
+
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('groups')
+          .doc(groupId)
+          .snapshots(),
+      builder: (context, snapshot) {
+        final data = snapshot.data?.data();
+        final groupName = (data?['name'] ?? '').toString().trim();
+        if (groupName.isEmpty) {
+          return _TripGroupText(text: _noGroupText);
+        }
+
+        return _TripGroupText(text: groupName);
+      },
+    );
+  }
+
+  String get _noGroupText {
+    return tr.language == AppLanguage.ar
+        ? 'لم يتم تحديد القروب بعد'
+        : 'No group yet';
+  }
+}
+
+class _TripGroupText extends StatelessWidget {
+  const _TripGroupText({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Text(
+        text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: Colors.grey.shade700,
+          height: 1.25,
+        ),
+      ),
+    );
+  }
+}
+
+class _TripReadyStatus {
+  const _TripReadyStatus({
+    required this.label,
+    required this.color,
+    required this.icon,
+  });
+
+  final String label;
+  final Color color;
+  final IconData icon;
+
+  static _TripReadyStatus? fromMembers(List<TripMember> members) {
+    if (members.isEmpty) {
+      return null;
+    }
+
+    final goingCount =
+        members.where((member) => member.status == 'going').length;
+    final pendingCount =
+        members.where((member) => member.status == 'pending').length;
+    final notGoingCount =
+        members.where((member) => member.status == 'not_going').length;
+
+    if (notGoingCount > goingCount && notGoingCount >= pendingCount) {
+      return const _TripReadyStatus(
+        label: 'Not happening',
+        color: Color(0xFF616161),
+        icon: Icons.circle,
+      );
+    }
+
+    if (goingCount > pendingCount && goingCount >= notGoingCount) {
+      return const _TripReadyStatus(
+        label: 'Ready',
+        color: Color(0xFF616161),
+        icon: Icons.circle,
+      );
+    }
+
+    return null;
+  }
+}
+
+class _ReadyBadge extends StatelessWidget {
+  const _ReadyBadge({required this.status});
+
+  final _TripReadyStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: status.color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(status.icon, size: 9, color: status.color),
+          const SizedBox(width: 5),
+          Text(
+            status.label,
+            style: TextStyle(
+              color: status.color,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TripInfoChip extends StatelessWidget {
+  const _TripInfoChip({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 19, color: const Color.fromARGB(255, 238, 156, 54)),
+        const SizedBox(width: 6),
+        Text(
+          text,
+          style: TextStyle(
+            color: Colors.grey.shade900,
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+String _formatTripDate(DateTime? value) {
+  if (value == null) {
+    return 'No date';
+  }
+
+  const months = <String>[
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+
+  final hour = value.hour % 12 == 0 ? 12 : value.hour % 12;
+  final minute = value.minute.toString().padLeft(2, '0');
+  final period = value.hour < 12 ? 'AM' : 'PM';
+
+  return '${value.day} ${months[value.month - 1]} • $hour:$minute $period';
+}
+
 class _TripStatCard extends StatelessWidget {
-  const _TripStatCard({required this.title, required this.value});
+  const _TripStatCard({
+    required this.title,
+    required this.value,
+    this.action,
+  });
 
   final String title;
   final int value;
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) {
@@ -201,25 +674,53 @@ class _TripStatCard extends StatelessWidget {
       elevation: 1.5,
       color: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              '$value',
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: Colors.orange,
+      child: SizedBox(
+        height: 90,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.grey.shade900,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 32,
+                    height: 32,
+                    child: action == null
+                        ? const SizedBox.shrink()
+                        : IconTheme(
+                            data: IconThemeData(
+                              color: Colors.grey.shade700,
+                              size: 22,
+                            ),
+                            child: action!,
+                          ),
+                  ),
+                ],
               ),
-            ),
-          ],
+              const SizedBox(height: 2),
+              Text(
+                '$value',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.orange
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

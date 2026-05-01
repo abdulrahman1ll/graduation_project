@@ -7,10 +7,12 @@ PreferredSizeWidget appBarWithLanguage({
   required bool isArabic,
   required String title,
   required VoidCallback onToggleLanguage,
+  List<Widget> actions = const <Widget>[],
 }) {
   return AppBar(
     title: Text(title),
     actions: [
+      ...actions,
       TextButton(
         onPressed: onToggleLanguage,
         child: Text(

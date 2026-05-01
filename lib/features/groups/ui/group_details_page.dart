@@ -3,11 +3,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/group.dart';
-import '../models/member.dart';
 import '../services/group_service.dart';
 import '../helpers/group_checklist_flow.dart';
 import '../../../core/models/app_language.dart';
 import '../../trips/ui/add_trip_page.dart';
+import '../../trips/models/trip_member.dart';
+import '../../trips/services/trip_service.dart';
 import '../../../core/utils/firestore_utils.dart';
 import '../../../core/utils/localization.dart';
 
@@ -105,12 +106,11 @@ class GroupDetailsPage extends StatelessWidget {
                   return const Center(child: Text('Failed to load trips.'));
                 }
 
-                final docs =
-                    (snapshot.data?.docs ?? []).where((doc) {
-                      final linkedGroupId =
-                          (doc.data()['groupId'] ?? '').toString().trim();
-                      return linkedGroupId.isEmpty || linkedGroupId == group.id;
-                    }).toList();
+                final docs = (snapshot.data?.docs ?? []).where((doc) {
+                  final linkedGroupId =
+                      (doc.data()['groupId'] ?? '').toString().trim();
+                  return linkedGroupId.isEmpty || linkedGroupId == group.id;
+                }).toList();
 
                 if (docs.isEmpty) {
                   return const Center(child: Text('No trips available.'));
@@ -129,7 +129,9 @@ class GroupDetailsPage extends StatelessWidget {
                     return ListTile(
                       title: Text(title.isEmpty ? 'Untitled trip' : title),
                       subtitle: Text(
-                        tripDate == null ? 'No date' : _formatTripDate(tripDate),
+                        tripDate == null
+                            ? 'No date'
+                            : _formatTripDate(tripDate),
                       ),
                       onTap: () async {
                         try {
@@ -141,7 +143,8 @@ class GroupDetailsPage extends StatelessWidget {
                           if (context.mounted) {
                             Navigator.of(sheetContext).pop();
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Trip linked to group')),
+                              const SnackBar(
+                                  content: Text('Trip linked to group')),
                             );
                           }
                         } on FirebaseException catch (e) {
@@ -151,7 +154,8 @@ class GroupDetailsPage extends StatelessWidget {
                         } catch (e) {
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Failed to link trip: $e')),
+                              SnackBar(
+                                  content: Text('Failed to link trip: $e')),
                             );
                           }
                         }
@@ -177,11 +181,13 @@ class GroupDetailsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final resolvedGroupService = groupService ?? GroupService();
+    final tripService = TripService();
 
     return StreamBuilder<Group?>(
       stream: resolvedGroupService.watchGroup(groupId),
       builder: (context, groupSnapshot) {
         final group = groupSnapshot.data;
+        final tripId = group?.tripId?.trim() ?? '';
 
         return Scaffold(
           appBar: AppBar(
@@ -189,10 +195,13 @@ class GroupDetailsPage extends StatelessWidget {
           ),
           body: group == null
               ? const Center(child: CircularProgressIndicator())
-              : StreamBuilder<List<Member>>(
-                  stream: resolvedGroupService.watchMembers(groupId),
+              : StreamBuilder<List<TripMember>>(
+                  stream: tripId.isEmpty
+                      ? Stream<List<TripMember>>.value(const <TripMember>[])
+                      : tripService.watchTripMembers(tripId),
                   builder: (context, membersSnapshot) {
-                    final members = membersSnapshot.data ?? const <Member>[];
+                    final members =
+                        membersSnapshot.data ?? const <TripMember>[];
                     final memberIds = members
                         .map((member) => member.userId)
                         .where((id) => id.trim().isNotEmpty)
@@ -270,24 +279,28 @@ class GroupDetailsPage extends StatelessWidget {
                                 label: const Text('Plan next trip'),
                               ),
                             ),
-                            if (group.tripId?.trim().isNotEmpty ?? false) ...[
+                            if (tripId.isNotEmpty) ...[
                               const SizedBox(height: 20),
                               Text(
                                 'Upcoming Trip',
-                                style: Theme.of(context).textTheme.titleMedium
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleMedium
                                     ?.copyWith(fontWeight: FontWeight.w600),
                               ),
                               const SizedBox(height: 10),
-                              FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                              FutureBuilder<
+                                  DocumentSnapshot<Map<String, dynamic>>>(
                                 future: FirebaseFirestore.instance
                                     .collection('trips')
-                                    .doc(group.tripId!.trim())
+                                    .doc(tripId)
                                     .get(),
                                 builder: (context, tripSnapshot) {
                                   if (tripSnapshot.connectionState ==
                                       ConnectionState.waiting) {
                                     return const Padding(
-                                      padding: EdgeInsets.symmetric(vertical: 12),
+                                      padding:
+                                          EdgeInsets.symmetric(vertical: 12),
                                       child: Center(
                                         child: CircularProgressIndicator(),
                                       ),
@@ -299,15 +312,17 @@ class GroupDetailsPage extends StatelessWidget {
                                     return const Text('No linked trip found.');
                                   }
 
-                                  final title =
-                                      (tripData['title'] ?? '').toString().trim();
+                                  final title = (tripData['title'] ?? '')
+                                      .toString()
+                                      .trim();
                                   final tripDate =
                                       (tripData['tripDate'] as Timestamp?)
                                           ?.toDate();
 
                                   return Card(
                                     child: ListTile(
-                                      contentPadding: const EdgeInsets.symmetric(
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
                                         horizontal: 16,
                                         vertical: 6,
                                       ),
@@ -327,7 +342,9 @@ class GroupDetailsPage extends StatelessWidget {
                             const SizedBox(height: 24),
                             Text(
                               'Members',
-                              style: Theme.of(context).textTheme.titleMedium
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
                                   ?.copyWith(fontWeight: FontWeight.w600),
                             ),
                             const SizedBox(height: 12),
