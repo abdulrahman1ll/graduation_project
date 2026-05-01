@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class PlaceDetailsSheet extends StatefulWidget {
   const PlaceDetailsSheet({
@@ -56,6 +57,47 @@ class _PlaceDetailsSheetState extends State<PlaceDetailsSheet> {
     setState(() {
       _selectedImageBytes = bytes;
     });
+  }
+
+  Future<void> _openInGoogleMaps() async {
+    final latitude = (widget.data['lat'] as num?)?.toDouble();
+    final longitude = (widget.data['lng'] as num?)?.toDouble();
+
+    if (latitude == null || longitude == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Place location is unavailable.')),
+      );
+      return;
+    }
+
+    final uri = Uri.parse(
+      'https://www.google.com/maps/dir/?api=1&destination=$latitude,$longitude&travelmode=driving',
+    );
+
+    try {
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      if (!launched) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open Google Maps.')),
+        );
+      }
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open Google Maps.')),
+      );
+    }
   }
 
   @override
@@ -142,6 +184,15 @@ class _PlaceDetailsSheetState extends State<PlaceDetailsSheet> {
                     ],
                   );
                 },
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _openInGoogleMaps,
+                  icon: const Icon(Icons.navigation_rounded),
+                  label: const Text("Open in Google Maps"),
+                ),
               ),
               const SizedBox(height: 20),
               const Text(

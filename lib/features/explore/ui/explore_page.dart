@@ -15,7 +15,6 @@ import '../models/recommended_place.dart';
 import '../services/place_service.dart';
 import '../services/weather_service.dart';
 import 'widgets/add_place_sheet.dart';
-import 'widgets/explore_filter_bar.dart';
 import 'widgets/place_details_sheet.dart';
 import 'widgets/route_info_card.dart';
 
@@ -57,7 +56,7 @@ class _ExplorePageState extends State<ExplorePage> {
 }
 
   bool _showOnlyFavorites = false;
-  String? _selectedCategoryChip;
+  String? _selectedPlaceType;
   String? _preferredPlaceType;
   String? _temperaturePreference;
 String? _activityPreference;
@@ -859,11 +858,17 @@ void _testInteractions() async {
 
                   final docs = snapshot.data?.docs ?? [];
 
-                  final visibleDocs = _showOnlyFavorites
-                      ? docs
-                            .where((doc) => favoriteIds.contains(doc.id))
-                            .toList()
-                      : docs;
+                  final visibleDocs = docs.where((doc) {
+                    final data = doc.data();
+                    final environmentType =
+                        data['environmentType']?.toString().toLowerCase();
+                    final matchesPlaceType = _selectedPlaceType == null ||
+                        environmentType == _selectedPlaceType;
+                    final matchesFavorite =
+                        !_showOnlyFavorites || favoriteIds.contains(doc.id);
+
+                    return matchesPlaceType && matchesFavorite;
+                  }).toList();
 
                   final approvedMarkers = visibleDocs
                       .map((doc) {
@@ -969,7 +974,7 @@ scrollGesturesEnabled: true,
 
                       FutureBuilder<List<RecommendedPlace>>(
   key: ValueKey(_recommendationRefreshKey),
-  future: _buildRecommendedPlaces(docs),
+  future: _buildRecommendedPlaces(visibleDocs),
                         builder: (context, recommendationSnapshot) {
                           if (!recommendationSnapshot.hasData ||
                               recommendationSnapshot.data!.isEmpty) {
@@ -1227,22 +1232,84 @@ scrollGesturesEnabled: true,
           ),
           const SizedBox(height: 16),
           _buildExploreSearchPill(),
-          ExploreFilterBar(
-            tr: widget.tr,
-            showOnlyFavorites: _showOnlyFavorites,
-            selectedCategoryChip: _selectedCategoryChip,
-            onFavoritesChanged: (_) {
-              setState(() {
-                _showOnlyFavorites = !_showOnlyFavorites;
-              });
-            },
-            onCategorySelected: (category) {
-              setState(() {
-                _selectedCategoryChip = category;
-              });
-            },
-          ),
+          _buildPlaceTypeFilterBar(),
         ],
+      ),
+    );
+  }
+
+  Widget _buildPlaceTypeFilterBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 14, 0, 0),
+      child: SizedBox(
+        height: 46,
+        child: ListView(
+          scrollDirection: Axis.horizontal,
+          children: [
+            _buildPlaceTypeChip(
+              label: 'All',
+              icon: Icons.public_rounded,
+              value: null,
+            ),
+            const SizedBox(width: 8),
+            _buildPlaceTypeChip(
+              label: widget.tr.t('desert'),
+              icon: Icons.local_florist_rounded,
+              value: 'desert',
+            ),
+            const SizedBox(width: 8),
+            _buildPlaceTypeChip(
+              label: widget.tr.t('beach'),
+              icon: Icons.waves_rounded,
+              value: 'beach',
+            ),
+            const SizedBox(width: 8),
+            _buildPlaceTypeChip(
+              label: 'Nature',
+              icon: Icons.park_rounded,
+              value: 'nature',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPlaceTypeChip({
+    required String label,
+    required IconData icon,
+    required String? value,
+  }) {
+    final isSelected = _selectedPlaceType == value;
+
+    return FilterChip(
+      selected: isSelected,
+      onSelected: (_) {
+        setState(() {
+          _selectedPlaceType = isSelected ? null : value;
+        });
+      },
+      showCheckmark: false,
+      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+      avatar: Icon(
+        icon,
+        size: 18,
+        color: isSelected ? Colors.white : const Color(0xFF7A6656),
+      ),
+      label: Text(label),
+      selectedColor: const Color(0xFF8B4A23),
+      side: BorderSide(
+        color: isSelected
+            ? const Color(0xFF8B4A23)
+            : Colors.white.withValues(alpha: 0.50),
+      ),
+      backgroundColor: Colors.white.withValues(alpha: 0.78),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(999),
+      ),
+      labelStyle: TextStyle(
+        color: isSelected ? Colors.white : const Color(0xFF5B3922),
+        fontWeight: isSelected ? FontWeight.w900 : FontWeight.w800,
       ),
     );
   }
@@ -1369,7 +1436,7 @@ scrollGesturesEnabled: true,
       width: 224,
       margin: const EdgeInsets.only(right: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFFBF5).withValues(alpha: 0.82),
+        color: const Color(0xFFFFFBF5).withValues(alpha: 0.90),
         borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
@@ -1402,9 +1469,9 @@ scrollGesturesEnabled: true,
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
-                            Color(0xFFE19B52),
-                            Color(0xFFB96127),
-                            Color(0xFFF2C58A),
+                            Color(0xFFE8C29A),
+                            Color(0xFFD8A06A),
+                            Color(0xFFC98A55),
                           ],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
@@ -1432,7 +1499,7 @@ scrollGesturesEnabled: true,
                         vertical: 5,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFE27622),
+                        color: const Color(0xFF8B4A23),
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
@@ -1501,7 +1568,7 @@ scrollGesturesEnabled: true,
                       const Spacer(),
                       const Icon(
                         Icons.star_rounded,
-                        color: Color(0xFFE27622),
+                        color: Color(0xFFD8A06A),
                         size: 17,
                       ),
                       const SizedBox(width: 3),
