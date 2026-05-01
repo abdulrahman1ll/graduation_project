@@ -27,6 +27,13 @@ service cloud.firestore {
         get(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid)).data.role == 'admin';
     }
 
+    function isTripGroupMember(tripId) {
+      let trip = get(/databases/$(database)/documents/trips/$(tripId));
+      return isSignedIn() &&
+        trip.data.groupId is string &&
+        isGroupMember(trip.data.groupId);
+    }
+
     function validTripGroupLink(tripId) {
       return !request.resource.data.keys().hasAny(['groupId']) ||
         request.resource.data.groupId == null ||
@@ -123,6 +130,26 @@ service cloud.firestore {
         addedSet.size() == 1;
     }
 
+    function validGroupTripLink(groupId) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'tripId'
+        ]) &&
+        (
+          resource.data.tripId == null ||
+          resource.data.tripId == ''
+        ) &&
+        request.resource.data.tripId is string &&
+        request.resource.data.tripId.size() > 0 &&
+        request.resource.data.name == resource.data.name &&
+        request.resource.data.description == resource.data.description &&
+        request.resource.data.members == resource.data.members &&
+        request.resource.data.imageUrl == resource.data.imageUrl &&
+        request.resource.data.createdBy == resource.data.createdBy &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        existsAfter(/databases/$(database)/documents/trips/$(request.resource.data.tripId)) &&
+        getAfter(/databases/$(database)/documents/trips/$(request.resource.data.tripId)).data.groupId == groupId;
+    }
+
     function validMemberDocument() {
       return request.resource.data.keys().hasAll(['userId', 'role', 'joinedAt']) &&
         request.resource.data.keys().hasOnly(['userId', 'role', 'joinedAt']) &&
@@ -151,6 +178,24 @@ service cloud.firestore {
         request.resource.data.userId == resource.data.userId &&
         request.resource.data.joinedAt == resource.data.joinedAt &&
         isValidRole(request.resource.data.role);
+    }
+
+    function isValidTripMemberStatus(status) {
+      return status == 'pending' ||
+        status == 'going' ||
+        status == 'not_going';
+    }
+
+    function validTripMemberDocument(userId) {
+      return request.resource.data.keys().hasAll(['userId', 'status', 'joinedAt']) &&
+        request.resource.data.keys().hasOnly(['userId', 'status', 'joinedAt', 'updatedAt']) &&
+        request.resource.data.userId == userId &&
+        isValidTripMemberStatus(request.resource.data.status) &&
+        request.resource.data.joinedAt is timestamp &&
+        (
+          !request.resource.data.keys().hasAny(['updatedAt']) ||
+          request.resource.data.updatedAt is timestamp
+        );
     }
 
     function validInitialReadBy() {
@@ -247,6 +292,13 @@ service cloud.firestore {
       match /checklist/{itemId} {
         allow read, write: if isSignedIn();
       }
+
+      match /members/{userId} {
+        allow read: if isSignedIn();
+        allow create, update: if (isTripGroupMember(tripId) || isSelf(userId)) &&
+          validTripMemberDocument(userId);
+        allow delete: if false;
+      }
     }
 
     match /groups/{groupId} {
@@ -256,6 +308,7 @@ service cloud.firestore {
         validGroupBootstrap(groupId);
       allow update: if
         (isGroupAdmin(groupId) && validGroupUpdate()) ||
+        (isGroupMember(groupId) && validGroupTripLink(groupId)) ||
         (isSignedIn() && validSelfJoinGroupUpdate());
       allow delete: if false;
 
