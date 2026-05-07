@@ -100,6 +100,8 @@ class DeepLinkService {
       final memberSnapshot =
           await groupRef.collection('members').doc(user.uid).get();
       if (!memberSnapshot.exists) {
+        final groupData = groupSnapshot.data() ?? const <String, dynamic>{};
+        final tripId = (groupData['tripId'] ?? '').toString().trim();
         final batch = _firestore.batch();
         batch.set(groupRef.collection('members').doc(user.uid), <String, dynamic>{
           'userId': user.uid,
@@ -109,6 +111,25 @@ class DeepLinkService {
         batch.update(groupRef, <String, dynamic>{
           'members': FieldValue.arrayUnion(<String>[user.uid]),
         });
+        if (tripId.isNotEmpty) {
+          final tripRef = _firestore.collection('trips').doc(tripId);
+          batch.set(
+            tripRef,
+            <String, dynamic>{
+              'memberIds': FieldValue.arrayUnion(<String>[user.uid]),
+            },
+            SetOptions(merge: true),
+          );
+          batch.set(
+            tripRef.collection('members').doc(user.uid),
+            <String, dynamic>{
+              'userId': user.uid,
+              'status': 'pending',
+              'joinedAt': FieldValue.serverTimestamp(),
+            },
+            SetOptions(merge: true),
+          );
+        }
         await batch.commit();
         debugPrint('DeepLink member created for ${user.uid}');
       } else {

@@ -196,6 +196,120 @@ class _GroupsPageState extends State<GroupsPage> {
     return filtered;
   }
 
+  Future<void> _showJoinGroupDialog() async {
+    final scaffoldContext = context;
+    final currentUserId = _currentUserId;
+    if (currentUserId == null) {
+      ScaffoldMessenger.of(scaffoldContext).showSnackBar(
+        const SnackBar(content: Text('Please sign in first.')),
+      );
+      return;
+    }
+
+    final controller = TextEditingController();
+    String? validationMessage;
+    var joining = false;
+
+    await showDialog<void>(
+      context: scaffoldContext,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (builderContext, setDialogState) {
+            Future<void> submit() async {
+              final groupId = controller.text.trim();
+              if (groupId.isEmpty) {
+                setDialogState(() {
+                  validationMessage = 'Enter invitation code';
+                });
+                return;
+              }
+
+              setDialogState(() {
+                joining = true;
+                validationMessage = null;
+              });
+
+              try {
+                final didJoin =
+                    await _groupService.joinGroup(groupId, currentUserId);
+                if (!mounted || !dialogContext.mounted) {
+                  return;
+                }
+                Navigator.of(dialogContext).pop();
+                ScaffoldMessenger.of(scaffoldContext).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      didJoin
+                          ? 'Joined group'
+                          : 'You are already a member',
+                    ),
+                  ),
+                );
+              } on FirebaseException catch (error) {
+                debugPrint(
+                  'GroupsPage.joinGroupByCode failed: '
+                  '${error.code} ${error.message}',
+                );
+                if (!mounted || !builderContext.mounted) {
+                  return;
+                }
+                setDialogState(() {
+                  joining = false;
+                  validationMessage = error.code == 'not-found'
+                      ? 'Group not found'
+                      : error.message ?? 'Unable to join group';
+                });
+              } catch (_) {
+                if (!mounted || !builderContext.mounted) {
+                  return;
+                }
+                setDialogState(() {
+                  joining = false;
+                  validationMessage = 'Unable to join group';
+                });
+              }
+            }
+
+            return AlertDialog(
+              title: const Text('Join Group'),
+              content: TextField(
+                controller: controller,
+                enabled: !joining,
+                autofocus: true,
+                decoration: InputDecoration(
+                  labelText: 'Enter invitation code',
+                  errorText: validationMessage,
+                ),
+                textInputAction: TextInputAction.done,
+                onSubmitted: joining ? null : (_) => submit(),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: joining
+                      ? null
+                      : () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: joining ? null : submit,
+                  child: joining
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Join'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    controller.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentUserId = _currentUserId;
@@ -207,6 +321,13 @@ class _GroupsPageState extends State<GroupsPage> {
         isArabic: widget.isArabic,
         title: widget.tr.t('groups'),
         onToggleLanguage: widget.onToggleLanguage,
+        actions: [
+          TextButton.icon(
+            onPressed: _showJoinGroupDialog,
+            icon: const Icon(Icons.group_add_outlined),
+            label: const Text('Join Group'),
+          ),
+        ],
       ),
       body: currentUserId == null
           ? const Center(child: Text('Failed to load groups'))

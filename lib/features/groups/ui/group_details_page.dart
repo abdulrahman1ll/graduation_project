@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/services.dart';
 
 import '../models/group.dart';
 import '../services/group_service.dart';
@@ -11,6 +12,16 @@ import '../../trips/models/trip_member.dart';
 import '../../trips/services/trip_service.dart';
 import '../../../core/utils/firestore_utils.dart';
 import '../../../core/utils/localization.dart';
+
+const Color _detailsBackground = Color(0xFFFFF8EF);
+const Color _detailsCard = Color(0xFFFFFBF5);
+const Color _detailsCardBorder = Color(0xFFF0DEC8);
+const Color _detailsSoftOrange = Color(0xFFFFE8C2);
+const Color _detailsOrange = Color(0xFFFF8A00);
+const Color _detailsBrown = Color(0xFF6B4F35);
+const Color _detailsDarkText = Color(0xFF2F2419);
+const Color _detailsMutedText = Color(0xFF8A735C);
+const double _detailsRadius = 16;
 
 class GroupDetailsPage extends StatelessWidget {
   const GroupDetailsPage({
@@ -95,7 +106,7 @@ class GroupDetailsPage extends StatelessWidget {
             child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
               stream: FirebaseFirestore.instance
                   .collection('trips')
-                  .orderBy('tripDate')
+                  .where('memberIds', arrayContains: userId)
                   .snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
@@ -111,6 +122,14 @@ class GroupDetailsPage extends StatelessWidget {
                       (doc.data()['groupId'] ?? '').toString().trim();
                   return linkedGroupId.isEmpty || linkedGroupId == group.id;
                 }).toList();
+                docs.sort((a, b) {
+                  final aDate = a.data()['tripDate'];
+                  final bDate = b.data()['tripDate'];
+                  if (aDate is Timestamp && bDate is Timestamp) {
+                    return aDate.compareTo(bDate);
+                  }
+                  return 0;
+                });
 
                 if (docs.isEmpty) {
                   return const Center(child: Text('No trips available.'));
@@ -148,6 +167,10 @@ class GroupDetailsPage extends StatelessWidget {
                             );
                           }
                         } on FirebaseException catch (e) {
+                          debugPrint(
+                            'GroupDetailsPage.linkChecklistToGroup failed: '
+                            '${e.code} ${e.message}',
+                          );
                           if (context.mounted) {
                             showFirestoreError(context, e);
                           }
@@ -178,6 +201,124 @@ class GroupDetailsPage extends StatelessWidget {
     return '$year/$month/$day';
   }
 
+  Future<void> _showInviteMembersSheet(BuildContext context) async {
+    final inviteLink = 'app://join?groupId=$groupId';
+
+    Future<void> copyValue({
+      required String value,
+      required String message,
+    }) async {
+      await Clipboard.setData(ClipboardData(text: value));
+      if (!context.mounted) {
+        return;
+      }
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    }
+
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: _detailsBackground,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Invite Members',
+                  style: Theme.of(sheetContext)
+                      .textTheme
+                      .titleLarge
+                      ?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Share this invitation code with your friends so they can join the group.',
+                  style: TextStyle(color: _detailsBrown, height: 1.35),
+                ),
+                const SizedBox(height: 18),
+                const Text(
+                  'Invitation Code',
+                  style: TextStyle(
+                    color: _detailsDarkText,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: _detailsCardBorder),
+                  ),
+                  child: SelectableText(
+                    groupId,
+                    style: const TextStyle(
+                      color: _detailsDarkText,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: _detailsBrown,
+                          side: const BorderSide(color: _detailsCardBorder),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                        ),
+                        onPressed: () => copyValue(
+                          value: groupId,
+                          message: 'Invitation code copied',
+                        ),
+                        icon: const Icon(Icons.copy),
+                        label: const Text('Copy Code'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton.icon(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: _detailsOrange,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                        ),
+                        onPressed: () => copyValue(
+                          value: inviteLink,
+                          message: 'Invitation link copied',
+                        ),
+                        icon: const Icon(Icons.link),
+                        label: const Text('Copy Link'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final resolvedGroupService = groupService ?? GroupService();
@@ -186,12 +327,29 @@ class GroupDetailsPage extends StatelessWidget {
     return StreamBuilder<Group?>(
       stream: resolvedGroupService.watchGroup(groupId),
       builder: (context, groupSnapshot) {
+        if (groupSnapshot.hasError) {
+          final error = groupSnapshot.error;
+          if (error is FirebaseException) {
+            debugPrint(
+              'GroupDetailsPage.loadGroup failed: '
+              '${error.code} ${error.message}',
+            );
+          }
+          return Scaffold(
+            appBar: AppBar(title: const Text('Group Details')),
+            body: const Center(child: Text('Unable to load group.')),
+          );
+        }
         final group = groupSnapshot.data;
         final tripId = group?.tripId?.trim() ?? '';
 
         return Scaffold(
+          backgroundColor: _detailsBackground,
           appBar: AppBar(
             title: const Text('Group Details'),
+            backgroundColor: _detailsBackground,
+            foregroundColor: _detailsDarkText,
+            elevation: 0,
           ),
           body: group == null
               ? const Center(child: CircularProgressIndicator())
@@ -202,8 +360,9 @@ class GroupDetailsPage extends StatelessWidget {
                   builder: (context, membersSnapshot) {
                     final members =
                         membersSnapshot.data ?? const <TripMember>[];
-                    final memberIds = members
-                        .map((member) => member.userId)
+                    final memberIds = (group.members.isNotEmpty
+                            ? group.members
+                            : members.map((member) => member.userId))
                         .where((id) => id.trim().isNotEmpty)
                         .toSet()
                         .toList(growable: false);
@@ -214,32 +373,63 @@ class GroupDetailsPage extends StatelessWidget {
                         final memberNames =
                             namesSnapshot.data ?? const <String, String>{};
 
+                        final memberCount = group.members.isNotEmpty
+                            ? group.members.length
+                            : memberIds.length;
+                        final hasUpcomingTrip = tripId.isNotEmpty;
+                        final subtitleParts = <String>[
+                          '$memberCount member${memberCount == 1 ? '' : 's'}',
+                          if (hasUpcomingTrip) '1 upcoming trip',
+                        ];
+
                         return ListView(
-                          padding: const EdgeInsets.all(20),
+                          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
                           children: [
                             Center(
-                              child: CircleAvatar(
-                                radius: 56,
-                                backgroundColor: const Color(0xFFFFE0B2),
-                                backgroundImage: group.imageUrl == null
-                                    ? null
-                                    : NetworkImage(group.imageUrl!),
-                                child: group.imageUrl == null
-                                    ? const Icon(
-                                        Icons.groups,
-                                        size: 40,
-                                        color: Colors.orange,
-                                      )
-                                    : null,
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: const BoxDecoration(
+                                  color: _detailsSoftOrange,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: CircleAvatar(
+                                  radius: 46,
+                                  backgroundColor: _detailsSoftOrange,
+                                  backgroundImage: group.imageUrl == null
+                                      ? null
+                                      : NetworkImage(group.imageUrl!),
+                                  child: group.imageUrl == null
+                                      ? const Icon(
+                                          Icons.groups_rounded,
+                                          size: 38,
+                                          color: _detailsOrange,
+                                        )
+                                      : null,
+                                ),
                               ),
                             ),
-                            const SizedBox(height: 16),
+                            const SizedBox(height: 14),
                             Text(
                               group.name.trim().isEmpty
                                   ? 'Group Chat'
                                   : group.name,
                               textAlign: TextAlign.center,
-                              style: Theme.of(context).textTheme.headlineSmall,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .headlineSmall
+                                  ?.copyWith(
+                                    color: _detailsDarkText,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              subtitleParts.join(' - '),
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: _detailsMutedText,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                             const SizedBox(height: 8),
                             Text(
@@ -247,46 +437,120 @@ class GroupDetailsPage extends StatelessWidget {
                                   ? 'No description yet.'
                                   : group.description,
                               textAlign: TextAlign.center,
-                              style: Theme.of(context).textTheme.bodyMedium,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(
+                                    color: _detailsBrown,
+                                    height: 1.35,
+                                  ),
                             ),
                             const SizedBox(height: 20),
-                            SizedBox(
-                              width: double.infinity,
-                              child: OutlinedButton(
-                                onPressed: () => openGroupChecklistFlow(
-                                  context: context,
-                                  group: group,
-                                  groupId: groupId,
-                                  groupService: resolvedGroupService,
+                            Card(
+                              elevation: 0,
+                              color: _detailsCard,
+                              shape: RoundedRectangleBorder(
+                                borderRadius:
+                                    BorderRadius.circular(_detailsRadius),
+                                side: const BorderSide(
+                                  color: _detailsCardBorder,
                                 ),
-                                child: Text(
-                                  (group.tripId?.trim().isEmpty ?? true)
-                                      ? 'Link to checklist'
-                                      : 'Open checklist',
+                              ),
+                              child: ListTile(
+                                leading: const CircleAvatar(
+                                  backgroundColor: _detailsSoftOrange,
+                                  child: Icon(
+                                    Icons.group_add_outlined,
+                                    color: _detailsOrange,
+                                  ),
                                 ),
+                                title: const Text(
+                                  'Invite Members',
+                                  style: TextStyle(
+                                    color: _detailsDarkText,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                subtitle: const Text(
+                                  'Share an invitation code with friends',
+                                  style: TextStyle(color: _detailsMutedText),
+                                ),
+                                trailing: const Icon(
+                                  Icons.chevron_right,
+                                  color: _detailsBrown,
+                                ),
+                                onTap: () => _showInviteMembersSheet(context),
                               ),
                             ),
                             const SizedBox(height: 12),
-                            SizedBox(
-                              width: double.infinity,
-                              child: OutlinedButton.icon(
-                                onPressed: () => _showPlanTripOptions(
-                                  context,
-                                  group,
-                                  resolvedGroupService,
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: FilledButton.icon(
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: _detailsOrange,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 14,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(999),
+                                      ),
+                                    ),
+                                    onPressed: () => openGroupChecklistFlow(
+                                      context: context,
+                                      group: group,
+                                      groupId: groupId,
+                                      groupService: resolvedGroupService,
+                                    ),
+                                    icon: const Icon(Icons.checklist),
+                                    label: Text(
+                                      (group.tripId?.trim().isEmpty ?? true)
+                                          ? 'Link checklist'
+                                          : 'Open checklist',
+                                    ),
+                                  ),
                                 ),
-                                icon: const Icon(Icons.calendar_month),
-                                label: const Text('Plan next trip'),
-                              ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: _detailsBrown,
+                                      side: const BorderSide(
+                                        color: _detailsCardBorder,
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 14,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(999),
+                                      ),
+                                    ),
+                                    onPressed: () => _showPlanTripOptions(
+                                      context,
+                                      group,
+                                      resolvedGroupService,
+                                    ),
+                                    icon: const Icon(
+                                      Icons.calendar_month,
+                                      color: _detailsOrange,
+                                    ),
+                                    label: const Text('Plan trip'),
+                                  ),
+                                ),
+                              ],
                             ),
                             if (tripId.isNotEmpty) ...[
-                              const SizedBox(height: 20),
-                              Text(
+                              const SizedBox(height: 24),
+                              const Text(
                                 'Upcoming Trip',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleMedium
-                                    ?.copyWith(fontWeight: FontWeight.w600),
+                                style: TextStyle(
+                                  color: _detailsDarkText,
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w800,
+                                ),
                               ),
                               const SizedBox(height: 10),
                               FutureBuilder<
@@ -306,6 +570,16 @@ class GroupDetailsPage extends StatelessWidget {
                                       ),
                                     );
                                   }
+                                  if (tripSnapshot.hasError) {
+                                    final error = tripSnapshot.error;
+                                    if (error is FirebaseException) {
+                                      debugPrint(
+                                        'GroupDetailsPage.loadLinkedTrip failed: '
+                                        '${error.code} ${error.message}',
+                                      );
+                                    }
+                                    return const Text('No linked trip found.');
+                                  }
 
                                   final tripData = tripSnapshot.data?.data();
                                   if (tripData == null) {
@@ -320,19 +594,68 @@ class GroupDetailsPage extends StatelessWidget {
                                           ?.toDate();
 
                                   return Card(
-                                    child: ListTile(
-                                      contentPadding:
-                                          const EdgeInsets.symmetric(
-                                        horizontal: 16,
-                                        vertical: 6,
+                                    elevation: 0,
+                                    color: _detailsCard,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(
+                                        _detailsRadius,
                                       ),
-                                      title: Text(
-                                        title.isEmpty ? 'Untitled trip' : title,
+                                      side: const BorderSide(
+                                        color: _detailsCardBorder,
                                       ),
-                                      subtitle: Text(
-                                        tripDate == null
-                                            ? 'No date'
-                                            : _formatTripDate(tripDate),
+                                    ),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(16),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            title.isEmpty
+                                                ? 'Untitled trip'
+                                                : title,
+                                            style: const TextStyle(
+                                              color: _detailsDarkText,
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 10),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 10,
+                                              vertical: 6,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: _detailsSoftOrange,
+                                              borderRadius:
+                                                  BorderRadius.circular(999),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                const Icon(
+                                                  Icons.event_outlined,
+                                                  size: 16,
+                                                  color: _detailsOrange,
+                                                ),
+                                                const SizedBox(width: 6),
+                                                Text(
+                                                  tripDate == null
+                                                      ? 'No date'
+                                                      : _formatTripDate(
+                                                          tripDate,
+                                                        ),
+                                                  style: const TextStyle(
+                                                    color: _detailsBrown,
+                                                    fontWeight:
+                                                        FontWeight.w700,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   );
@@ -340,12 +663,13 @@ class GroupDetailsPage extends StatelessWidget {
                               ),
                             ],
                             const SizedBox(height: 24),
-                            Text(
+                            const Text(
                               'Members',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.w600),
+                              style: TextStyle(
+                                color: _detailsDarkText,
+                                fontSize: 17,
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
                             const SizedBox(height: 12),
                             if (membersSnapshot.connectionState ==
@@ -358,15 +682,42 @@ class GroupDetailsPage extends StatelessWidget {
                                 ),
                               )
                             else
-                              ...members.map(
-                                (member) => ListTile(
-                                  contentPadding: EdgeInsets.zero,
-                                  leading: const CircleAvatar(
-                                    radius: 18,
-                                    child: Icon(Icons.person, size: 18),
+                              ...memberIds.map(
+                                (memberId) => Container(
+                                  margin: const EdgeInsets.only(bottom: 10),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 10,
                                   ),
-                                  title: Text(
-                                    memberNames[member.userId] ?? 'Member',
+                                  decoration: BoxDecoration(
+                                    color: _detailsCard,
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(
+                                      color: _detailsCardBorder,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const CircleAvatar(
+                                        radius: 18,
+                                        backgroundColor: _detailsSoftOrange,
+                                        child: Icon(
+                                          Icons.person,
+                                          size: 18,
+                                          color: _detailsOrange,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          memberNames[memberId] ?? 'Member',
+                                          style: const TextStyle(
+                                            color: _detailsDarkText,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ),

@@ -2,14 +2,12 @@ import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../models/chat_message.dart';
 import '../models/chat_types.dart';
 import '../models/group.dart';
 import '../services/chat_service.dart';
 import '../services/group_service.dart';
-import '../services/invite_service.dart';
 import '../helpers/group_checklist_flow.dart';
 import 'group_details_page.dart';
 import 'widgets/chat_composer.dart';
@@ -21,13 +19,11 @@ class GroupChatPage extends StatefulWidget {
     required this.groupId,
     this.chatService,
     this.groupService,
-    this.inviteService,
   });
 
   final String groupId;
   final ChatService? chatService;
   final GroupService? groupService;
-  final InviteService? inviteService;
 
   @override
   State<GroupChatPage> createState() => _GroupChatPageState();
@@ -36,7 +32,6 @@ class GroupChatPage extends StatefulWidget {
 class _GroupChatPageState extends State<GroupChatPage> {
   late final ChatService _chatService;
   late final GroupService _groupService;
-  late final InviteService _inviteService;
   late final Stream<List<ChatMessage>> _messagesStream;
   final ScrollController _scrollController = ScrollController();
   StreamSubscription<List<ChatMessage>>? _messagesSubscription;
@@ -55,7 +50,6 @@ class _GroupChatPageState extends State<GroupChatPage> {
     super.initState();
     _chatService = widget.chatService ?? ChatService();
     _groupService = widget.groupService ?? GroupService();
-    _inviteService = widget.inviteService ?? const InviteService();
     _messagesStream = _chatService.watchMessages(widget.groupId);
     _loadRole();
     _listenForReadReceipts();
@@ -149,17 +143,6 @@ class _GroupChatPageState extends State<GroupChatPage> {
         curve: Curves.easeOut,
       );
     });
-  }
-
-  Future<void> _copyInviteLink() async {
-    final inviteLink = _inviteService.generateInviteLink(widget.groupId);
-    await Clipboard.setData(ClipboardData(text: inviteLink));
-    if (!mounted) {
-      return;
-    }
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Invite link copied')),
-    );
   }
 
   Future<void> _handleSend(String content) async {
@@ -287,11 +270,6 @@ class _GroupChatPageState extends State<GroupChatPage> {
                         : Icons.checklist,
                   ),
                 ),
-              IconButton(
-                onPressed: _copyInviteLink,
-                tooltip: 'Copy invite link',
-                icon: const Icon(Icons.link),
-              ),
             ],
           ),
           body: Stack(

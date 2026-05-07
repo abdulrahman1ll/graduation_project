@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -129,7 +128,7 @@ class _AddTripPageState extends State<AddTripPage> {
                       if (groups.isEmpty) ...[
                         const SizedBox(height: 6),
                         Text(
-                          'Create or join a group before creating a trip.',
+                          'You can create this trip now and link a group later.',
                           style: TextStyle(color: Colors.grey.shade700),
                         ),
                       ],

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../../core/models/app_language.dart';
 import '../../../core/utils/localization.dart';
@@ -31,6 +32,35 @@ Future<void> openGroupChecklistFlow({
     return;
   }
 
+  try {
+    final tripSnapshot = await FirebaseFirestore.instance
+        .collection('trips')
+        .doc(tripId)
+        .get();
+    if (!tripSnapshot.exists) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No linked trip found.')),
+        );
+      }
+      return;
+    }
+  } on FirebaseException catch (error) {
+    debugPrint(
+      'group_checklist_flow.open_checklist failed: '
+      '${error.code} ${error.message}',
+    );
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No linked trip found.')),
+      );
+    }
+    return;
+  }
+
+  if (!context.mounted) {
+    return;
+  }
   await Navigator.of(context).push(
     MaterialPageRoute<void>(
       builder: (_) => TripChecklistPage(

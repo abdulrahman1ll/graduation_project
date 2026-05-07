@@ -13,6 +13,13 @@ class TripService {
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
 
+  Stream<QuerySnapshot<Map<String, dynamic>>> watchUserTrips(String uid) {
+    return _firestore
+        .collection('trips')
+        .where('memberIds', arrayContains: uid)
+        .snapshots();
+  }
+
   Stream<List<TripMember>> watchTripMembers(String tripId) {
     // ignore: avoid_print
     print('Reading members from trip.members');
@@ -103,7 +110,11 @@ class TripService {
       );
     }
 
-    final docRef = await _firestore.collection('trips').add({
+    final tripRef = _firestore.collection('trips').doc();
+    final creatorMemberRef = tripRef.collection('members').doc(user.uid);
+    final batch = _firestore.batch();
+
+    batch.set(tripRef, <String, dynamic>{
       'title': title,
       'description': description,
       'locationName': locationName,
@@ -112,8 +123,16 @@ class TripService {
       'groupId': null,
       'createdBy': user.uid,
       'createdAt': FieldValue.serverTimestamp(),
+      'memberIds': <String>[user.uid],
     });
-    return docRef.id;
+    batch.set(creatorMemberRef, <String, dynamic>{
+      'userId': user.uid,
+      'status': 'going',
+      'joinedAt': FieldValue.serverTimestamp(),
+    });
+
+    await batch.commit();
+    return tripRef.id;
   }
 
   Future<void> syncGroupMembersToTrip({
@@ -123,12 +142,26 @@ class TripService {
     final groupSnapshot =
         await _firestore.collection('groups').doc(groupId).get();
     final groupData = groupSnapshot.data() ?? const <String, dynamic>{};
+    final tripSnapshot =
+        await _firestore.collection('trips').doc(tripId).get();
+    final tripData = tripSnapshot.data() ?? const <String, dynamic>{};
+    final tripCreatorId = (tripData['createdBy'] ?? '').toString().trim();
     final memberIds = (groupData['members'] as List<dynamic>?)
             ?.map((member) => member.toString().trim())
             .where((memberId) => memberId.isNotEmpty)
             .toSet()
             .toList(growable: false) ??
         const <String>[];
+    if (memberIds.isEmpty) {
+      return;
+    }
+
+    await _firestore.collection('trips').doc(tripId).set(
+      <String, dynamic>{
+        'memberIds': FieldValue.arrayUnion(memberIds),
+      },
+      SetOptions(merge: true),
+    );
 
     for (var index = 0; index < memberIds.length; index += 450) {
       final batch = _firestore.batch();
@@ -139,11 +172,15 @@ class TripService {
             .doc(tripId)
             .collection('members')
             .doc(userId);
-        batch.set(memberRef, <String, dynamic>{
-          'userId': userId,
-          'status': 'pending',
-          'joinedAt': FieldValue.serverTimestamp(),
-        });
+        batch.set(
+          memberRef,
+          <String, dynamic>{
+            'userId': userId,
+            'status': userId == tripCreatorId ? 'going' : 'pending',
+            'joinedAt': FieldValue.serverTimestamp(),
+          },
+          SetOptions(merge: true),
+        );
       }
       await batch.commit();
     }

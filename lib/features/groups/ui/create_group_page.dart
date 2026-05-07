@@ -105,6 +105,10 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
         ),
       );
     } on FirebaseException catch (error) {
+      debugPrint(
+        'CreateGroupPage.createGroup failed: '
+        '${error.code} ${error.message}',
+      );
       if (!mounted) {
         return;
       }
@@ -127,13 +131,17 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
 
   @override
   Widget build(BuildContext context) {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Create Group')),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: FirebaseFirestore.instance
-            .collection('trips')
-            .orderBy('createdAt', descending: true)
-            .snapshots(),
+        stream: userId == null
+            ? const Stream<QuerySnapshot<Map<String, dynamic>>>.empty()
+            : FirebaseFirestore.instance
+                .collection('trips')
+                .where('createdBy', isEqualTo: userId)
+                .snapshots(),
         builder: (context, snapshot) {
           final availableTrips = (snapshot.data?.docs ?? const [])
               .where((doc) {
@@ -141,6 +149,14 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
                 return groupId.isEmpty;
               })
               .toList(growable: false);
+          availableTrips.sort((a, b) {
+            final aDate = a.data()['createdAt'];
+            final bDate = b.data()['createdAt'];
+            if (aDate is Timestamp && bDate is Timestamp) {
+              return bDate.compareTo(aDate);
+            }
+            return 0;
+          });
 
           return ListView(
             padding: const EdgeInsets.all(20),

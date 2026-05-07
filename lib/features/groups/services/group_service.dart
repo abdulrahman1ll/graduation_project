@@ -133,7 +133,19 @@ class GroupService {
         'joinedAt': FieldValue.serverTimestamp(),
       });
       if (tripRef != null) {
-        batch.update(tripRef, <String, dynamic>{'groupId': groupRef.id});
+        batch.update(tripRef, <String, dynamic>{
+          'groupId': groupRef.id,
+          'memberIds': FieldValue.arrayUnion(<String>[creatorId]),
+        });
+        batch.set(
+          tripRef.collection('members').doc(creatorId),
+          <String, dynamic>{
+            'userId': creatorId,
+            'status': 'going',
+            'joinedAt': FieldValue.serverTimestamp(),
+          },
+          SetOptions(merge: true),
+        );
       }
       await batch.commit();
 
@@ -189,6 +201,13 @@ class GroupService {
     if (linkedGroupId.isNotEmpty && linkedGroupId != groupId) {
       throw _invalidArgument('This checklist is already linked to another group.');
     }
+    final groupData = groupSnapshot.data() ?? const <String, dynamic>{};
+    final groupMemberIds = _memberIdsFromData(groupData);
+    final tripCreatorId = (tripData['createdBy'] ?? '').toString().trim();
+    final tripMemberIds = <String>{
+      ...groupMemberIds,
+      if (tripCreatorId.isNotEmpty) tripCreatorId,
+    }.toList(growable: false);
 
     final batch = _firestore.batch();
     batch.update(groupRef, <String, dynamic>{
@@ -196,9 +215,24 @@ class GroupService {
     });
     batch.set(
       tripRef,
-      <String, dynamic>{'groupId': groupId},
+      <String, dynamic>{
+        'groupId': groupId,
+        if (tripMemberIds.isNotEmpty)
+          'memberIds': FieldValue.arrayUnion(tripMemberIds),
+      },
       SetOptions(merge: true),
     );
+    for (final memberId in tripMemberIds) {
+      batch.set(
+        tripRef.collection('members').doc(memberId),
+        <String, dynamic>{
+          'userId': memberId,
+          'status': memberId == tripCreatorId ? 'going' : 'pending',
+          'joinedAt': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
+    }
     await batch.commit();
 
     await _chatService.sendSystemMessage(groupId, 'Checklist linked to this group');
@@ -227,27 +261,66 @@ class GroupService {
     return downloadUrl;
   }
 
-  Future<void> joinGroup(String groupId, String userId) async {
+  Future<bool> joinGroup(String groupId, String userId) async {
     _ensureSignedInUser(userId);
-    final memberRef = _memberRef(groupId, userId);
-    final memberSnapshot = await memberRef.get();
-    if (memberSnapshot.exists) {
-      await _notificationService.subscribeToGroup(groupId);
-      return;
+    final trimmedGroupId = groupId.trim();
+    if (trimmedGroupId.isEmpty) {
+      throw _invalidArgument('Group ID is required.');
     }
 
-    await memberRef.set(<String, dynamic>{
+    final groupRef = _groups.doc(trimmedGroupId);
+    final memberRef = _memberRef(trimmedGroupId, userId);
+    final memberSnapshot = await memberRef.get();
+    if (memberSnapshot.exists) {
+      await _notificationService.subscribeToGroup(trimmedGroupId);
+      return false;
+    }
+
+    final batch = _firestore.batch();
+    batch.set(memberRef, <String, dynamic>{
       'userId': userId,
       'role': GroupRole.member.value,
       'joinedAt': FieldValue.serverTimestamp(),
     });
-    await _groups.doc(groupId).update(<String, dynamic>{
+    batch.update(groupRef, <String, dynamic>{
       'members': FieldValue.arrayUnion(<String>[userId]),
     });
+    await batch.commit();
 
-    await _notificationService.subscribeToGroup(groupId);
+    final groupSnapshot = await groupRef.get();
+    final tripId = (groupSnapshot.data()?['tripId'] ?? '').toString().trim();
+    if (tripId.isNotEmpty) {
+      try {
+        final tripRef = _trips.doc(tripId);
+        final tripBatch = _firestore.batch();
+        tripBatch.update(
+          tripRef,
+          <String, dynamic>{
+            'memberIds': FieldValue.arrayUnion(<String>[userId]),
+          },
+        );
+        tripBatch.set(
+          tripRef.collection('members').doc(userId),
+          <String, dynamic>{
+            'userId': userId,
+            'status': 'pending',
+            'joinedAt': FieldValue.serverTimestamp(),
+          },
+          SetOptions(merge: true),
+        );
+        await tripBatch.commit();
+      } on FirebaseException catch (error, stackTrace) {
+        _logFirestoreError('joinGroup(syncLinkedTrip)', error, stackTrace);
+      }
+    }
+
+    await _notificationService.subscribeToGroup(trimmedGroupId);
     final memberName = await _resolveUserName(userId);
-    await _chatService.sendSystemMessage(groupId, '$memberName joined the group');
+    await _chatService.sendSystemMessage(
+      trimmedGroupId,
+      '$memberName joined the group',
+    );
+    return true;
   }
 
   Future<void> removeMember(
@@ -271,10 +344,26 @@ class GroupService {
       return;
     }
 
-    await targetRef.delete();
-    await _groups.doc(groupId).update(<String, dynamic>{
+    final groupRef = _groups.doc(groupId);
+    final groupSnapshot = await groupRef.get();
+    final tripId =
+        (groupSnapshot.data()?['tripId'] ?? '').toString().trim();
+
+    final batch = _firestore.batch();
+    batch.delete(targetRef);
+    batch.update(groupRef, <String, dynamic>{
       'members': FieldValue.arrayRemove(<String>[targetUserId]),
     });
+    if (tripId.isNotEmpty) {
+      batch.set(
+        _trips.doc(tripId),
+        <String, dynamic>{
+          'memberIds': FieldValue.arrayRemove(<String>[targetUserId]),
+        },
+        SetOptions(merge: true),
+      );
+    }
+    await batch.commit();
     final targetName = await _resolveUserName(targetUserId);
     await _chatService.sendSystemMessage(
       groupId,
@@ -295,6 +384,15 @@ class GroupService {
     if (role == null) {
       throw _permissionDenied('You must be a group member to update this group.');
     }
+  }
+
+  List<String> _memberIdsFromData(Map<String, dynamic> data) {
+    return (data['members'] as List<dynamic>?)
+            ?.map((member) => member.toString().trim())
+            .where((memberId) => memberId.isNotEmpty)
+            .toSet()
+            .toList(growable: false) ??
+        const <String>[];
   }
 
   Future<Map<String, String>> resolveUserNames(Iterable<String> userIds) async {

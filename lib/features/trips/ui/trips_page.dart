@@ -87,8 +87,21 @@ class _TripsPageState extends State<TripsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      return Scaffold(
+        appBar: appBarWithLanguage(
+          tr: widget.tr,
+          isArabic: widget.isArabic,
+          title: widget.tr.t('trips'),
+          onToggleLanguage: widget.onToggleLanguage,
+        ),
+        body: const Center(child: Text('Please sign in to view trips.')),
+      );
+    }
+
     final body = StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: FirebaseFirestore.instance.collection('trips').snapshots(),
+      stream: _tripService.watchUserTrips(currentUser.uid),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -849,9 +862,17 @@ class _AddChecklistItemsPageState extends State<AddChecklistItemsPage> {
             return const Center(child: CircularProgressIndicator());
           }
           if (groupsSnapshot.hasError) {
+            final error = groupsSnapshot.error;
+            if (error is FirebaseException) {
+              debugPrint(
+                'AddChecklistItemsPage.loadTemplateGroups failed: '
+                'path=checklist_templates '
+                'code=${error.code} message=${error.message}',
+              );
+            }
             logFirestoreReadError(
               'checklist_templates',
-              groupsSnapshot.error,
+              error,
             );
             return Center(child: Text(widget.tr.t('load_error')));
           }
@@ -869,9 +890,17 @@ class _AddChecklistItemsPageState extends State<AddChecklistItemsPage> {
                 return const Center(child: CircularProgressIndicator());
               }
               if (itemsSnapshot.hasError) {
+                final error = itemsSnapshot.error;
+                if (error is FirebaseException) {
+                  debugPrint(
+                    'AddChecklistItemsPage.loadTemplateItems failed: '
+                    'path=collectionGroup(items) '
+                    'code=${error.code} message=${error.message}',
+                  );
+                }
                 logFirestoreReadError(
                   'checklist_templates/*/items',
-                  itemsSnapshot.error,
+                  error,
                 );
                 return Center(child: Text(widget.tr.t('load_error')));
               }

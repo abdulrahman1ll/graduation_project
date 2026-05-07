@@ -45,6 +45,10 @@ class _LinkGroupChecklistPageState extends State<LinkGroupChecklistPage> {
       }
       Navigator.of(context).pop(true);
     } on FirebaseException catch (error) {
+      debugPrint(
+        'LinkGroupChecklistPage.linkChecklistToGroup failed: '
+        '${error.code} ${error.message}',
+      );
       if (!mounted) {
         return;
       }
@@ -70,18 +74,33 @@ class _LinkGroupChecklistPageState extends State<LinkGroupChecklistPage> {
               stream: FirebaseFirestore.instance
                   .collection('trips')
                   .where('createdBy', isEqualTo: userId)
-                  .orderBy('createdAt', descending: true)
                   .snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
                 if (snapshot.hasError) {
+                  final error = snapshot.error;
+                  if (error is FirebaseException) {
+                    debugPrint(
+                      'LinkGroupChecklistPage.loadTrips failed: '
+                      '${error.code} ${error.message}',
+                    );
+                  }
                   return const Center(child: Text('Unable to load trips'));
                 }
 
-                final trips = snapshot.data?.docs ??
-                    <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+                final trips = (snapshot.data?.docs ??
+                        <QueryDocumentSnapshot<Map<String, dynamic>>>[])
+                    .toList(growable: false);
+                trips.sort((a, b) {
+                  final aDate = a.data()['createdAt'];
+                  final bDate = b.data()['createdAt'];
+                  if (aDate is Timestamp && bDate is Timestamp) {
+                    return bDate.compareTo(aDate);
+                  }
+                  return 0;
+                });
                 if (trips.isEmpty) {
                   return const Center(
                     child: Text('No trips found. Create a trip first.'),
