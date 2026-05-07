@@ -1242,20 +1242,40 @@ class _TripChecklistPageState extends State<TripChecklistPage> {
   final ChecklistAssignmentService _assignmentService =
       ChecklistAssignmentService();
   final ChecklistUserResolver _userResolver = ChecklistUserResolver();
-  final Set<String> _assignmentInProgressIds = <String>{};
 
   Future<void> _toggleDone(
     BuildContext context,
     String itemId,
     bool newValue,
+    String? assignedTo,
+    String? currentUserId,
   ) async {
+    final normalizedAssignedTo = _normalizeUserId(assignedTo);
+    final normalizedCurrentUserId = _normalizeUserId(currentUserId);
+    if (normalizedAssignedTo != normalizedCurrentUserId ||
+        normalizedCurrentUserId == null) {
+      return;
+    }
+
     try {
-      await FirebaseFirestore.instance
+      final itemRef = FirebaseFirestore.instance
           .collection('trips')
           .doc(widget.tripId)
           .collection('checklist')
-          .doc(itemId)
-          .update({'done': newValue});
+          .doc(itemId);
+
+      await FirebaseFirestore.instance
+          .runTransaction<void>((transaction) async {
+        final snapshot = await transaction.get(itemRef);
+        final latestAssignedTo = _normalizeUserId(
+          snapshot.data()?['assignedTo'] as String?,
+        );
+        if (latestAssignedTo != normalizedCurrentUserId) {
+          return;
+        }
+
+        transaction.update(itemRef, {'done': newValue});
+      });
     } on FirebaseException catch (e) {
       if (context.mounted) {
         showFirestoreError(context, e);
@@ -1263,18 +1283,14 @@ class _TripChecklistPageState extends State<TripChecklistPage> {
     }
   }
 
-  Future<void> _toggleAssignment(
+  Future<void> _assignToMe(
     BuildContext context, {
     required String itemId,
     required String currentUserId,
     required String? assignedTo,
   }) async {
-    setState(() {
-      _assignmentInProgressIds.add(itemId);
-    });
-
     try {
-      await _assignmentService.toggleAssignment(
+      await _assignmentService.assignToCurrentUser(
         tripId: widget.tripId,
         itemId: itemId,
         currentUserId: currentUserId,
@@ -1284,13 +1300,48 @@ class _TripChecklistPageState extends State<TripChecklistPage> {
       if (context.mounted) {
         showFirestoreError(context, e);
       }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _assignmentInProgressIds.remove(itemId);
-        });
+    }
+  }
+
+  Future<void> _releaseFromMe(
+    BuildContext context, {
+    required String itemId,
+    required String currentUserId,
+    required String? assignedTo,
+    required bool done,
+  }) async {
+    if (done) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Undo completion before releasing this item.'),
+          ),
+        );
+      return;
+    }
+
+    try {
+      await _assignmentService.releaseFromCurrentUser(
+        tripId: widget.tripId,
+        itemId: itemId,
+        currentUserId: currentUserId,
+        assignedTo: assignedTo,
+        done: done,
+      );
+    } on FirebaseException catch (e) {
+      if (context.mounted) {
+        showFirestoreError(context, e);
       }
     }
+  }
+
+  String? _normalizeUserId(String? value) {
+    final trimmed = value?.trim();
+    if (trimmed == null || trimmed.isEmpty) {
+      return null;
+    }
+    return trimmed;
   }
 
   @override
@@ -1476,17 +1527,29 @@ class _TripChecklistPageState extends State<TripChecklistPage> {
                           assignedTo: assignedTo,
                           currentUserId: currentUserId,
                           userResolver: _userResolver,
-                          assignmentInProgress:
-                              _assignmentInProgressIds.contains(itemId),
-                          onDoneChanged: (value) =>
-                              _toggleDone(context, itemId, value),
+                          onDoneChanged: (value) => _toggleDone(
+                            context,
+                            itemId,
+                            value,
+                            assignedTo,
+                            currentUserId,
+                          ),
                           onAssignPressed: currentUserId == null
-                              ? () {}
-                              : () => _toggleAssignment(
+                              ? null
+                              : () => _assignToMe(
                                     context,
                                     itemId: itemId,
                                     currentUserId: currentUserId,
                                     assignedTo: assignedTo,
+                                  ),
+                          onReleasePressed: currentUserId == null
+                              ? null
+                              : () => _releaseFromMe(
+                                    context,
+                                    itemId: itemId,
+                                    currentUserId: currentUserId,
+                                    assignedTo: assignedTo,
+                                    done: done,
                                   ),
                         );
                       },

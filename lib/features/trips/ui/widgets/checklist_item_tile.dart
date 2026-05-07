@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../services/checklist_user_resolver.dart';
 
-class ChecklistItemTile extends StatelessWidget {
+class ChecklistItemTile extends StatefulWidget {
   const ChecklistItemTile({
     super.key,
     required this.itemName,
@@ -11,9 +11,9 @@ class ChecklistItemTile extends StatelessWidget {
     required this.assignedTo,
     required this.currentUserId,
     required this.userResolver,
-    required this.assignmentInProgress,
     required this.onDoneChanged,
     required this.onAssignPressed,
+    required this.onReleasePressed,
   });
 
   final String itemName;
@@ -22,17 +22,30 @@ class ChecklistItemTile extends StatelessWidget {
   final String? assignedTo;
   final String? currentUserId;
   final ChecklistUserResolver userResolver;
-  final bool assignmentInProgress;
   final ValueChanged<bool> onDoneChanged;
-  final VoidCallback onAssignPressed;
+  final Future<void> Function()? onAssignPressed;
+  final Future<void> Function()? onReleasePressed;
+
+  @override
+  State<ChecklistItemTile> createState() => _ChecklistItemTileState();
+}
+
+class _ChecklistItemTileState extends State<ChecklistItemTile> {
+  bool _assignmentInProgress = false;
+  bool _releaseInProgress = false;
 
   @override
   Widget build(BuildContext context) {
-    final normalizedAssignedTo = _normalizeUserId(assignedTo);
-    final cardColor = done ? const Color(0xFFFFF7ED) : Colors.white;
+    final normalizedAssignedTo = _normalizeUserId(widget.assignedTo);
+    final normalizedCurrentUserId = _normalizeUserId(widget.currentUserId);
+    final canAssignToMe = normalizedAssignedTo == null;
+    final canMarkDone = normalizedCurrentUserId != null &&
+        normalizedAssignedTo == normalizedCurrentUserId;
+    final canShowRelease = canMarkDone;
+    final cardColor = widget.done ? const Color(0xFFFFF7ED) : Colors.white;
     final iconColor =
-        done ? Colors.orange.withValues(alpha: 0.6) : Colors.orange;
-    final titleColor = done
+        widget.done ? Colors.orange.withValues(alpha: 0.6) : Colors.orange;
+    final titleColor = widget.done
         ? const Color(0xFF1F1F1F).withValues(alpha: 0.58)
         : const Color(0xFF1F1F1F);
 
@@ -52,34 +65,46 @@ class ChecklistItemTile extends StatelessWidget {
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         leading: Transform.scale(
           scale: 1.08,
-          child: Checkbox(
-            value: done,
-            activeColor: Colors.orange,
-            side: const BorderSide(color: Color(0xFFD0D0D0), width: 1.4),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(5),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: canMarkDone
+                ? null
+                : () => _showBlockedDoneMessage(
+                      context,
+                      assignedTo: normalizedAssignedTo,
+                    ),
+            child: Checkbox(
+              value: widget.done,
+              activeColor: Colors.orange,
+              side: const BorderSide(color: Color(0xFFD0D0D0), width: 1.4),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(5),
+              ),
+              onChanged: canMarkDone
+                  ? (value) {
+                      if (value == null) {
+                        return;
+                      }
+                      widget.onDoneChanged(value);
+                    }
+                  : null,
             ),
-            onChanged: (value) {
-              if (value == null) {
-                return;
-              }
-              onDoneChanged(value);
-            },
           ),
         ),
         title: Row(
           children: [
-            Icon(itemIcon, color: iconColor, size: 25),
+            Icon(widget.itemIcon, color: iconColor, size: 25),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                itemName,
+                widget.itemName,
                 style: TextStyle(
                   fontSize: 18.5,
                   fontWeight: FontWeight.w800,
                   color: titleColor,
-                  decoration:
-                      done ? TextDecoration.lineThrough : TextDecoration.none,
+                  decoration: widget.done
+                      ? TextDecoration.lineThrough
+                      : TextDecoration.none,
                   decorationColor: const Color(0xFF8A8A8A).withValues(
                     alpha: 0.55,
                   ),
@@ -90,35 +115,104 @@ class ChecklistItemTile extends StatelessWidget {
             Flexible(
               child: _AssignmentBadge(
                 assignedTo: normalizedAssignedTo,
-                currentUserId: currentUserId,
-                userResolver: userResolver,
+                currentUserId: normalizedCurrentUserId,
+                userResolver: widget.userResolver,
               ),
             ),
           ],
         ),
-        trailing: IconButton(
-          icon: assignmentInProgress
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(
-                  Icons.add_circle_outline,
-                  size: 20,
-                  color: Colors.orange,
-                ),
-          visualDensity: VisualDensity.compact,
-          padding: const EdgeInsets.all(4),
-          constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
-          splashRadius: 18,
-          tooltip: 'Assign item',
-          onPressed: assignmentInProgress || currentUserId == null
-              ? null
-              : onAssignPressed,
-        ),
+        trailing: canAssignToMe
+            ? IconButton(
+                icon: _assignmentInProgress
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(
+                        Icons.add_circle_outline,
+                        size: 20,
+                        color: Colors.orange,
+                      ),
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.all(4),
+                constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+                splashRadius: 18,
+                tooltip: 'Assign to me',
+                onPressed:
+                    _assignmentInProgress || widget.onAssignPressed == null
+                        ? null
+                        : _assignToMe,
+              )
+            : canShowRelease
+                ? IconButton(
+                    icon: _releaseInProgress
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(
+                            Icons.close,
+                            size: 18,
+                            color: Color(0xFF7A6B55),
+                          ),
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.all(4),
+                    constraints:
+                        const BoxConstraints(minWidth: 32, minHeight: 32),
+                    splashRadius: 18,
+                    tooltip: 'Release item',
+                    onPressed:
+                        _releaseInProgress || widget.onReleasePressed == null
+                            ? null
+                            : _releaseFromMe,
+                  )
+                : null,
       ),
     );
+  }
+
+  Future<void> _releaseFromMe() async {
+    final onReleasePressed = widget.onReleasePressed;
+    if (onReleasePressed == null || _releaseInProgress) {
+      return;
+    }
+
+    setState(() {
+      _releaseInProgress = true;
+    });
+
+    try {
+      await onReleasePressed();
+    } finally {
+      if (mounted) {
+        setState(() {
+          _releaseInProgress = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _assignToMe() async {
+    final onAssignPressed = widget.onAssignPressed;
+    if (onAssignPressed == null || _assignmentInProgress) {
+      return;
+    }
+
+    setState(() {
+      _assignmentInProgress = true;
+    });
+
+    try {
+      await onAssignPressed();
+    } finally {
+      if (mounted) {
+        setState(() {
+          _assignmentInProgress = false;
+        });
+      }
+    }
   }
 
   static String? _normalizeUserId(String? value) {
@@ -127,6 +221,18 @@ class ChecklistItemTile extends StatelessWidget {
       return null;
     }
     return trimmed;
+  }
+
+  static void _showBlockedDoneMessage(
+    BuildContext context, {
+    required String? assignedTo,
+  }) {
+    final message = assignedTo == null
+        ? 'Assign this item to yourself first.'
+        : 'This item is assigned to another member.';
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 }
 
