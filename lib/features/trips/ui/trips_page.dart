@@ -6,6 +6,7 @@ import '../../../core/models/app_language.dart';
 import '../../../core/utils/firestore_utils.dart';
 import '../../../core/utils/localization.dart';
 import '../../../core/widgets/language_app_bar.dart';
+import '../../../widgets/kashta_background.dart';
 import '../helpers/checklist_utils.dart';
 import '../models/trip_member.dart';
 import '../services/checklist_assignment_service.dart';
@@ -96,7 +97,9 @@ class _TripsPageState extends State<TripsPage> {
           title: widget.tr.t('trips'),
           onToggleLanguage: widget.onToggleLanguage,
         ),
-        body: const Center(child: Text('Please sign in to view trips.')),
+        body: const KashtaBackground(
+          child: Center(child: Text('Please sign in to view trips.')),
+        ),
       );
     }
 
@@ -288,7 +291,7 @@ class _TripsPageState extends State<TripsPage> {
           ),
         ],
       ),
-      body: body,
+      body: KashtaBackground(child: body),
     );
   }
 }

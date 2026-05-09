@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class AiRecommendationService {
-  static const String baseUrl = 'http://10.0.2.2:5000';
+  static const String baseUrl = 'https://kashta-api.onrender.com';
 
   Future<double?> predictRating({
     required String preferredPlaceType,

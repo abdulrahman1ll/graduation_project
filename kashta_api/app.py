@@ -1,10 +1,20 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 import joblib
 import pandas as pd
+import os
 
 app = Flask(__name__)
+CORS(app)
 
 model = joblib.load("kashta_model_clean_v2.pkl")
+
+@app.route("/", methods=["GET"])
+def home():
+    return jsonify({
+        "status": "ok",
+        "message": "Kashta AI API is running"
+    })
 
 @app.route("/predict", methods=["POST"])
 def predict():
@@ -15,7 +25,7 @@ def predict():
             "preferredPlaceType": data["preferredPlaceType"],
             "distancePreference": data["distancePreference"],
             "temperaturePreference": data["temperaturePreference"],
-            
+
             "placeEnvironmentType": data["placeEnvironmentType"],
             "placeDistanceBucket": data["placeDistanceBucket"],
             "placeAverageRating": float(data["placeAverageRating"]),
@@ -36,4 +46,5 @@ def predict():
         }), 200
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)

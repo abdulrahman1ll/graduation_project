@@ -11,6 +11,7 @@ import 'package:http/http.dart' as http;
 import '../services/ai_recommendation_service.dart';
 import '../../../core/utils/firestore_utils.dart';
 import '../../../core/utils/localization.dart';
+import '../../../widgets/kashta_background.dart';
 import '../models/recommended_place.dart';
 import '../services/place_service.dart';
 import '../services/weather_service.dart';
@@ -799,20 +800,8 @@ void _testInteractions() async {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: Image.asset(
-            'assets/kas.png',
-            fit: BoxFit.cover,
-          ),
-        ),
-        Positioned.fill(
-          child: Container(
-            color: const Color(0xFFF8EFE2).withValues(alpha: 0.72),
-          ),
-        ),
-        SafeArea(
+    return KashtaBackground(
+      child: SafeArea(
           child: Column(
             children: [
               _buildExploreHeader(),
@@ -1169,8 +1158,7 @@ scrollGesturesEnabled: true,
               ),
             ],
           ),
-        ),
-      ],
+      ),
     );
   }
 

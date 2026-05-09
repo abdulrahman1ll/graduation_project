@@ -8,6 +8,7 @@ import '../groups.dart' as chat;
 import '../../../core/providers/role_provider.dart';
 import '../../../core/utils/localization.dart';
 import '../../../core/widgets/language_app_bar.dart';
+import '../../../widgets/kashta_background.dart';
 
 class GroupsPage extends StatefulWidget {
   const GroupsPage({
@@ -329,32 +330,35 @@ class _GroupsPageState extends State<GroupsPage> {
           ),
         ],
       ),
-      body: currentUserId == null
-          ? const Center(child: Text('Failed to load groups'))
-          : Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: 'Search groups',
-                      prefixIcon: const Icon(Icons.search),
-                      filled: true,
-                      fillColor: Colors.white,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 14),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide.none,
+      body: KashtaBackground(
+        child: currentUserId == null
+            ? const Center(child: Text('Failed to load groups'))
+            : Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                    child: TextField(
+                      controller: _searchController,
+                      decoration: InputDecoration(
+                        hintText: 'Search groups',
+                        prefixIcon: const Icon(Icons.search),
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding:
+                            const EdgeInsets.symmetric(vertical: 14),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide.none,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                Expanded(
-                  child: _buildBody(context, currentUserId),
-                ),
-              ],
-            ),
+                  Expanded(
+                    child: _buildBody(context, currentUserId),
+                  ),
+                ],
+              ),
+      ),
       floatingActionButton: _CreateGroupFab(
         emptyState: _visibleGroups.isEmpty && !_loading,
       ),
