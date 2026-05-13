@@ -84,8 +84,7 @@ class _MainScreenState extends State<MainScreen> {
   void _openAdminDashboard() {
     Navigator.of(
       context,
-    ).push(MaterialPageRoute(builder: (_) => const AdminDashboardPage()));
+    ).push(
+        MaterialPageRoute(builder: (_) => AdminDashboardPage(tr: widget.tr)));
   }
 }
-
-

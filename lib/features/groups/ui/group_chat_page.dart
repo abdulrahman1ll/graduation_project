@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../../../core/utils/localization.dart';
 import '../models/chat_message.dart';
 import '../models/chat_types.dart';
 import '../models/group.dart';
@@ -17,11 +18,13 @@ class GroupChatPage extends StatefulWidget {
   const GroupChatPage({
     super.key,
     required this.groupId,
+    required this.tr,
     this.chatService,
     this.groupService,
   });
 
   final String groupId;
+  final Tr tr;
   final ChatService? chatService;
   final GroupService? groupService;
 
@@ -155,7 +158,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
       final type = _inferType(content).value;
       await _chatService.sendMessage(widget.groupId, userId, type, content);
     } catch (error) {
-      _showError('Unable to send message.');
+      _showError(widget.tr.t('unableToSendMessage'));
     } finally {
       if (mounted) {
         setState(() => _sending = false);
@@ -175,7 +178,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
         await _chatService.pinMessage(widget.groupId, message.id, userId);
       }
     } catch (_) {
-      _showError('Unable to update message.');
+      _showError(widget.tr.t('unableToUpdateMessage'));
     }
   }
 
@@ -191,15 +194,17 @@ class _GroupChatPageState extends State<GroupChatPage> {
     if (!mounted) {
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
   Widget build(BuildContext context) {
+    final tr = widget.tr;
     if (_roleError != null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Group Chat')),
-        body: const Center(child: Text('Unable to load group access')),
+        appBar: AppBar(title: Text(tr.t('groupChat'))),
+        body: Center(child: Text(tr.t('unableToLoadGroupAccess'))),
       );
     }
 
@@ -223,6 +228,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
                         MaterialPageRoute<void>(
                           builder: (_) => GroupDetailsPage(
                             groupId: widget.groupId,
+                            tr: tr,
                             groupService: _groupService,
                           ),
                         ),
@@ -245,7 +251,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
                     child: Text(
                       group?.name.trim().isNotEmpty == true
                           ? group!.name
-                          : 'Group Chat',
+                          : tr.t('groupChat'),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -260,10 +266,11 @@ class _GroupChatPageState extends State<GroupChatPage> {
                     group: group,
                     groupId: widget.groupId,
                     groupService: _groupService,
+                    tr: tr,
                   ),
                   tooltip: (group.tripId?.trim().isEmpty ?? true)
-                      ? 'Link to checklist'
-                      : 'Open checklist',
+                      ? tr.t('link_to_checklist')
+                      : tr.t('open_checklist'),
                   icon: Icon(
                     (group.tripId?.trim().isEmpty ?? true)
                         ? Icons.fact_check
@@ -291,27 +298,29 @@ class _GroupChatPageState extends State<GroupChatPage> {
                     groupId: widget.groupId,
                     chatService: _chatService,
                     senderNames: _senderNames,
+                    tr: tr,
                   ),
                   Expanded(
                     child: StreamBuilder<List<ChatMessage>>(
                       stream: _messagesStream,
                       builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
                           return const Center(
                             child: CircularProgressIndicator(),
                           );
                         }
                         if (snapshot.hasError) {
-                          return const Center(
-                            child: Text('Unable to load messages'),
+                          return Center(
+                            child: Text(tr.t('unableToLoadMessages')),
                           );
                         }
 
                         final messages = snapshot.data ?? const <ChatMessage>[];
                         if (messages.isEmpty) {
-                          return const Center(
+                          return Center(
                             child: Text(
-                              'No messages yet. Start the conversation.',
+                              tr.t('noMessagesYet'),
                             ),
                           );
                         }
@@ -324,15 +333,15 @@ class _GroupChatPageState extends State<GroupChatPage> {
                           itemCount: messages.length,
                           itemBuilder: (context, index) {
                             final message = messages[index];
-                            final senderName =
-                                _senderNames[message.senderId] ?? 'Member';
+                            final senderName = _senderNames[message.senderId] ??
+                                tr.t('member');
                             return ChatMessageBubble(
                               key: ValueKey(message.id),
                               message: message,
                               senderName: senderName,
+                              tr: tr,
                               currentUserId: _currentUserId,
-                              isSeenByCurrentUser:
-                                  _currentUserId != null &&
+                              isSeenByCurrentUser: _currentUserId != null &&
                                   message.hasRead(_currentUserId!),
                               canPin: _role == GroupRole.admin &&
                                   message.type != ChatMessageType.system,
@@ -348,6 +357,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
                     child: ChatComposer(
                       isSending: _sending,
                       enabled: _role != null,
+                      tr: tr,
                       onSend: _handleSend,
                     ),
                   ),
@@ -366,11 +376,13 @@ class _PinnedMessageBanner extends StatelessWidget {
     required this.groupId,
     required this.chatService,
     required this.senderNames,
+    required this.tr,
   });
 
   final String groupId;
   final ChatService chatService;
   final Map<String, String> senderNames;
+  final Tr tr;
 
   @override
   Widget build(BuildContext context) {
@@ -381,6 +393,10 @@ class _PinnedMessageBanner extends StatelessWidget {
         if (message == null) {
           return const SizedBox.shrink();
         }
+
+        final content = message.type == ChatMessageType.system
+            ? localizedSystemMessageContent(tr, message.content)
+            : message.content;
 
         return InkWell(
           onTap: () => _showPinnedMessagesSheet(context),
@@ -399,7 +415,7 @@ class _PinnedMessageBanner extends StatelessWidget {
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    'Pinned: ${message.content}',
+                    tr.t('pinnedWithMessage').replaceAll('{message}', content),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -433,7 +449,7 @@ class _PinnedMessageBanner extends StatelessWidget {
 
                 final messages = snapshot.data ?? const <ChatMessage>[];
                 if (messages.isEmpty) {
-                  return const Center(child: Text('No pinned messages'));
+                  return Center(child: Text(tr.t('noPinnedMessages')));
                 }
 
                 return ListView.separated(
@@ -444,7 +460,7 @@ class _PinnedMessageBanner extends StatelessWidget {
                   itemBuilder: (context, index) {
                     final message = messages[index];
                     final senderName =
-                        senderNames[message.senderId] ?? 'Member';
+                        senderNames[message.senderId] ?? tr.t('member');
                     return Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
@@ -463,7 +479,14 @@ class _PinnedMessageBanner extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 6),
-                          Text(message.content),
+                          Text(
+                            message.type == ChatMessageType.system
+                                ? localizedSystemMessageContent(
+                                    tr,
+                                    message.content,
+                                  )
+                                : message.content,
+                          ),
                         ],
                       ),
                     );

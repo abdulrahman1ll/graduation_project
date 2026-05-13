@@ -30,6 +30,7 @@ class _KashtaAppState extends State<KashtaApp> {
   void initState() {
     super.initState();
     _deepLinkService = widget.deepLinkService ?? chat.DeepLinkService();
+    _deepLinkService.trProvider = () => Tr(_lang);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         return;
@@ -61,9 +62,8 @@ class _KashtaAppState extends State<KashtaApp> {
         navigatorKey: _deepLinkService.navigatorKey,
         debugShowCheckedModeBanner: false,
         routes: {
-    '/welcome_preferences': (context) => const WelcomePreferencesPage(),
-    
-  },
+          '/welcome_preferences': (context) => WelcomePreferencesPage(tr: tr),
+        },
         home: Directionality(
           textDirection: isArabic ? TextDirection.rtl : TextDirection.ltr,
           child: AuthGate(
@@ -100,41 +100,43 @@ class AuthGate extends StatelessWidget {
           );
         }
 
-       if (snapshot.data == null) {
-  return AuthPage(
-    tr: tr,
-    isArabic: isArabic,
-    onToggleLanguage: onToggleLanguage,
-  );
-}
+        if (snapshot.data == null) {
+          return AuthPage(
+            tr: tr,
+            isArabic: isArabic,
+            onToggleLanguage: onToggleLanguage,
+          );
+        }
 
-final user = snapshot.data;
+        final user = snapshot.data;
 
-return FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-  future: FirebaseFirestore.instance.collection('users').doc(user!.uid).get(),
-  builder: (context, userSnap) {
-    if (userSnap.connectionState == ConnectionState.waiting) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
+        return FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+          future: FirebaseFirestore.instance
+              .collection('users')
+              .doc(user!.uid)
+              .get(),
+          builder: (context, userSnap) {
+            if (userSnap.connectionState == ConnectionState.waiting) {
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
+            }
 
-    final data = userSnap.data?.data();
-    final completed = data?['preferencesCompleted'] == true;
+            final data = userSnap.data?.data();
+            final completed = data?['preferencesCompleted'] == true;
 
-    if (!completed) {
-      return const WelcomePreferencesPage();
-    }
+            if (!completed) {
+              return WelcomePreferencesPage(tr: tr);
+            }
 
-    return MainScreen(
-      tr: tr,
-      isArabic: isArabic,
-      onToggleLanguage: onToggleLanguage,
-    );
-  },
-);
+            return MainScreen(
+              tr: tr,
+              isArabic: isArabic,
+              onToggleLanguage: onToggleLanguage,
+            );
+          },
+        );
       },
     );
   }
 }
-

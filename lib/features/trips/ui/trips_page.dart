@@ -59,7 +59,7 @@ class _TripsPageState extends State<TripsPage> {
 
     return _TripDecisionCard(
       tr: widget.tr,
-      title: title.isEmpty ? 'Untitled trip' : title,
+      title: title.isEmpty ? widget.tr.t('untitled_trip') : title,
       groupId: groupId,
       tripDate: tripDate,
       fallbackMemberCount: fallbackMemberCount,
@@ -71,7 +71,7 @@ class _TripsPageState extends State<TripsPage> {
             builder: (_) => TripChecklistPage(
               tr: widget.tr,
               tripId: doc.id,
-              tripTitle: title.isEmpty ? 'Untitled trip' : title,
+              tripTitle: title.isEmpty ? widget.tr.t('untitled_trip') : title,
             ),
           ),
         );
@@ -79,7 +79,7 @@ class _TripsPageState extends State<TripsPage> {
       onViewDetails: () {
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => TripDetailsPage(tripId: doc.id),
+            builder: (_) => TripDetailsPage(tr: widget.tr, tripId: doc.id),
           ),
         );
       },
@@ -97,8 +97,8 @@ class _TripsPageState extends State<TripsPage> {
           title: widget.tr.t('trips'),
           onToggleLanguage: widget.onToggleLanguage,
         ),
-        body: const KashtaBackground(
-          child: Center(child: Text('Please sign in to view trips.')),
+        body: KashtaBackground(
+          child: Center(child: Text(widget.tr.t('please_sign_in_view_trips'))),
         ),
       );
     }
@@ -118,8 +118,8 @@ class _TripsPageState extends State<TripsPage> {
           if (error is FirebaseException) {
             final link = extractIndexLink(error.message);
             if (link != null) {
-              return const Center(
-                child: Text('Trips query requires a Firestore index.'),
+              return Center(
+                child: Text(widget.tr.t('trips_index_required')),
               );
             }
           }
@@ -156,19 +156,19 @@ class _TripsPageState extends State<TripsPage> {
                   children: [
                     Expanded(
                       child: _TripStatCard(
-                        title: 'Upcoming Trips',
+                        title: widget.tr.t('upcoming_trips'),
                         value: upcomingCount,
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: _TripStatCard(
-                        title: 'Past Trips',
+                        title: widget.tr.t('past_trips'),
                         value: pastCount,
                         action: IconButton(
                           tooltip: _showPastTrips
-                              ? 'Hide past trips'
-                              : 'Show past trips',
+                              ? widget.tr.t('hide_past_trips')
+                              : widget.tr.t('show_past_trips'),
                           visualDensity: VisualDensity.compact,
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(
@@ -185,9 +185,7 @@ class _TripsPageState extends State<TripsPage> {
                                   });
                                 },
                           icon: Icon(
-                            _showPastTrips
-                                ? Icons.expand_less
-                                : Icons.history,
+                            _showPastTrips ? Icons.expand_less : Icons.history,
                           ),
                         ),
                       ),
@@ -207,18 +205,19 @@ class _TripsPageState extends State<TripsPage> {
                 children: [
                   Expanded(
                     child: _TripStatCard(
-                      title: 'Upcoming Trips',
+                      title: widget.tr.t('upcoming_trips'),
                       value: upcomingCount,
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: _TripStatCard(
-                      title: 'Past Trips',
+                      title: widget.tr.t('past_trips'),
                       value: pastCount,
                       action: IconButton(
-                        tooltip:
-                            _showPastTrips ? 'Hide past trips' : 'Show past trips',
+                        tooltip: _showPastTrips
+                            ? widget.tr.t('hide_past_trips')
+                            : widget.tr.t('show_past_trips'),
                         visualDensity: VisualDensity.compact,
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(
@@ -252,7 +251,7 @@ class _TripsPageState extends State<TripsPage> {
                       padding: const EdgeInsets.symmetric(vertical: 32),
                       child: Center(
                         child: Text(
-                          'No upcoming trips.',
+                          widget.tr.t('no_upcoming_trips'),
                           style: TextStyle(color: Colors.grey.shade700),
                         ),
                       ),
@@ -263,10 +262,10 @@ class _TripsPageState extends State<TripsPage> {
                     const SizedBox(height: 8),
                     const Divider(height: 24),
                     _PastTripsSection(
+                      tr: widget.tr,
                       trips: pastDocs,
                       isExpanded: _showPastTrips,
-                      buildTripCard: (doc) =>
-                          _buildTripCard(doc, isPast: true),
+                      buildTripCard: (doc) => _buildTripCard(doc, isPast: true),
                     ),
                   ],
                 ],
@@ -298,11 +297,13 @@ class _TripsPageState extends State<TripsPage> {
 
 class _PastTripsSection extends StatelessWidget {
   const _PastTripsSection({
+    required this.tr,
     required this.trips,
     required this.isExpanded,
     required this.buildTripCard,
   });
 
+  final Tr tr;
   final List<QueryDocumentSnapshot<Map<String, dynamic>>> trips;
   final bool isExpanded;
   final Widget Function(QueryDocumentSnapshot<Map<String, dynamic>> doc)
@@ -316,7 +317,7 @@ class _PastTripsSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Past Trips',
+            tr.t('past_trips'),
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w700,
                   color: Colors.grey.shade700,
@@ -328,7 +329,7 @@ class _PastTripsSection extends StatelessWidget {
           ] else ...[
             const SizedBox(height: 6),
             Text(
-              '${trips.length} past trip${trips.length == 1 ? '' : 's'} hidden',
+              '${trips.length} ${tr.t(trips.length == 1 ? 'past_trip_hidden' : 'past_trips_hidden')}',
               style: TextStyle(
                 color: Colors.grey.shade600,
                 fontWeight: FontWeight.w500,
@@ -372,7 +373,7 @@ class _TripDecisionCard extends StatelessWidget {
         final members = snapshot.data ?? const <TripMember>[];
         final memberCount =
             members.isEmpty ? fallbackMemberCount : members.length;
-        final status = _TripReadyStatus.fromMembers(members);
+        final status = _TripReadyStatus.fromMembers(members, tr);
         final pendingCount =
             members.where((member) => member.status == 'pending').length;
 
@@ -419,7 +420,7 @@ class _TripDecisionCard extends StatelessWidget {
                   children: [
                     _TripInfoChip(
                       icon: Icons.calendar_today_outlined,
-                      text: _formatTripDate(tripDate),
+                      text: _formatTripDate(tripDate, tr),
                     ),
                     _TripInfoChip(
                       icon: Icons.group_outlined,
@@ -440,8 +441,8 @@ class _TripDecisionCard extends StatelessWidget {
                       Expanded(
                         child: Text(
                           pendingCount == 1
-                              ? '1 member not confirmed'
-                              : '$pendingCount members not confirmed',
+                              ? '1 ${tr.t('member_not_confirmed')}'
+                              : '$pendingCount ${tr.t('members_not_confirmed')}',
                           style: TextStyle(
                             color: Colors.grey.shade600,
                             fontWeight: FontWeight.w500,
@@ -458,7 +459,7 @@ class _TripDecisionCard extends StatelessWidget {
                     TextButton.icon(
                       onPressed: onOpenChecklist,
                       icon: const Icon(Icons.checklist, size: 18),
-                      label: const Text('Open Checklist'),
+                      label: Text(tr.t('open_checklist')),
                       style: isPast
                           ? TextButton.styleFrom(
                               foregroundColor: Colors.grey.shade500,
@@ -469,7 +470,7 @@ class _TripDecisionCard extends StatelessWidget {
                     TextButton.icon(
                       onPressed: onViewDetails,
                       icon: const Icon(Icons.info_outline, size: 18),
-                      label: const Text('View Details'),
+                      label: Text(tr.t('view_details')),
                       style: isPast
                           ? TextButton.styleFrom(
                               foregroundColor: Colors.grey.shade500,
@@ -496,7 +497,7 @@ class _TripGroupSubtitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (groupId.isEmpty) {
-      return _TripGroupText(text: _noGroupText);
+      return _TripGroupText(text: tr.t('no_group'));
     }
 
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
@@ -508,18 +509,12 @@ class _TripGroupSubtitle extends StatelessWidget {
         final data = snapshot.data?.data();
         final groupName = (data?['name'] ?? '').toString().trim();
         if (groupName.isEmpty) {
-          return _TripGroupText(text: _noGroupText);
+          return _TripGroupText(text: tr.t('no_group'));
         }
 
         return _TripGroupText(text: groupName);
       },
     );
-  }
-
-  String get _noGroupText {
-    return tr.language == AppLanguage.ar
-        ? 'لم يتم تحديد القروب بعد'
-        : 'No group yet';
   }
 }
 
@@ -556,7 +551,7 @@ class _TripReadyStatus {
   final Color color;
   final IconData icon;
 
-  static _TripReadyStatus? fromMembers(List<TripMember> members) {
+  static _TripReadyStatus? fromMembers(List<TripMember> members, Tr tr) {
     if (members.isEmpty) {
       return null;
     }
@@ -569,16 +564,16 @@ class _TripReadyStatus {
         members.where((member) => member.status == 'not_going').length;
 
     if (notGoingCount > goingCount && notGoingCount >= pendingCount) {
-      return const _TripReadyStatus(
-        label: 'Not happening',
+      return _TripReadyStatus(
+        label: tr.t('not_happening'),
         color: Color(0xFF616161),
         icon: Icons.circle,
       );
     }
 
     if (goingCount > pendingCount && goingCount >= notGoingCount) {
-      return const _TripReadyStatus(
-        label: 'Ready',
+      return _TripReadyStatus(
+        label: tr.t('ready'),
         color: Color(0xFF616161),
         icon: Icons.circle,
       );
@@ -646,29 +641,29 @@ class _TripInfoChip extends StatelessWidget {
   }
 }
 
-String _formatTripDate(DateTime? value) {
+String _formatTripDate(DateTime? value, Tr tr) {
   if (value == null) {
-    return 'No date';
+    return tr.t('no_date');
   }
 
-  const months = <String>[
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
+  final months = <String>[
+    tr.t('jan'),
+    tr.t('feb'),
+    tr.t('mar'),
+    tr.t('apr'),
+    tr.t('may'),
+    tr.t('jun'),
+    tr.t('jul'),
+    tr.t('aug'),
+    tr.t('sep'),
+    tr.t('oct'),
+    tr.t('nov'),
+    tr.t('dec'),
   ];
 
   final hour = value.hour % 12 == 0 ? 12 : value.hour % 12;
   final minute = value.minute.toString().padLeft(2, '0');
-  final period = value.hour < 12 ? 'AM' : 'PM';
+  final period = value.hour < 12 ? tr.t('am') : tr.t('pm');
 
   return '${value.day} ${months[value.month - 1]} • $hour:$minute $period';
 }
@@ -730,10 +725,9 @@ class _TripStatCard extends StatelessWidget {
               Text(
                 '$value',
                 style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.orange
-                ),
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.orange),
               ),
             ],
           ),
@@ -839,7 +833,7 @@ class _AddChecklistItemsPageState extends State<AddChecklistItemsPage> {
       }
     } on FirebaseException catch (e) {
       if (context.mounted) {
-        showFirestoreError(context, e);
+        showFirestoreError(context, e, tr: widget.tr);
       }
     } catch (_) {
       if (context.mounted) {
@@ -1019,9 +1013,7 @@ class _AddChecklistItemsPageState extends State<AddChecklistItemsPage> {
                         child: TextField(
                           controller: _searchController,
                           decoration: InputDecoration(
-                            hintText: widget.tr.language == AppLanguage.ar
-                                ? 'ابحث في عناصر القائمة'
-                                : 'Search checklist items',
+                            hintText: widget.tr.t('search_checklist_items'),
                             prefixIcon: const Icon(Icons.search),
                             filled: true,
                             fillColor: const Color(0xFFF7F7F7),
@@ -1050,9 +1042,7 @@ class _AddChecklistItemsPageState extends State<AddChecklistItemsPage> {
                         child: groups.isEmpty
                             ? Center(
                                 child: Text(
-                                  widget.tr.language == AppLanguage.ar
-                                      ? 'لا توجد عناصر مطابقة'
-                                      : 'No matching items',
+                                  widget.tr.t('no_matching_items'),
                                 ),
                               )
                             : ListView.builder(
@@ -1060,9 +1050,7 @@ class _AddChecklistItemsPageState extends State<AddChecklistItemsPage> {
                                 itemCount: groups.length,
                                 itemBuilder: (context, index) {
                                   final isArabic =
-                                      Localizations.localeOf(context)
-                                              .languageCode ==
-                                          'ar';
+                                      widget.tr.language == AppLanguage.ar;
                                   final group = groups[index];
                                   final groupTitle = checklistDisplayName(
                                     tr: widget.tr,
@@ -1310,7 +1298,7 @@ class _TripChecklistPageState extends State<TripChecklistPage> {
       });
     } on FirebaseException catch (e) {
       if (context.mounted) {
-        showFirestoreError(context, e);
+        showFirestoreError(context, e, tr: widget.tr);
       }
     }
   }
@@ -1330,7 +1318,7 @@ class _TripChecklistPageState extends State<TripChecklistPage> {
       );
     } on FirebaseException catch (e) {
       if (context.mounted) {
-        showFirestoreError(context, e);
+        showFirestoreError(context, e, tr: widget.tr);
       }
     }
   }
@@ -1346,8 +1334,8 @@ class _TripChecklistPageState extends State<TripChecklistPage> {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(
-            content: Text('Undo completion before releasing this item.'),
+          SnackBar(
+            content: Text(widget.tr.t('undo_completion_before_release')),
           ),
         );
       return;
@@ -1363,7 +1351,7 @@ class _TripChecklistPageState extends State<TripChecklistPage> {
       );
     } on FirebaseException catch (e) {
       if (context.mounted) {
-        showFirestoreError(context, e);
+        showFirestoreError(context, e, tr: widget.tr);
       }
     }
   }
@@ -1395,7 +1383,7 @@ class _TripChecklistPageState extends State<TripChecklistPage> {
         title: Text('${widget.tr.t('trip_checklist')} - ${widget.tripTitle}'),
         actions: [
           IconButton(
-            tooltip: 'Add from templates',
+            tooltip: widget.tr.t('add_from_templates'),
             onPressed: openAddChecklistItems,
             icon: const Icon(
               Icons.playlist_add,
@@ -1558,6 +1546,7 @@ class _TripChecklistPageState extends State<TripChecklistPage> {
                           done: done,
                           assignedTo: assignedTo,
                           currentUserId: currentUserId,
+                          tr: widget.tr,
                           userResolver: _userResolver,
                           onDoneChanged: (value) => _toggleDone(
                             context,

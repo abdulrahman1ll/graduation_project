@@ -1,13 +1,43 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/utils/localization.dart';
 import '../../models/chat_message.dart';
 import '../../models/chat_types.dart';
+
+String localizedSystemMessageContent(Tr tr, String content) {
+  const createdSuffix = ' created the group';
+  const joinedSuffix = ' joined the group';
+  final trimmedRight = content.trimRight();
+
+  if (trimmedRight.endsWith(createdSuffix)) {
+    final username =
+        trimmedRight.substring(0, trimmedRight.length - createdSuffix.length);
+    if (username.trim().isEmpty) {
+      return content;
+    }
+    return tr.t('systemCreatedGroup').replaceAll('{username}', username);
+  }
+  if (trimmedRight.endsWith(joinedSuffix)) {
+    final username =
+        trimmedRight.substring(0, trimmedRight.length - joinedSuffix.length);
+    if (username.trim().isEmpty) {
+      return content;
+    }
+    return tr.t('systemJoinedGroup').replaceAll('{username}', username);
+  }
+  if (content.trim() == 'Checklist linked to this group') {
+    return tr.t('systemChecklistLinked');
+  }
+
+  return content;
+}
 
 class ChatMessageBubble extends StatelessWidget {
   const ChatMessageBubble({
     super.key,
     required this.message,
     required this.senderName,
+    required this.tr,
     required this.currentUserId,
     required this.isSeenByCurrentUser,
     required this.canPin,
@@ -16,12 +46,14 @@ class ChatMessageBubble extends StatelessWidget {
 
   final ChatMessage message;
   final String senderName;
+  final Tr tr;
   final String? currentUserId;
   final bool isSeenByCurrentUser;
   final bool canPin;
   final VoidCallback onTogglePin;
 
-  bool get _isMine => currentUserId != null && currentUserId == message.senderId;
+  bool get _isMine =>
+      currentUserId != null && currentUserId == message.senderId;
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +68,7 @@ class ChatMessageBubble extends StatelessWidget {
               borderRadius: BorderRadius.circular(999),
             ),
             child: Text(
-              message.content,
+              localizedSystemMessageContent(tr, message.content),
               style: const TextStyle(
                 color: Color(0xFF4B5563),
                 fontSize: 12,
@@ -49,9 +81,8 @@ class ChatMessageBubble extends StatelessWidget {
       );
     }
 
-    final backgroundColor = _isMine
-        ? const Color(0xFFFEE8C7)
-        : const Color(0xFFEEFAEE);
+    final backgroundColor =
+        _isMine ? const Color(0xFFFEE8C7) : const Color(0xFFEEFAEE);
     final alignment =
         _isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start;
     final radius = BorderRadius.only(
@@ -79,8 +110,11 @@ class ChatMessageBubble extends StatelessWidget {
                                   ? Icons.push_pin_outlined
                                   : Icons.push_pin,
                             ),
-                            title: Text(message.isPinned ? 'Unpin' : 'Pin'),
-                            onTap: () => Navigator.of(menuContext).pop('toggle_pin'),
+                            title: Text(
+                              message.isPinned ? tr.t('unpin') : tr.t('pin'),
+                            ),
+                            onTap: () =>
+                                Navigator.of(menuContext).pop('toggle_pin'),
                           ),
                         ],
                       ),
@@ -99,7 +133,8 @@ class ChatMessageBubble extends StatelessWidget {
               children: [
                 Container(
                   constraints: const BoxConstraints(maxWidth: 320),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
                     color: backgroundColor,
                     borderRadius: radius,
@@ -111,7 +146,7 @@ class ChatMessageBubble extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        _isMine ? 'You' : senderName,
+                        _isMine ? tr.t('you') : senderName,
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
@@ -144,7 +179,7 @@ class ChatMessageBubble extends StatelessWidget {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            isSeenByCurrentUser ? 'Seen' : 'Sent',
+                            isSeenByCurrentUser ? tr.t('seen') : tr.t('sent'),
                             style: const TextStyle(
                               fontSize: 11,
                               color: Color(0xFF6B7280),
@@ -174,7 +209,7 @@ class ChatMessageBubble extends StatelessWidget {
 
   String _formatTime(DateTime? value) {
     if (value == null) {
-      return 'Sending...';
+      return tr.t('sending');
     }
     final hour = value.hour.toString().padLeft(2, '0');
     final minute = value.minute.toString().padLeft(2, '0');

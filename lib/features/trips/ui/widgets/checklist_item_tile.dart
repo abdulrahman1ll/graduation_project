@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/utils/localization.dart';
 import '../../services/checklist_user_resolver.dart';
 
 class ChecklistItemTile extends StatefulWidget {
@@ -10,6 +11,7 @@ class ChecklistItemTile extends StatefulWidget {
     required this.done,
     required this.assignedTo,
     required this.currentUserId,
+    required this.tr,
     required this.userResolver,
     required this.onDoneChanged,
     required this.onAssignPressed,
@@ -21,6 +23,7 @@ class ChecklistItemTile extends StatefulWidget {
   final bool done;
   final String? assignedTo;
   final String? currentUserId;
+  final Tr tr;
   final ChecklistUserResolver userResolver;
   final ValueChanged<bool> onDoneChanged;
   final Future<void> Function()? onAssignPressed;
@@ -72,6 +75,7 @@ class _ChecklistItemTileState extends State<ChecklistItemTile> {
                 : () => _showBlockedDoneMessage(
                       context,
                       assignedTo: normalizedAssignedTo,
+                      tr: widget.tr,
                     ),
             child: Checkbox(
               value: widget.done,
@@ -116,6 +120,7 @@ class _ChecklistItemTileState extends State<ChecklistItemTile> {
               child: _AssignmentBadge(
                 assignedTo: normalizedAssignedTo,
                 currentUserId: normalizedCurrentUserId,
+                tr: widget.tr,
                 userResolver: widget.userResolver,
               ),
             ),
@@ -138,7 +143,7 @@ class _ChecklistItemTileState extends State<ChecklistItemTile> {
                 padding: const EdgeInsets.all(4),
                 constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
                 splashRadius: 18,
-                tooltip: 'Assign to me',
+                tooltip: widget.tr.t('assign_to_me'),
                 onPressed:
                     _assignmentInProgress || widget.onAssignPressed == null
                         ? null
@@ -162,7 +167,7 @@ class _ChecklistItemTileState extends State<ChecklistItemTile> {
                     constraints:
                         const BoxConstraints(minWidth: 32, minHeight: 32),
                     splashRadius: 18,
-                    tooltip: 'Release item',
+                    tooltip: widget.tr.t('release_item'),
                     onPressed:
                         _releaseInProgress || widget.onReleasePressed == null
                             ? null
@@ -226,10 +231,11 @@ class _ChecklistItemTileState extends State<ChecklistItemTile> {
   static void _showBlockedDoneMessage(
     BuildContext context, {
     required String? assignedTo,
+    required Tr tr,
   }) {
     final message = assignedTo == null
-        ? 'Assign this item to yourself first.'
-        : 'This item is assigned to another member.';
+        ? tr.t('assign_item_first')
+        : tr.t('item_assigned_to_another_member');
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message)));
@@ -240,11 +246,13 @@ class _AssignmentBadge extends StatelessWidget {
   const _AssignmentBadge({
     required this.assignedTo,
     required this.currentUserId,
+    required this.tr,
     required this.userResolver,
   });
 
   final String? assignedTo;
   final String? currentUserId;
+  final Tr tr;
   final ChecklistUserResolver userResolver;
 
   @override
@@ -255,16 +263,19 @@ class _AssignmentBadge extends StatelessWidget {
     }
 
     if (normalizedCurrentUserId == null || normalizedCurrentUserId.isEmpty) {
-      return _buildBadge('Member');
+      return _buildBadge(tr.t('member'));
     }
 
-    return FutureBuilder<String>(
-      future: userResolver.resolveAssignmentLabel(
+    return FutureBuilder<ChecklistAssignmentLabel>(
+      future: userResolver.resolveAssignmentLabelInfo(
         assignedTo: assignedTo,
         currentUserId: normalizedCurrentUserId,
       ),
       builder: (context, snapshot) {
-        final label = snapshot.data ?? _fallbackLabel();
+        final resolved = snapshot.data ?? _fallbackLabel();
+        final label = resolved.isFallback
+            ? _localizedFallbackLabel(resolved.text)
+            : resolved.text;
         return _buildBadge(label);
       },
     );
@@ -297,7 +308,7 @@ class _AssignmentBadge extends StatelessWidget {
   }
 
   _BadgeStyle _badgeStyle(String label) {
-    if (label == 'You') {
+    if (label == tr.t('you')) {
       return const _BadgeStyle(
         backgroundColor: Color(0xFFCFEFD8),
         borderColor: Color(0xFF7AC48F),
@@ -316,14 +327,24 @@ class _AssignmentBadge extends StatelessWidget {
     );
   }
 
-  String _fallbackLabel() {
+  ChecklistAssignmentLabel _fallbackLabel() {
     if (assignedTo == null) {
-      return '';
+      return const ChecklistAssignmentLabel(text: '', isFallback: true);
     }
     if (assignedTo == currentUserId) {
-      return 'You';
+      return const ChecklistAssignmentLabel(text: 'You', isFallback: true);
     }
-    return 'Member';
+    return const ChecklistAssignmentLabel(text: 'Member', isFallback: true);
+  }
+
+  String _localizedFallbackLabel(String label) {
+    if (label == 'You') {
+      return tr.t('you');
+    }
+    if (label == 'Member') {
+      return tr.t('member');
+    }
+    return label;
   }
 }
 

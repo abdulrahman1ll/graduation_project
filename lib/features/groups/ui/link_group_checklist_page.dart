@@ -2,16 +2,19 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../../../core/utils/localization.dart';
 import '../services/group_service.dart';
 
 class LinkGroupChecklistPage extends StatefulWidget {
   const LinkGroupChecklistPage({
     super.key,
     required this.groupId,
+    required this.tr,
     this.groupService,
   });
 
   final String groupId;
+  final Tr tr;
   final GroupService? groupService;
 
   @override
@@ -53,7 +56,10 @@ class _LinkGroupChecklistPageState extends State<LinkGroupChecklistPage> {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.message ?? 'Unable to link checklist.')),
+        SnackBar(
+          content:
+              Text(error.message ?? widget.tr.t('unable_to_link_checklist')),
+        ),
       );
     } finally {
       if (mounted) {
@@ -65,11 +71,12 @@ class _LinkGroupChecklistPageState extends State<LinkGroupChecklistPage> {
   @override
   Widget build(BuildContext context) {
     final userId = FirebaseAuth.instance.currentUser?.uid;
+    final tr = widget.tr;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Link to checklist')),
+      appBar: AppBar(title: Text(tr.t('link_to_checklist'))),
       body: userId == null
-          ? const Center(child: Text('Unable to load trips'))
+          ? Center(child: Text(tr.t('load_error')))
           : StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
               stream: FirebaseFirestore.instance
                   .collection('trips')
@@ -87,7 +94,7 @@ class _LinkGroupChecklistPageState extends State<LinkGroupChecklistPage> {
                       '${error.code} ${error.message}',
                     );
                   }
-                  return const Center(child: Text('Unable to load trips'));
+                  return Center(child: Text(tr.t('load_error')));
                 }
 
                 final trips = (snapshot.data?.docs ??
@@ -102,8 +109,8 @@ class _LinkGroupChecklistPageState extends State<LinkGroupChecklistPage> {
                   return 0;
                 });
                 if (trips.isEmpty) {
-                  return const Center(
-                    child: Text('No trips found. Create a trip first.'),
+                  return Center(
+                    child: Text(tr.t('no_trips_create_first')),
                   );
                 }
 
@@ -114,7 +121,8 @@ class _LinkGroupChecklistPageState extends State<LinkGroupChecklistPage> {
                   itemBuilder: (context, index) {
                     final trip = trips[index];
                     final data = trip.data();
-                    final title = (data['title'] ?? 'Untitled trip').toString();
+                    final title =
+                        (data['title'] ?? tr.t('untitled_trip')).toString();
                     final description = (data['description'] ?? '').toString();
                     return Material(
                       color: Colors.white,
@@ -136,7 +144,8 @@ class _LinkGroupChecklistPageState extends State<LinkGroupChecklistPage> {
                             ? const SizedBox(
                                 width: 18,
                                 height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
                               )
                             : const Icon(Icons.chevron_right),
                         onTap: _linking ? null : () => _linkTrip(trip.id),

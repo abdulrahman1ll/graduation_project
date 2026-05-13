@@ -3,20 +3,23 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/providers/role_provider.dart';
+import '../../../core/utils/localization.dart';
 import 'pending_places_page.dart';
 
 class AdminDashboardPage extends StatelessWidget {
-  const AdminDashboardPage({super.key});
+  const AdminDashboardPage({super.key, required this.tr});
+
+  final Tr tr;
 
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<RoleProvider>();
     if (!provider.isAdmin) {
-      return const Scaffold(body: Center(child: Text('Access denied')));
+      return Scaffold(body: Center(child: Text(tr.t('access_denied'))));
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Admin Dashboard')),
+      appBar: AppBar(title: Text(tr.t('admin_dashboard'))),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -32,10 +35,10 @@ class AdminDashboardPage extends StatelessWidget {
               final error = pendingSnapshot.error;
               if (error is FirebaseException &&
                   error.code == 'permission-denied') {
-                return const Center(child: Text('Permission denied'));
+                return Center(child: Text(tr.t('permission_denied')));
               }
-              return const Center(
-                child: Text('Failed to load moderation dashboard'),
+              return Center(
+                child: Text(tr.t('failed_load_moderation_dashboard')),
               );
             }
 
@@ -43,13 +46,13 @@ class AdminDashboardPage extends StatelessWidget {
             return Card(
               child: ListTile(
                 contentPadding: const EdgeInsets.all(16),
-                title: const Text('Pending Places'),
-                subtitle: Text('$pendingCount waiting for review'),
+                title: Text(tr.t('pending_places')),
+                subtitle: Text('$pendingCount ${tr.t('waiting_for_review')}'),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (_) => const PendingPlacesPage(),
+                      builder: (_) => PendingPlacesPage(tr: tr),
                     ),
                   );
                 },

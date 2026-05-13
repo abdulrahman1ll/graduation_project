@@ -110,9 +110,8 @@ class _AuthPageState extends State<AuthPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Align(
-                  alignment: widget.isArabic
-                      ? Alignment.topLeft
-                      : Alignment.topRight,
+                  alignment:
+                      widget.isArabic ? Alignment.topLeft : Alignment.topRight,
                   child: TextButton(
                     onPressed: widget.onToggleLanguage,
                     style: TextButton.styleFrom(
@@ -215,9 +214,8 @@ class _AuthPageState extends State<AuthPage> {
                 child: _authModeButton(
                   label: tr.t('sign_in'),
                   selected: !_isSignUp,
-                  onPressed: _loading
-                      ? null
-                      : () => setState(() => _isSignUp = false),
+                  onPressed:
+                      _loading ? null : () => setState(() => _isSignUp = false),
                 ),
               ),
               const SizedBox(width: 10),
@@ -225,9 +223,8 @@ class _AuthPageState extends State<AuthPage> {
                 child: _authModeButton(
                   label: tr.t('sign_up'),
                   selected: _isSignUp,
-                  onPressed: _loading
-                      ? null
-                      : () => setState(() => _isSignUp = true),
+                  onPressed:
+                      _loading ? null : () => setState(() => _isSignUp = true),
                 ),
               ),
             ],
@@ -236,14 +233,14 @@ class _AuthPageState extends State<AuthPage> {
           if (_isSignUp) ...[
             _authTextField(
               controller: _fullNameController,
-              hintText: 'Full name',
+              hintText: tr.t('full_name'),
               icon: Icons.badge_outlined,
               textInputAction: TextInputAction.next,
             ),
             const SizedBox(height: 12),
             _authTextField(
               controller: _usernameController,
-              hintText: 'Username',
+              hintText: tr.t('username'),
               icon: Icons.alternate_email_rounded,
               textInputAction: TextInputAction.next,
             ),
@@ -418,9 +415,8 @@ class _AuthPageState extends State<AuthPage> {
     String? username,
     String? usernameLower,
   }) async {
-    final userDocRef = FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid);
+    final userDocRef =
+        FirebaseFirestore.instance.collection('users').doc(user.uid);
     final existingDoc = await userDocRef.get();
     final profileData = <String, dynamic>{
       if (fullName != null) 'fullName': fullName,
@@ -485,9 +481,8 @@ class _AuthPageState extends State<AuthPage> {
     required String username,
     required String usernameLower,
   }) async {
-    final userDocRef = FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid);
+    final userDocRef =
+        FirebaseFirestore.instance.collection('users').doc(user.uid);
     final existingDoc = await userDocRef.get();
     final existingData = existingDoc.data() ?? const <String, dynamic>{};
     final defaultPreferences = {
@@ -561,12 +556,12 @@ class _AuthPageState extends State<AuthPage> {
     debugPrint('SIGN UP usernameLower: $usernameLower');
 
     if (fullName.isEmpty) {
-      _snack('Full name is required');
+      _snack(widget.tr.t('full_name_required'));
       return;
     }
 
     if (username.isEmpty) {
-      _snack('Username is required');
+      _snack(widget.tr.t('username_required'));
       return;
     }
 
@@ -578,7 +573,7 @@ class _AuthPageState extends State<AuthPage> {
     await _authRun(() async {
       final usernameTaken = await _isUsernameTaken(usernameLower);
       if (usernameTaken) {
-        _snack('This username is already taken. Please choose another one.');
+        _snack(widget.tr.t('username_taken'));
         return;
       }
 
@@ -599,7 +594,7 @@ class _AuthPageState extends State<AuthPage> {
         debugPrint('SIGNUP_AUTH_EXCEPTION: ${e.code} ${e.message}');
 
         if (e.code == 'email-already-in-use') {
-          _snack('This email is already registered. Please sign in instead.');
+          _snack(widget.tr.t('email_already_registered'));
           return;
         }
 
@@ -625,7 +620,7 @@ class _AuthPageState extends State<AuthPage> {
       final signedUpUser = user;
 
       if (signedUpUser == null) {
-        _snack('Could not create user profile. Please try again.');
+        _snack(widget.tr.t('could_not_create_user_profile'));
         return;
       }
 

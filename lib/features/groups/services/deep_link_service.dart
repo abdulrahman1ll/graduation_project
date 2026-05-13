@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../../../core/utils/localization.dart';
 import 'invite_service.dart';
 import '../ui/group_chat_page.dart';
 
@@ -14,6 +15,7 @@ class DeepLinkService {
     FirebaseFirestore? firestore,
     InviteService? inviteService,
     GlobalKey<NavigatorState>? navigatorKey,
+    this.trProvider,
   })  : _auth = auth ?? FirebaseAuth.instance,
         _firestore = firestore ?? FirebaseFirestore.instance,
         _inviteService = inviteService ?? const InviteService(),
@@ -24,6 +26,7 @@ class DeepLinkService {
   final InviteService _inviteService;
   final GlobalKey<NavigatorState> navigatorKey;
   final AppLinks _appLinks = AppLinks();
+  Tr Function()? trProvider;
 
   StreamSubscription<Uri?>? _uriSubscription;
   bool _initialized = false;
@@ -103,7 +106,8 @@ class DeepLinkService {
         final groupData = groupSnapshot.data() ?? const <String, dynamic>{};
         final tripId = (groupData['tripId'] ?? '').toString().trim();
         final batch = _firestore.batch();
-        batch.set(groupRef.collection('members').doc(user.uid), <String, dynamic>{
+        batch.set(
+            groupRef.collection('members').doc(user.uid), <String, dynamic>{
           'userId': user.uid,
           'role': 'member',
           'joinedAt': FieldValue.serverTimestamp(),
@@ -140,10 +144,15 @@ class DeepLinkService {
       if (!context.mounted) {
         return;
       }
+      final tr = trProvider?.call();
+      if (tr == null) {
+        debugPrint('DeepLink ignored: missing localization provider');
+        return;
+      }
       Navigator.push(
         context,
         MaterialPageRoute<void>(
-          builder: (_) => GroupChatPage(groupId: groupId),
+          builder: (_) => GroupChatPage(groupId: groupId, tr: tr),
         ),
       );
     } catch (error) {
@@ -173,8 +182,7 @@ class DeepLinkService {
     }
 
     final isFallbackInvite = uri.scheme == 'app' && uri.host == 'join';
-    final isWebInvite =
-        uri.scheme == 'https' &&
+    final isWebInvite = uri.scheme == 'https' &&
         uri.host == 'kashta.app' &&
         uri.path == '/join';
     if (!isFallbackInvite && !isWebInvite) {

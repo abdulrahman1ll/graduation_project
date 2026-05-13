@@ -84,7 +84,7 @@ class _AddTripPageState extends State<AddTripPage> {
             ),
             const SizedBox(height: 12),
             if (currentUserId == null)
-              const Text('Sign in to select a group.')
+              Text(tr.t('sign_in_select_group'))
             else
               StreamBuilder<List<Group>>(
                 stream: _groupService.watchUserGroups(currentUserId),
@@ -110,7 +110,7 @@ class _AddTripPageState extends State<AddTripPage> {
                                 value: group.id,
                                 child: Text(
                                   group.name.trim().isEmpty
-                                      ? 'Untitled group'
+                                      ? tr.t('untitled_group')
                                       : group.name,
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -122,13 +122,14 @@ class _AddTripPageState extends State<AddTripPage> {
                             : (value) {
                                 setState(() => _selectedGroupId = value);
                               },
-                        decoration:
-                            const InputDecoration(labelText: 'Select Group'),
+                        decoration: InputDecoration(
+                          labelText: tr.t('select_group'),
+                        ),
                       ),
                       if (groups.isEmpty) ...[
                         const SizedBox(height: 6),
                         Text(
-                          'You can create this trip now and link a group later.',
+                          tr.t('link_group_later'),
                           style: TextStyle(color: Colors.grey.shade700),
                         ),
                       ],
@@ -139,14 +140,14 @@ class _AddTripPageState extends State<AddTripPage> {
             const SizedBox(height: 12),
             TextFormField(
               controller: _locationNameController,
-              decoration: const InputDecoration(labelText: 'Location name'),
+              decoration: InputDecoration(labelText: tr.t('location_name')),
               textInputAction: TextInputAction.next,
             ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _mapLinkController,
-              decoration: const InputDecoration(
-                labelText: 'Map link (optional)',
+              decoration: InputDecoration(
+                labelText: tr.t('map_link_optional'),
               ),
               keyboardType: TextInputType.url,
               textInputAction: TextInputAction.done,
@@ -157,13 +158,14 @@ class _AddTripPageState extends State<AddTripPage> {
               icon: const Icon(Icons.event_outlined),
               label: Text(
                 selectedTripDateTime == null
-                    ? 'Choose date & time'
-                    : _formatDateTime(selectedTripDateTime),
+                    ? tr.t('choose_date_time')
+                    : _formatDateTime(selectedTripDateTime, tr),
               ),
             ),
             const SizedBox(height: 16),
             if (currentUserId == null)
               _TripPreview(
+                tr: tr,
                 title: _titleController.text.trim(),
                 dateTime: _tripDateTime,
                 groupName: '',
@@ -173,6 +175,7 @@ class _AddTripPageState extends State<AddTripPage> {
                 stream: _groupService.watchUserGroups(currentUserId),
                 builder: (context, snapshot) {
                   return _TripPreview(
+                    tr: tr,
                     title: _titleController.text.trim(),
                     dateTime: _tripDateTime,
                     groupName: _groupNameForSelection(
@@ -191,7 +194,7 @@ class _AddTripPageState extends State<AddTripPage> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.add),
-              label: const Text('Create Trip'),
+              label: Text(tr.t('create_trip')),
               style: FilledButton.styleFrom(
                 backgroundColor: Colors.orange,
                 foregroundColor: Colors.white,
@@ -281,7 +284,7 @@ class _AddTripPageState extends State<AddTripPage> {
       }
     } on FirebaseException catch (e) {
       if (mounted) {
-        showFirestoreError(context, e);
+        showFirestoreError(context, e, tr: widget.tr);
       }
     } catch (_) {
       if (mounted) {
@@ -308,7 +311,9 @@ class _AddTripPageState extends State<AddTripPage> {
     }
     for (final group in groups) {
       if (group.id == selected) {
-        return group.name.trim().isEmpty ? 'Untitled group' : group.name;
+        return group.name.trim().isEmpty
+            ? widget.tr.t('untitled_group')
+            : group.name;
       }
     }
     return '';
@@ -331,11 +336,13 @@ class _AddTripPageState extends State<AddTripPage> {
 
 class _TripPreview extends StatelessWidget {
   const _TripPreview({
+    required this.tr,
     required this.title,
     required this.dateTime,
     required this.groupName,
   });
 
+  final Tr tr;
   final String title;
   final DateTime? dateTime;
   final String groupName;
@@ -355,26 +362,26 @@ class _TripPreview extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Preview',
-            style: TextStyle(fontWeight: FontWeight.w700),
+          Text(
+            tr.t('preview'),
+            style: const TextStyle(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 10),
           _PreviewLine(
             icon: Icons.route_outlined,
-            text: title.isEmpty ? 'Trip name' : title,
+            text: title.isEmpty ? tr.t('trip_name') : title,
           ),
           const SizedBox(height: 8),
           _PreviewLine(
             icon: Icons.event_outlined,
             text: previewDateTime == null
-                ? 'Date & time'
-                : _formatDateTime(previewDateTime),
+                ? tr.t('date_time')
+                : _formatDateTime(previewDateTime, tr),
           ),
           const SizedBox(height: 8),
           _PreviewLine(
             icon: Icons.groups_outlined,
-            text: groupName.isEmpty ? 'No group selected' : groupName,
+            text: groupName.isEmpty ? tr.t('no_group_selected') : groupName,
           ),
         ],
       ),
@@ -406,23 +413,23 @@ class _PreviewLine extends StatelessWidget {
   }
 }
 
-String _formatDateTime(DateTime value) {
-  const months = <String>[
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
+String _formatDateTime(DateTime value, Tr tr) {
+  final months = <String>[
+    tr.t('jan'),
+    tr.t('feb'),
+    tr.t('mar'),
+    tr.t('apr'),
+    tr.t('may'),
+    tr.t('jun'),
+    tr.t('jul'),
+    tr.t('aug'),
+    tr.t('sep'),
+    tr.t('oct'),
+    tr.t('nov'),
+    tr.t('dec'),
   ];
   final hour = value.hour % 12 == 0 ? 12 : value.hour % 12;
   final minute = value.minute.toString().padLeft(2, '0');
-  final period = value.hour < 12 ? 'AM' : 'PM';
+  final period = value.hour < 12 ? tr.t('am') : tr.t('pm');
   return '${value.day} ${months[value.month - 1]} - $hour:$minute $period';
 }

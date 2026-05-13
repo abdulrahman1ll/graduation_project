@@ -34,6 +34,16 @@ class ChecklistResolvedUser {
   }
 }
 
+class ChecklistAssignmentLabel {
+  const ChecklistAssignmentLabel({
+    required this.text,
+    required this.isFallback,
+  });
+
+  final String text;
+  final bool isFallback;
+}
+
 class ChecklistUserResolver {
   ChecklistUserResolver({FirebaseFirestore? firestore})
       : _firestore = firestore ?? FirebaseFirestore.instance;
@@ -48,16 +58,33 @@ class ChecklistUserResolver {
     required String? assignedTo,
     required String currentUserId,
   }) async {
+    final label = await resolveAssignmentLabelInfo(
+      assignedTo: assignedTo,
+      currentUserId: currentUserId,
+    );
+    return label.text;
+  }
+
+  Future<ChecklistAssignmentLabel> resolveAssignmentLabelInfo({
+    required String? assignedTo,
+    required String currentUserId,
+  }) async {
     final normalizedAssignedTo = _normalizeUserId(assignedTo);
     if (normalizedAssignedTo == null) {
-      return '';
+      return const ChecklistAssignmentLabel(text: '', isFallback: true);
     }
     if (normalizedAssignedTo == currentUserId) {
-      return 'You';
+      return const ChecklistAssignmentLabel(text: 'You', isFallback: true);
     }
 
     final user = await _resolveUser(normalizedAssignedTo);
-    return user.displayName;
+    final hasStoredName =
+        ChecklistResolvedUser._normalize(user.username) != null ||
+            ChecklistResolvedUser._normalize(user.fullName) != null;
+    return ChecklistAssignmentLabel(
+      text: user.displayName,
+      isFallback: !hasStoredName,
+    );
   }
 
   Future<ChecklistResolvedUser> _resolveUser(String uid) {

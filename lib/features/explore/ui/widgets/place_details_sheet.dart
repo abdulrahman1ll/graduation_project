@@ -6,9 +6,13 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../../core/models/app_language.dart';
+import '../../../../core/utils/localization.dart';
+
 class PlaceDetailsSheet extends StatefulWidget {
   const PlaceDetailsSheet({
     super.key,
+    required this.tr,
     required this.data,
     required this.placeId,
     required this.weatherFuture,
@@ -16,6 +20,7 @@ class PlaceDetailsSheet extends StatefulWidget {
     required this.onSubmitReview,
   });
 
+  final Tr tr;
   final Map<String, dynamic> data;
   final String placeId;
   final Future<Map<String, dynamic>?> weatherFuture;
@@ -100,6 +105,81 @@ class _PlaceDetailsSheetState extends State<PlaceDetailsSheet> {
     }
   }
 
+  String _localizedEnvironmentValue(Object? value) {
+    final raw = (value ?? '').toString().trim();
+    switch (raw.toLowerCase()) {
+      case 'desert':
+        return widget.tr.t('desert');
+      case 'beach':
+        return widget.tr.t('beach');
+      case 'nature':
+        return widget.tr.t('nature');
+      case 'family':
+        return widget.tr.t('family');
+      case 'quiet':
+        return widget.tr.t('quiet');
+      default:
+        return raw.isEmpty ? '-' : raw;
+    }
+  }
+
+  String _localizedWeatherMain(Object? value) {
+    final raw = (value ?? '').toString().trim();
+    if (widget.tr.language != AppLanguage.ar) {
+      return raw;
+    }
+
+    switch (raw.toLowerCase()) {
+      case 'clear':
+        return 'صافي';
+      case 'clouds':
+        return 'غائم';
+      case 'rain':
+        return 'ممطر';
+      case 'thunderstorm':
+        return 'عاصفة رعدية';
+      case 'drizzle':
+        return 'رذاذ';
+      case 'snow':
+        return 'ثلج';
+      case 'mist':
+      case 'fog':
+        return 'ضباب';
+      case 'haze':
+        return 'ضباب خفيف';
+      default:
+        return raw;
+    }
+  }
+
+  String _localizedKashtaCondition(Object? value) {
+    final raw = (value ?? '').toString().trim();
+    if (widget.tr.language != AppLanguage.ar) {
+      return raw;
+    }
+
+    switch (raw.toLowerCase()) {
+      case 'good':
+        return 'جيدة';
+      case 'moderate':
+        return 'متوسطة';
+      case 'bad':
+      case 'poor':
+        return 'غير مناسبة';
+      default:
+        return raw;
+    }
+  }
+
+  String _formattedWind(Object? value) {
+    final raw = (value ?? '').toString().trim();
+    if (raw.isEmpty) {
+      return '-';
+    }
+    final unit = widget.tr.language == AppLanguage.ar ? 'م/ث' : 'm/s';
+    return '$raw $unit';
+  }
+
   @override
   Widget build(BuildContext context) {
     return DraggableScrollableSheet(
@@ -122,7 +202,10 @@ class _PlaceDetailsSheetState extends State<PlaceDetailsSheet> {
                 ),
               ),
               const SizedBox(height: 8),
-              Text("Environment: ${widget.data['environmentType'] ?? '-'}"),
+              Text(
+                '${widget.tr.t('environmentLabel')}: '
+                '${_localizedEnvironmentValue(widget.data['environmentType'])}',
+              ),
               const SizedBox(height: 8),
               FutureBuilder<Map<String, dynamic>?>(
                 future: widget.weatherFuture,
@@ -138,11 +221,14 @@ class _PlaceDetailsSheetState extends State<PlaceDetailsSheet> {
                   final temp = snapshot.data!["temp"];
                   final weather = snapshot.data!["weather"].toString().trim();
                   final wind = snapshot.data!["wind"];
+                  final displayWeather = _localizedWeatherMain(weather);
 
                   String kashtaCondition = "Good";
                   if (weather == "Rain" || wind > 8) {
                     kashtaCondition = "Bad";
                   }
+                  final displayKashtaCondition =
+                      _localizedKashtaCondition(kashtaCondition);
 
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -161,14 +247,19 @@ class _PlaceDetailsSheetState extends State<PlaceDetailsSheet> {
                         children: [
                           const Icon(Icons.cloud, color: Colors.grey),
                           const SizedBox(width: 6),
-                          Text("Weather: $weather"),
+                          Text(
+                            "${widget.tr.t('weatherLabel')}: $displayWeather",
+                          ),
                         ],
                       ),
                       Row(
                         children: [
                           const Icon(Icons.air, color: Colors.blue),
                           const SizedBox(width: 6),
-                          Text("Wind: $wind m/s"),
+                          Text(
+                            "${widget.tr.t('windLabel')}: "
+                            "${_formattedWind(wind)}",
+                          ),
                         ],
                       ),
                       Row(
@@ -178,7 +269,10 @@ class _PlaceDetailsSheetState extends State<PlaceDetailsSheet> {
                             color: Colors.green,
                           ),
                           const SizedBox(width: 6),
-                          Text("Kashta conditions: $kashtaCondition"),
+                          Text(
+                            "${widget.tr.t('kashtaConditions')}: "
+                            "$displayKashtaCondition",
+                          ),
                         ],
                       ),
                     ],
@@ -191,13 +285,16 @@ class _PlaceDetailsSheetState extends State<PlaceDetailsSheet> {
                 child: ElevatedButton.icon(
                   onPressed: _openInGoogleMaps,
                   icon: const Icon(Icons.navigation_rounded),
-                  label: const Text("Open in Google Maps"),
+                  label: Text(
+                    widget.tr.t('openInGoogleMaps'),
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ),
               ),
               const SizedBox(height: 20),
-              const Text(
-                "Rate this place",
-                style: TextStyle(fontWeight: FontWeight.bold),
+              Text(
+                widget.tr.t('rateThisPlace'),
+                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               Row(
@@ -219,15 +316,18 @@ class _PlaceDetailsSheetState extends State<PlaceDetailsSheet> {
               TextField(
                 controller: _commentController,
                 maxLines: 3,
-                decoration: const InputDecoration(
-                  hintText: "Write your comment...",
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  hintText: widget.tr.t('writeYourComment'),
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 10),
               ElevatedButton(
                 onPressed: _pickImage,
-                child: const Text("Add Image (Optional)"),
+                child: Text(
+                  widget.tr.t('addImageOptional'),
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
               ),
               if (_selectedImageBytes != null)
                 Padding(
@@ -247,7 +347,10 @@ class _PlaceDetailsSheetState extends State<PlaceDetailsSheet> {
                     selectedImageBytes: _selectedImageBytes,
                   );
                 },
-                child: const Text("Submit Review"),
+                child: Text(
+                  widget.tr.t('submitReview'),
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
               ),
               const SizedBox(height: 25),
               const Divider(),
@@ -289,7 +392,8 @@ class _PlaceDetailsSheetState extends State<PlaceDetailsSheet> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        'Average rating: ${avgRating.toStringAsFixed(1)}',
+                        '${widget.tr.t('averageRating')}: '
+                        '${avgRating.toStringAsFixed(1)}',
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -297,9 +401,9 @@ class _PlaceDetailsSheetState extends State<PlaceDetailsSheet> {
                       ),
                       const SizedBox(height: 10),
                       if (images.isNotEmpty) ...[
-                        const Text(
-                          "Photos",
-                          style: TextStyle(
+                        Text(
+                          widget.tr.t('photos'),
+                          style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
@@ -310,10 +414,10 @@ class _PlaceDetailsSheetState extends State<PlaceDetailsSheet> {
                           physics: const NeverScrollableScrollPhysics(),
                           gridDelegate:
                               const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 3,
-                                crossAxisSpacing: 6,
-                                mainAxisSpacing: 6,
-                              ),
+                            crossAxisCount: 3,
+                            crossAxisSpacing: 6,
+                            mainAxisSpacing: 6,
+                          ),
                           itemCount: images.length,
                           itemBuilder: (context, index) {
                             final img = images[index];
@@ -344,9 +448,9 @@ class _PlaceDetailsSheetState extends State<PlaceDetailsSheet> {
                         ),
                         const SizedBox(height: 20),
                       ],
-                      const Text(
-                        "Reviews",
-                        style: TextStyle(
+                      Text(
+                        widget.tr.t('reviews'),
+                        style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),

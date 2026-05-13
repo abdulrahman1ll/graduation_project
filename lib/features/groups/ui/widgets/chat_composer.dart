@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/utils/localization.dart';
+
 class ChatComposer extends StatefulWidget {
   const ChatComposer({
     super.key,
     required this.isSending,
     required this.enabled,
+    required this.tr,
     required this.onSend,
   });
 
   final bool isSending;
   final bool enabled;
+  final Tr tr;
   final Future<void> Function(String content) onSend;
 
   @override
@@ -53,8 +57,8 @@ class _ChatComposerState extends State<ChatComposer> {
               onSubmitted: (_) => _submit(),
               decoration: InputDecoration(
                 hintText: widget.enabled
-                    ? 'Write a message'
-                    : 'Join the group to chat',
+                    ? widget.tr.t('writeMessage')
+                    : widget.tr.t('joinGroupToChat'),
                 filled: true,
                 fillColor: const Color(0xFFF7F7F7),
                 border: OutlineInputBorder(

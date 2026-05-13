@@ -2,16 +2,22 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-void showFirestoreError(BuildContext context, FirebaseException e) {
+import 'localization.dart';
+
+void showFirestoreError(BuildContext context, FirebaseException e, {Tr? tr}) {
   String message;
   if (e.code == 'permission-denied') {
-    message = 'You do not have permission to perform this action.';
+    message = tr?.t('firestore_permission_denied') ??
+        'You do not have permission to perform this action.';
   } else if (e.code == 'unauthenticated') {
-    message = 'Please sign in again.';
+    message = tr?.t('firestore_unauthenticated') ?? 'Please sign in again.';
   } else if (e.code == 'invalid-argument') {
-    message = e.message ?? 'Some fields are invalid.';
+    message = e.message ??
+        tr?.t('firestore_invalid_fields') ??
+        'Some fields are invalid.';
   } else {
-    message = 'Something went wrong. Please try again.';
+    message = tr?.t('firestore_generic_error') ??
+        'Something went wrong. Please try again.';
   }
   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
 }

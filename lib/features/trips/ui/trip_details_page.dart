@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/utils/firestore_utils.dart';
+import '../../../core/utils/localization.dart';
 import '../../groups/services/group_service.dart';
 import '../models/trip_member.dart';
 import '../services/trip_service.dart';
@@ -10,11 +11,13 @@ import '../services/trip_service.dart';
 class TripDetailsPage extends StatelessWidget {
   const TripDetailsPage({
     super.key,
+    required this.tr,
     required this.tripId,
     this.tripService,
     this.groupService,
   });
 
+  final Tr tr;
   final String tripId;
   final TripService? tripService;
   final GroupService? groupService;
@@ -25,7 +28,7 @@ class TripDetailsPage extends StatelessWidget {
     final resolvedGroupService = groupService ?? GroupService();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Trip Details')),
+      appBar: AppBar(title: Text(tr.t('trip_details'))),
       body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
         stream: FirebaseFirestore.instance
             .collection('trips')
@@ -37,12 +40,12 @@ class TripDetailsPage extends StatelessWidget {
           }
           if (tripSnapshot.hasError) {
             logFirestoreReadError('trips/$tripId', tripSnapshot.error);
-            return const Center(child: Text('Failed to load trip.'));
+            return Center(child: Text(tr.t('failed_load_trip')));
           }
 
           final tripData = tripSnapshot.data?.data();
           if (tripData == null) {
-            return const Center(child: Text('Trip not found.'));
+            return Center(child: Text(tr.t('trip_not_found')));
           }
 
           final title = (tripData['title'] ?? '').toString().trim();
@@ -68,7 +71,7 @@ class TripDetailsPage extends StatelessWidget {
                     padding: const EdgeInsets.all(16),
                     children: [
                       Text(
-                        title.isEmpty ? 'Untitled trip' : title,
+                        title.isEmpty ? tr.t('untitled_trip') : title,
                         style: Theme.of(context)
                             .textTheme
                             .headlineSmall
@@ -86,23 +89,24 @@ class TripDetailsPage extends StatelessWidget {
                           _TripDetailChip(
                             icon: Icons.event_outlined,
                             text: tripDate == null
-                                ? 'No date'
-                                : _formatTripDateTime(tripDate),
+                                ? tr.t('no_date')
+                                : _formatTripDateTime(tripDate, tr),
                           ),
                           _TripDetailChip(
                             icon: Icons.group_outlined,
-                            text: '${members.length} Members',
+                            text: '${members.length} ${tr.t('members')}',
                           ),
                         ],
                       ),
                       const SizedBox(height: 16),
                       _TripAttendanceSection(
+                        tr: tr,
                         tripId: tripId,
                         tripService: resolvedTripService,
                       ),
                       const SizedBox(height: 24),
                       Text(
-                        'Members',
+                        tr.t('trip_members'),
                         style: Theme.of(context)
                             .textTheme
                             .titleMedium
@@ -114,7 +118,7 @@ class TripDetailsPage extends StatelessWidget {
                           members.isEmpty)
                         const Center(child: CircularProgressIndicator())
                       else if (members.isEmpty)
-                        const Text('No members yet.')
+                        Text(tr.t('no_members_yet'))
                       else
                         ...members.map(
                           (member) => ListTile(
@@ -123,8 +127,10 @@ class TripDetailsPage extends StatelessWidget {
                               radius: 18,
                               child: Icon(Icons.person, size: 18),
                             ),
-                            title: Text(memberNames[member.userId] ?? 'Member'),
-                            subtitle: Text(_statusLabel(member.status)),
+                            title: Text(
+                              memberNames[member.userId] ?? tr.t('member'),
+                            ),
+                            subtitle: Text(_statusLabel(member.status, tr)),
                           ),
                         ),
                     ],
@@ -141,10 +147,12 @@ class TripDetailsPage extends StatelessWidget {
 
 class _TripAttendanceSection extends StatefulWidget {
   const _TripAttendanceSection({
+    required this.tr,
     required this.tripId,
     required this.tripService,
   });
 
+  final Tr tr;
   final String tripId;
   final TripService tripService;
 
@@ -160,7 +168,7 @@ class _TripAttendanceSectionState extends State<_TripAttendanceSection> {
     final userId = FirebaseAuth.instance.currentUser?.uid;
     if (userId == null || userId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please sign in first.')),
+        SnackBar(content: Text(widget.tr.t('please_sign_in_first'))),
       );
       return;
     }
@@ -175,13 +183,13 @@ class _TripAttendanceSectionState extends State<_TripAttendanceSection> {
     } on FirebaseException catch (e) {
       if (mounted) {
         setState(() => _optimisticStatus = null);
-        showFirestoreError(context, e);
+        showFirestoreError(context, e, tr: widget.tr);
       }
     } catch (_) {
       if (mounted) {
         setState(() => _optimisticStatus = null);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unable to update attendance.')),
+          SnackBar(content: Text(widget.tr.t('unable_update_attendance'))),
         );
       }
     } finally {
@@ -195,10 +203,10 @@ class _TripAttendanceSectionState extends State<_TripAttendanceSection> {
   Widget build(BuildContext context) {
     final userId = FirebaseAuth.instance.currentUser?.uid;
     if (userId == null || userId.isEmpty) {
-      return const Card(
+      return Card(
         child: Padding(
-          padding: EdgeInsets.all(16),
-          child: Text('Sign in to confirm attendance.'),
+          padding: const EdgeInsets.all(16),
+          child: Text(widget.tr.t('sign_in_confirm_attendance')),
         ),
       );
     }
@@ -217,7 +225,7 @@ class _TripAttendanceSectionState extends State<_TripAttendanceSection> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Will you attend?',
+                  widget.tr.t('will_you_attend'),
                   style: Theme.of(context)
                       .textTheme
                       .titleSmall
@@ -237,8 +245,8 @@ class _TripAttendanceSectionState extends State<_TripAttendanceSection> {
                       Expanded(
                         child: Text(
                           status == 'going'
-                              ? 'You are going'
-                              : 'You are not going',
+                              ? widget.tr.t('you_are_going')
+                              : widget.tr.t('you_are_not_going'),
                           style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
                       ),
@@ -253,7 +261,7 @@ class _TripAttendanceSectionState extends State<_TripAttendanceSection> {
                           onPressed: () {
                             setState(() => _optimisticStatus = 'pending');
                           },
-                          child: const Text('Change'),
+                          child: Text(widget.tr.t('change')),
                         ),
                     ],
                   ),
@@ -274,7 +282,7 @@ class _TripAttendanceSectionState extends State<_TripAttendanceSection> {
                                   ),
                                 )
                               : const Icon(Icons.check),
-                          label: const Text("I'm going"),
+                          label: Text(widget.tr.t('im_going')),
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -292,7 +300,7 @@ class _TripAttendanceSectionState extends State<_TripAttendanceSection> {
                                   ),
                                 )
                               : const Icon(Icons.close),
-                          label: const Text('Not going'),
+                          label: Text(widget.tr.t('not_going')),
                         ),
                       ),
                     ],
@@ -326,34 +334,34 @@ class _TripDetailChip extends StatelessWidget {
   }
 }
 
-String _formatTripDateTime(DateTime value) {
-  const months = <String>[
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
+String _formatTripDateTime(DateTime value, Tr tr) {
+  final months = <String>[
+    tr.t('jan'),
+    tr.t('feb'),
+    tr.t('mar'),
+    tr.t('apr'),
+    tr.t('may'),
+    tr.t('jun'),
+    tr.t('jul'),
+    tr.t('aug'),
+    tr.t('sep'),
+    tr.t('oct'),
+    tr.t('nov'),
+    tr.t('dec'),
   ];
   final hour = value.hour % 12 == 0 ? 12 : value.hour % 12;
   final minute = value.minute.toString().padLeft(2, '0');
-  final period = value.hour < 12 ? 'AM' : 'PM';
+  final period = value.hour < 12 ? tr.t('am') : tr.t('pm');
   return '${value.day} ${months[value.month - 1]} - $hour:$minute $period';
 }
 
-String _statusLabel(String status) {
+String _statusLabel(String status, Tr tr) {
   switch (status) {
     case 'going':
-      return 'Going';
+      return tr.t('going');
     case 'not_going':
-      return 'Not going';
+      return tr.t('not_going');
     default:
-      return 'Pending';
+      return tr.t('pending');
   }
 }

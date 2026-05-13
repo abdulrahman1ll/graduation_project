@@ -9,6 +9,7 @@ import '../../../core/providers/role_provider.dart';
 import '../../../core/utils/localization.dart';
 import '../../../core/widgets/language_app_bar.dart';
 import '../../../widgets/kashta_background.dart';
+import 'widgets/chat_message_bubble.dart';
 
 class GroupsPage extends StatefulWidget {
   const GroupsPage({
@@ -33,7 +34,8 @@ class _GroupsPageState extends State<GroupsPage> {
 
   StreamSubscription<List<chat.Group>>? _groupsSubscription;
   final Map<String, StreamSubscription<List<chat.ChatMessage>>>
-      _messageSubscriptions = <String, StreamSubscription<List<chat.ChatMessage>>>{};
+      _messageSubscriptions =
+      <String, StreamSubscription<List<chat.ChatMessage>>>{};
   final Map<String, _GroupConversationSummary> _summaries =
       <String, _GroupConversationSummary>{};
   final Map<String, String> _senderNames = <String, String>{};
@@ -77,7 +79,7 @@ class _GroupsPageState extends State<GroupsPage> {
     if (currentUserId == null) {
       setState(() {
         _loading = false;
-        _error = 'Failed to load groups';
+        _error = widget.tr.t('failedToLoadGroups');
       });
       return;
     }
@@ -143,7 +145,8 @@ class _GroupsPageState extends State<GroupsPage> {
     final unreadCount = messages
         .where(
           (message) =>
-              message.senderId != currentUserId && !message.hasRead(currentUserId),
+              message.senderId != currentUserId &&
+              !message.hasRead(currentUserId),
         )
         .length;
     final lastMessage = messages.isEmpty ? null : messages.last;
@@ -202,113 +205,33 @@ class _GroupsPageState extends State<GroupsPage> {
     final currentUserId = _currentUserId;
     if (currentUserId == null) {
       ScaffoldMessenger.of(scaffoldContext).showSnackBar(
-        const SnackBar(content: Text('Please sign in first.')),
+        SnackBar(content: Text(widget.tr.t('please_sign_in_first'))),
       );
       return;
     }
 
-    final controller = TextEditingController();
-    String? validationMessage;
-    var joining = false;
-
-    await showDialog<void>(
+    final didJoin = await showDialog<bool>(
       context: scaffoldContext,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (builderContext, setDialogState) {
-            Future<void> submit() async {
-              final groupId = controller.text.trim();
-              if (groupId.isEmpty) {
-                setDialogState(() {
-                  validationMessage = 'Enter invitation code';
-                });
-                return;
-              }
-
-              setDialogState(() {
-                joining = true;
-                validationMessage = null;
-              });
-
-              try {
-                final didJoin =
-                    await _groupService.joinGroup(groupId, currentUserId);
-                if (!mounted || !dialogContext.mounted) {
-                  return;
-                }
-                Navigator.of(dialogContext).pop();
-                ScaffoldMessenger.of(scaffoldContext).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      didJoin
-                          ? 'Joined group'
-                          : 'You are already a member',
-                    ),
-                  ),
-                );
-              } on FirebaseException catch (error) {
-                debugPrint(
-                  'GroupsPage.joinGroupByCode failed: '
-                  '${error.code} ${error.message}',
-                );
-                if (!mounted || !builderContext.mounted) {
-                  return;
-                }
-                setDialogState(() {
-                  joining = false;
-                  validationMessage = error.code == 'not-found'
-                      ? 'Group not found'
-                      : error.message ?? 'Unable to join group';
-                });
-              } catch (_) {
-                if (!mounted || !builderContext.mounted) {
-                  return;
-                }
-                setDialogState(() {
-                  joining = false;
-                  validationMessage = 'Unable to join group';
-                });
-              }
-            }
-
-            return AlertDialog(
-              title: const Text('Join Group'),
-              content: TextField(
-                controller: controller,
-                enabled: !joining,
-                autofocus: true,
-                decoration: InputDecoration(
-                  labelText: 'Enter invitation code',
-                  errorText: validationMessage,
-                ),
-                textInputAction: TextInputAction.done,
-                onSubmitted: joining ? null : (_) => submit(),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: joining
-                      ? null
-                      : () => Navigator.of(dialogContext).pop(),
-                  child: const Text('Cancel'),
-                ),
-                FilledButton(
-                  onPressed: joining ? null : submit,
-                  child: joining
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Join'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+      builder: (_) => _JoinGroupDialog(
+        tr: widget.tr,
+        groupService: _groupService,
+        currentUserId: currentUserId,
+      ),
     );
 
-    controller.dispose();
+    if (!mounted || didJoin == null) {
+      return;
+    }
+
+    ScaffoldMessenger.of(scaffoldContext).showSnackBar(
+      SnackBar(
+        content: Text(
+          didJoin
+              ? widget.tr.t('joinedGroup')
+              : widget.tr.t('alreadyGroupMember'),
+        ),
+      ),
+    );
   }
 
   @override
@@ -320,19 +243,19 @@ class _GroupsPageState extends State<GroupsPage> {
       appBar: appBarWithLanguage(
         tr: widget.tr,
         isArabic: widget.isArabic,
-        title: widget.tr.t('groups'),
+        title: widget.tr.t('groupsTitle'),
         onToggleLanguage: widget.onToggleLanguage,
         actions: [
           TextButton.icon(
             onPressed: _showJoinGroupDialog,
             icon: const Icon(Icons.group_add_outlined),
-            label: const Text('Join Group'),
+            label: Text(widget.tr.t('joinGroup')),
           ),
         ],
       ),
       body: KashtaBackground(
         child: currentUserId == null
-            ? const Center(child: Text('Failed to load groups'))
+            ? Center(child: Text(widget.tr.t('failedToLoadGroups')))
             : Column(
                 children: [
                   Padding(
@@ -340,7 +263,7 @@ class _GroupsPageState extends State<GroupsPage> {
                     child: TextField(
                       controller: _searchController,
                       decoration: InputDecoration(
-                        hintText: 'Search groups',
+                        hintText: widget.tr.t('searchGroups'),
                         prefixIcon: const Icon(Icons.search),
                         filled: true,
                         fillColor: Colors.white,
@@ -361,6 +284,7 @@ class _GroupsPageState extends State<GroupsPage> {
       ),
       floatingActionButton: _CreateGroupFab(
         emptyState: _visibleGroups.isEmpty && !_loading,
+        tr: widget.tr,
       ),
     );
   }
@@ -371,23 +295,24 @@ class _GroupsPageState extends State<GroupsPage> {
     }
 
     if (_error != null) {
-      return const Center(child: Text('Failed to load groups'));
+      return Center(child: Text(widget.tr.t('failedToLoadGroups')));
     }
 
     final visibleGroups = _visibleGroups;
     if (visibleGroups.isEmpty) {
       if (_groups.isEmpty) {
         return _GroupsEmptyState(
+          tr: widget.tr,
           onCreate: () {
             Navigator.of(context).push(
               MaterialPageRoute<void>(
-                builder: (_) => const chat.CreateGroupPage(),
+                builder: (_) => chat.CreateGroupPage(tr: widget.tr),
               ),
             );
           },
         );
       }
-      return const Center(child: Text('No groups match your search'));
+      return Center(child: Text(widget.tr.t('noGroupsMatchSearch')));
     }
 
     return ListView.separated(
@@ -401,11 +326,20 @@ class _GroupsPageState extends State<GroupsPage> {
         final senderName = lastMessage == null
             ? ''
             : (lastMessage.senderId == currentUserId
-                  ? 'You'
-                  : (_senderNames[lastMessage.senderId] ?? 'Member'));
+                ? widget.tr.t('you')
+                : (_senderNames[lastMessage.senderId] ??
+                    widget.tr.t('member')));
+        final lastMessageContent = lastMessage == null
+            ? ''
+            : lastMessage.type == chat.ChatMessageType.system
+                ? localizedSystemMessageContent(
+                    widget.tr,
+                    lastMessage.content,
+                  )
+                : lastMessage.content;
         final preview = lastMessage == null
             ? group.description
-            : '$senderName: ${lastMessage.content}';
+            : '$senderName: $lastMessageContent';
 
         return Material(
           color: Colors.white,
@@ -418,7 +352,10 @@ class _GroupsPageState extends State<GroupsPage> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => chat.GroupChatPage(groupId: group.id),
+                  builder: (_) => chat.GroupChatPage(
+                    groupId: group.id,
+                    tr: widget.tr,
+                  ),
                 ),
               );
             },
@@ -448,7 +385,7 @@ class _GroupsPageState extends State<GroupsPage> {
                             Expanded(
                               child: Text(
                                 group.name.trim().isEmpty
-                                    ? 'Unnamed Group'
+                                    ? widget.tr.t('unnamedGroup')
                                     : group.name,
                                 style: const TextStyle(
                                   fontWeight: FontWeight.w700,
@@ -460,7 +397,8 @@ class _GroupsPageState extends State<GroupsPage> {
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              _formatTime(lastMessage?.createdAt ?? group.createdAt),
+                              _formatTime(
+                                  lastMessage?.createdAt ?? group.createdAt),
                               style: const TextStyle(
                                 color: Color(0xFF6B7280),
                                 fontSize: 12,
@@ -470,7 +408,9 @@ class _GroupsPageState extends State<GroupsPage> {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          preview.isEmpty ? 'No messages yet' : preview,
+                          preview.isEmpty
+                              ? widget.tr.t('noMessagesPreview')
+                              : preview,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -491,9 +431,9 @@ class _GroupsPageState extends State<GroupsPage> {
                                   color: const Color(0xFFFFF3E0),
                                   borderRadius: BorderRadius.circular(999),
                                 ),
-                                child: const Text(
-                                  '📌 Pinned',
-                                  style: TextStyle(
+                                child: Text(
+                                  widget.tr.t('pinned'),
+                                  style: const TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w600,
                                   ),
@@ -538,8 +478,9 @@ class _GroupsPageState extends State<GroupsPage> {
       return '';
     }
     final now = DateTime.now();
-    final isSameDay =
-        value.year == now.year && value.month == now.month && value.day == now.day;
+    final isSameDay = value.year == now.year &&
+        value.month == now.month &&
+        value.day == now.day;
     if (isSameDay) {
       final hour = value.hour.toString().padLeft(2, '0');
       final minute = value.minute.toString().padLeft(2, '0');
@@ -561,11 +502,123 @@ class _GroupConversationSummary {
   final bool hasPinned;
 }
 
+class _JoinGroupDialog extends StatefulWidget {
+  const _JoinGroupDialog({
+    required this.tr,
+    required this.groupService,
+    required this.currentUserId,
+  });
+
+  final Tr tr;
+  final chat.GroupService groupService;
+  final String currentUserId;
+
+  @override
+  State<_JoinGroupDialog> createState() => _JoinGroupDialogState();
+}
+
+class _JoinGroupDialogState extends State<_JoinGroupDialog> {
+  final TextEditingController _controller = TextEditingController();
+
+  String? _validationMessage;
+  bool _joining = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final groupId = _controller.text.trim();
+    if (groupId.isEmpty) {
+      setState(() {
+        _validationMessage = widget.tr.t('enterInvitationCode');
+      });
+      return;
+    }
+
+    setState(() {
+      _joining = true;
+      _validationMessage = null;
+    });
+
+    try {
+      final didJoin = await widget.groupService.joinGroup(
+        groupId,
+        widget.currentUserId,
+      );
+      if (!mounted) {
+        return;
+      }
+      Navigator.of(context).pop(didJoin);
+    } on FirebaseException catch (error) {
+      debugPrint(
+        'GroupsPage.joinGroupByCode failed: '
+        '${error.code} ${error.message}',
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _joining = false;
+        _validationMessage = error.code == 'not-found'
+            ? widget.tr.t('groupNotFound')
+            : error.message ?? widget.tr.t('unableToJoinGroup');
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _joining = false;
+        _validationMessage = widget.tr.t('unableToJoinGroup');
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.tr.t('joinGroup')),
+      content: TextField(
+        controller: _controller,
+        enabled: !_joining,
+        autofocus: true,
+        decoration: InputDecoration(
+          labelText: widget.tr.t('enterInvitationCode'),
+          errorText: _validationMessage,
+        ),
+        textInputAction: TextInputAction.done,
+        onSubmitted: _joining ? null : (_) => _submit(),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _joining ? null : () => Navigator.of(context).pop(),
+          child: Text(widget.tr.t('cancel')),
+        ),
+        FilledButton(
+          onPressed: _joining ? null : _submit,
+          child: _joining
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Text(widget.tr.t('join')),
+        ),
+      ],
+    );
+  }
+}
+
 class _GroupsEmptyState extends StatelessWidget {
   const _GroupsEmptyState({
+    required this.tr,
     required this.onCreate,
   });
 
+  final Tr tr;
   final VoidCallback onCreate;
 
   @override
@@ -590,27 +643,28 @@ class _GroupsEmptyState extends StatelessWidget {
                   ),
                 ],
               ),
-              child: const Icon(Icons.groups_rounded, size: 42, color: Colors.orange),
+              child: const Icon(Icons.groups_rounded,
+                  size: 42, color: Colors.orange),
             ),
             const SizedBox(height: 16),
-            const Text(
-              'No groups yet',
-              style: TextStyle(
+            Text(
+              tr.t('no_groups_yet'),
+              style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Create a group to start chatting and planning together.',
+            Text(
+              tr.t('groupsChatEmptySubtitle'),
               textAlign: TextAlign.center,
-              style: TextStyle(color: Color(0xFF6B7280)),
+              style: const TextStyle(color: Color(0xFF6B7280)),
             ),
             const SizedBox(height: 16),
             FilledButton.icon(
               onPressed: onCreate,
               icon: const Icon(Icons.add),
-              label: const Text('Create Group'),
+              label: Text(tr.t('createGroupTitle')),
             ),
           ],
         ),
@@ -622,9 +676,11 @@ class _GroupsEmptyState extends StatelessWidget {
 class _CreateGroupFab extends StatelessWidget {
   const _CreateGroupFab({
     required this.emptyState,
+    required this.tr,
   });
 
   final bool emptyState;
+  final Tr tr;
 
   @override
   Widget build(BuildContext context) {
@@ -637,11 +693,11 @@ class _CreateGroupFab extends StatelessWidget {
           backgroundColor: Colors.orange,
           foregroundColor: Colors.white,
           icon: const Icon(Icons.add),
-          label: const Text('New Group'),
+          label: Text(tr.t('newGroup')),
           onPressed: () {
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (_) => const chat.CreateGroupPage(),
+                builder: (_) => chat.CreateGroupPage(tr: tr),
               ),
             );
           },

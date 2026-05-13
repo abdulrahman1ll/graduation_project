@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../../core/utils/localization.dart';
+
 class WelcomePreferencesPage extends StatefulWidget {
-  const WelcomePreferencesPage({super.key});
+  const WelcomePreferencesPage({super.key, required this.tr});
+
+  final Tr tr;
 
   @override
   State<WelcomePreferencesPage> createState() => _WelcomePreferencesPageState();
@@ -20,26 +24,26 @@ class _WelcomePreferencesPageState extends State<WelcomePreferencesPage> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    if (_placeType == null || _distance == null || _temperature == null || _activity == null) {
+    if (_placeType == null ||
+        _distance == null ||
+        _temperature == null ||
+        _activity == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please answer all questions')),
+        SnackBar(content: Text(widget.tr.t('please_answer_all_questions'))),
       );
       return;
     }
 
     setState(() => _loading = true);
 
-    await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .set({
+    await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
       'preferences': {
         'placeType': _placeType,
         'distancePreference': _distance,
         'temperaturePreference': _temperature,
         'activityPreference': _activity,
       },
-      'preferencesCompleted' :true,
+      'preferencesCompleted': true,
     }, SetOptions(merge: true));
 
     if (!mounted) return;
@@ -70,128 +74,129 @@ class _WelcomePreferencesPageState extends State<WelcomePreferencesPage> {
 
   @override
   Widget build(BuildContext context) {
+    final tr = widget.tr;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F3ED),
-     body: SafeArea(
-  child: SingleChildScrollView(
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-      child: Column(
-        children: [
-              const SizedBox(height: 20),
+        backgroundColor: const Color(0xFFF8F3ED),
+        body: SafeArea(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              child: Column(
+                children: [
+                  const SizedBox(height: 20),
 
-              Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  color: Colors.orange.shade100,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.landscape_rounded,
-                  size: 60,
-                  color: Colors.orange,
-                ),
-              ),
-
-              const SizedBox(height: 20),
-
-              const Text(
-                'Welcome to Kashta',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-
-              const SizedBox(height: 10),
-
-              Text(
-                'Let us personalize your experience by asking you a few quick questions.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey.shade700),
-              ),
-
-              const SizedBox(height: 30),
-
-              /// place type
-              const Align(
-                alignment: Alignment.centerLeft,
-                child: Text("Preferred place type"),
-              ),
-              const SizedBox(height: 10),
-              _buildOption("Desert", "desert", _placeType,
-                  (v) => setState(() => _placeType = v)),
-              _buildOption("Beach", "beach", _placeType,
-                  (v) => setState(() => _placeType = v)),
-              _buildOption("Nature", "nature", _placeType,
-                  (v) => setState(() => _placeType = v)),
-
-              const SizedBox(height: 20),
-
-              /// distance
-              const Align(
-                alignment: Alignment.centerLeft,
-                child: Text("Distance preference"),
-              ),
-              const SizedBox(height: 10),
-              _buildOption("Near", "near", _distance,
-                  (v) => setState(() => _distance = v)),
-              _buildOption("Flexible", "flexible", _distance,
-                  (v) => setState(() => _distance = v)),
-
-              const SizedBox(height: 20),
-
-              /// temperature
-              const Align(
-                alignment: Alignment.centerLeft,
-                child: Text("Preferred weather"),
-              ),
-              const SizedBox(height: 10),
-              _buildOption("Cool", "cool", _temperature,
-                  (v) => setState(() => _temperature = v)),
-              _buildOption("Moderate", "moderate", _temperature,
-                  (v) => setState(() => _temperature = v)),
-              _buildOption("Warm", "warm", _temperature,
-                  (v) => setState(() => _temperature = v)),
+                  Container(
+                    width: 120,
+                    height: 120,
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade100,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.landscape_rounded,
+                      size: 60,
+                      color: Colors.orange,
+                    ),
+                  ),
 
                   const SizedBox(height: 20),
 
-const Align(
-  alignment: Alignment.centerLeft,
-  child: Text("Preferred activity"),
-),
-const SizedBox(height: 10),
-_buildOption("Camping", "camping", _activity,
-    (v) => setState(() => _activity = v)),
-_buildOption("Barbecue", "barbecue", _activity,
-    (v) => setState(() => _activity = v)),
-_buildOption("Hiking", "hiking", _activity,
-    (v) => setState(() => _activity = v)),
-_buildOption("Relaxing", "relaxing", _activity,
-    (v) => setState(() => _activity = v)),
-
-              const SizedBox(height: 30),
-
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton(
-                  onPressed: _loading ? null : _savePreferences,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange,
+                  Text(
+                    tr.t('welcome_title'),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                  child: _loading
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text("Continue"),
-                ),
+
+                  const SizedBox(height: 10),
+
+                  Text(
+                    tr.t('choose_preferences'),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.grey.shade700),
+                  ),
+
+                  const SizedBox(height: 30),
+
+                  /// place type
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(tr.t('preferred_place_type')),
+                  ),
+                  const SizedBox(height: 10),
+                  _buildOption(tr.t('desert'), "desert", _placeType,
+                      (v) => setState(() => _placeType = v)),
+                  _buildOption(tr.t('beach'), "beach", _placeType,
+                      (v) => setState(() => _placeType = v)),
+                  _buildOption(tr.t('nature'), "nature", _placeType,
+                      (v) => setState(() => _placeType = v)),
+
+                  const SizedBox(height: 20),
+
+                  /// distance
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(tr.t('distance_preference')),
+                  ),
+                  const SizedBox(height: 10),
+                  _buildOption(tr.t('near'), "near", _distance,
+                      (v) => setState(() => _distance = v)),
+                  _buildOption(tr.t('flexible'), "flexible", _distance,
+                      (v) => setState(() => _distance = v)),
+
+                  const SizedBox(height: 20),
+
+                  /// temperature
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(tr.t('preferred_weather')),
+                  ),
+                  const SizedBox(height: 10),
+                  _buildOption(tr.t('cool'), "cool", _temperature,
+                      (v) => setState(() => _temperature = v)),
+                  _buildOption(tr.t('moderate'), "moderate", _temperature,
+                      (v) => setState(() => _temperature = v)),
+                  _buildOption(tr.t('warm'), "warm", _temperature,
+                      (v) => setState(() => _temperature = v)),
+
+                  const SizedBox(height: 20),
+
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(tr.t('preferred_activity')),
+                  ),
+                  const SizedBox(height: 10),
+                  _buildOption(tr.t('camping'), "camping", _activity,
+                      (v) => setState(() => _activity = v)),
+                  _buildOption(tr.t('barbecue'), "barbecue", _activity,
+                      (v) => setState(() => _activity = v)),
+                  _buildOption(tr.t('hiking'), "hiking", _activity,
+                      (v) => setState(() => _activity = v)),
+                  _buildOption(tr.t('relaxing'), "relaxing", _activity,
+                      (v) => setState(() => _activity = v)),
+
+                  const SizedBox(height: 30),
+
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: ElevatedButton(
+                      onPressed: _loading ? null : _savePreferences,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange,
+                      ),
+                      child: _loading
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : Text(tr.t('continue_button')),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
-     )
-    );
+        ));
   }
 }

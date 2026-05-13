@@ -5,11 +5,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/providers/role_provider.dart';
-import '../../explore/services/place_service.dart';
 import '../../../core/utils/firestore_utils.dart';
+import '../../../core/utils/localization.dart';
+import '../../explore/services/place_service.dart';
 
 class PendingPlacesPage extends StatefulWidget {
-  const PendingPlacesPage({super.key});
+  const PendingPlacesPage({super.key, required this.tr});
+
+  final Tr tr;
 
   @override
   State<PendingPlacesPage> createState() => _PendingPlacesPageState();
@@ -21,13 +24,14 @@ class _PendingPlacesPageState extends State<PendingPlacesPage> {
 
   @override
   Widget build(BuildContext context) {
+    final tr = widget.tr;
     final provider = context.watch<RoleProvider>();
     if (!provider.isAdmin) {
-      return const Scaffold(body: Center(child: Text('Access denied')));
+      return Scaffold(body: Center(child: Text(tr.t('access_denied'))));
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Pending Places')),
+      appBar: AppBar(title: Text(tr.t('pending_places'))),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: FirebaseFirestore.instance
             .collection('places')
@@ -42,14 +46,14 @@ class _PendingPlacesPageState extends State<PendingPlacesPage> {
             logFirestoreReadError('places', error);
             if (error is FirebaseException &&
                 error.code == 'permission-denied') {
-              return const Center(child: Text('Permission denied'));
+              return Center(child: Text(tr.t('permission_denied')));
             }
-            return const Center(child: Text('Failed to load pending places'));
+            return Center(child: Text(tr.t('failed_load_pending_places')));
           }
 
           final docs = pendingSnapshot.data?.docs ?? [];
           if (docs.isEmpty) {
-            return const Center(child: Text('No pending places'));
+            return Center(child: Text(tr.t('no_pending_places')));
           }
 
           return ListView.builder(
@@ -77,11 +81,13 @@ class _PendingPlacesPageState extends State<PendingPlacesPage> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Type: ${(data['environmentType'] ?? '-').toString()}',
+                        '${tr.t('type')}: '
+                        '${(data['environmentType'] ?? '-').toString()}',
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Created by: ${(data['createdBy'] ?? '-').toString()}',
+                        '${tr.t('created_by')}: '
+                        '${(data['createdBy'] ?? '-').toString()}',
                       ),
                       if (imageBase64 != null && imageBase64.isNotEmpty) ...[
                         const SizedBox(height: 10),
@@ -105,14 +111,14 @@ class _PendingPlacesPageState extends State<PendingPlacesPage> {
                               onPressed: isBusy
                                   ? null
                                   : () => _handleApproveReject(
-                                      placeId: placeId,
-                                      approve: true,
-                                    ),
+                                        placeId: placeId,
+                                        approve: true,
+                                      ),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.green,
                                 foregroundColor: Colors.white,
                               ),
-                              child: const Text('Approve'),
+                              child: Text(tr.t('approve')),
                             ),
                           ),
                           const SizedBox(width: 10),
@@ -121,14 +127,14 @@ class _PendingPlacesPageState extends State<PendingPlacesPage> {
                               onPressed: isBusy
                                   ? null
                                   : () => _handleApproveReject(
-                                      placeId: placeId,
-                                      approve: false,
-                                    ),
+                                        placeId: placeId,
+                                        approve: false,
+                                      ),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.red,
                                 foregroundColor: Colors.white,
                               ),
-                              child: const Text('Reject'),
+                              child: Text(tr.t('reject')),
                             ),
                           ),
                         ],
@@ -160,7 +166,7 @@ class _PendingPlacesPageState extends State<PendingPlacesPage> {
       }
     } on FirebaseException catch (e) {
       if (mounted) {
-        showFirestoreError(context, e);
+        showFirestoreError(context, e, tr: widget.tr);
       }
     } catch (_) {
       if (mounted) {
@@ -169,8 +175,9 @@ class _PendingPlacesPageState extends State<PendingPlacesPage> {
           FirebaseException(
             plugin: 'cloud_firestore',
             code: 'unknown',
-            message: 'Operation failed',
+            message: widget.tr.t('operation_failed'),
           ),
+          tr: widget.tr,
         );
       }
     } finally {

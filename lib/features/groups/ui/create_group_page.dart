@@ -5,16 +5,20 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../core/models/app_language.dart';
+import '../../../core/utils/localization.dart';
 import '../services/group_service.dart';
 import 'group_chat_page.dart';
 
 class CreateGroupPage extends StatefulWidget {
   const CreateGroupPage({
     super.key,
+    this.tr,
     this.initialTripId,
     this.groupService,
   });
 
+  final Tr? tr;
   final String? initialTripId;
   final GroupService? groupService;
 
@@ -68,6 +72,7 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
   }
 
   Future<void> _save() async {
+    final tr = _tr(context);
     final userId = FirebaseAuth.instance.currentUser?.uid;
     if (userId == null) {
       return;
@@ -75,7 +80,7 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
     if (_nameController.text.trim().isEmpty ||
         _descriptionController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Name and description are required.')),
+        SnackBar(content: Text(tr.t('nameAndDescriptionRequired'))),
       );
       return;
     }
@@ -101,7 +106,7 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
       }
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (_) => GroupChatPage(groupId: groupId),
+          builder: (_) => GroupChatPage(groupId: groupId, tr: tr),
         ),
       );
     } on FirebaseException catch (error) {
@@ -113,14 +118,14 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.message ?? 'Unable to create group.')),
+        SnackBar(content: Text(error.message ?? tr.t('unableToCreateGroup'))),
       );
     } catch (_) {
       if (!mounted) {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to create group.')),
+        SnackBar(content: Text(tr.t('unableToCreateGroup'))),
       );
     } finally {
       if (mounted) {
@@ -129,12 +134,21 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
     }
   }
 
+  Tr _tr(BuildContext context) {
+    if (widget.tr != null) {
+      return widget.tr!;
+    }
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    return Tr(isArabic ? AppLanguage.ar : AppLanguage.en);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final tr = _tr(context);
     final userId = FirebaseAuth.instance.currentUser?.uid;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Create Group')),
+      appBar: AppBar(title: Text(tr.t('createGroupTitle'))),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: userId == null
             ? const Stream<QuerySnapshot<Map<String, dynamic>>>.empty()
@@ -143,12 +157,10 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
                 .where('createdBy', isEqualTo: userId)
                 .snapshots(),
         builder: (context, snapshot) {
-          final availableTrips = (snapshot.data?.docs ?? const [])
-              .where((doc) {
-                final groupId = (doc.data()['groupId'] ?? '').toString().trim();
-                return groupId.isEmpty;
-              })
-              .toList(growable: false);
+          final availableTrips = (snapshot.data?.docs ?? const []).where((doc) {
+            final groupId = (doc.data()['groupId'] ?? '').toString().trim();
+            return groupId.isEmpty;
+          }).toList(growable: false);
           availableTrips.sort((a, b) {
             final aDate = a.data()['createdAt'];
             final bDate = b.data()['createdAt'];
@@ -183,19 +195,24 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
               const SizedBox(height: 12),
               TextButton(
                 onPressed: _saving ? null : _pickImage,
-                child: const Text('Choose group image'),
+                child: Text(tr.t('chooseGroupImage')),
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                hint: const Text('Checklist trip link (optional)'),
-                initialValue: availableTrips.any((doc) => doc.id == _selectedTripId)
-                    ? _selectedTripId
-                    : null,
+                hint: Text(tr.t('checklistTripLinkOptional')),
+                initialValue:
+                    availableTrips.any((doc) => doc.id == _selectedTripId)
+                        ? _selectedTripId
+                        : null,
                 items: availableTrips
                     .map(
                       (doc) => DropdownMenuItem<String>(
                         value: doc.id,
-                        child: Text((doc.data()['title'] ?? '').toString()),
+                        child: Text(
+                          (doc.data()['title'] ?? '').toString().trim().isEmpty
+                              ? tr.t('untitled_trip')
+                              : (doc.data()['title'] ?? '').toString(),
+                        ),
                       ),
                     )
                     .toList(growable: false),
@@ -203,19 +220,18 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
                     ? null
                     : (value) => setState(() => _selectedTripId = value),
                 decoration: InputDecoration(
-                  labelText: 'Checklist trip',
-                  helperText:
-                      'Leave empty if you do not want to link this group to a checklist.',
-                  border: OutlineInputBorder(),
+                  labelText: tr.t('checklistTrip'),
+                  helperText: tr.t('leaveChecklistLinkEmpty'),
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 16),
               TextField(
                 controller: _nameController,
                 enabled: !_saving,
-                decoration: const InputDecoration(
-                  labelText: 'Group name',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: tr.t('groupName'),
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 16),
@@ -224,9 +240,9 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
                 enabled: !_saving,
                 minLines: 3,
                 maxLines: 5,
-                decoration: const InputDecoration(
-                  labelText: 'Description',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: tr.t('description'),
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 24),
@@ -246,7 +262,7 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
                           color: Colors.white,
                         ),
                       )
-                    : const Text('Create group'),
+                    : Text(tr.t('createGroup')),
               ),
             ],
           );

@@ -27,10 +27,12 @@ class GroupDetailsPage extends StatelessWidget {
   const GroupDetailsPage({
     super.key,
     required this.groupId,
+    required this.tr,
     this.groupService,
   });
 
   final String groupId;
+  final Tr tr;
   final GroupService? groupService;
 
   Future<void> _showPlanTripOptions(
@@ -47,12 +49,12 @@ class GroupDetailsPage extends StatelessWidget {
             children: [
               ListTile(
                 leading: const Icon(Icons.event_available),
-                title: const Text('Select existing trip'),
+                title: Text(tr.t('selectExistingTrip')),
                 onTap: () => Navigator.of(context).pop('existing'),
               ),
               ListTile(
                 leading: const Icon(Icons.add_circle_outline),
-                title: const Text('Create new trip'),
+                title: Text(tr.t('createNewTrip')),
                 onTap: () => Navigator.of(context).pop('create'),
               ),
             ],
@@ -70,8 +72,7 @@ class GroupDetailsPage extends StatelessWidget {
       return;
     }
 
-    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
-    final tr = Tr(isArabic ? AppLanguage.ar : AppLanguage.en);
+    final isArabic = tr.language == AppLanguage.ar;
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (tripContext) => AddTripPage(
@@ -92,7 +93,7 @@ class GroupDetailsPage extends StatelessWidget {
     if (userId.isEmpty) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Please sign in first.')));
+      ).showSnackBar(SnackBar(content: Text(tr.t('please_sign_in_first'))));
       return;
     }
 
@@ -114,7 +115,7 @@ class GroupDetailsPage extends StatelessWidget {
                 }
                 if (snapshot.hasError) {
                   logFirestoreReadError('trips', snapshot.error);
-                  return const Center(child: Text('Failed to load trips.'));
+                  return Center(child: Text(tr.t('failedToLoadTrips')));
                 }
 
                 final docs = (snapshot.data?.docs ?? []).where((doc) {
@@ -132,7 +133,7 @@ class GroupDetailsPage extends StatelessWidget {
                 });
 
                 if (docs.isEmpty) {
-                  return const Center(child: Text('No trips available.'));
+                  return Center(child: Text(tr.t('noTripsAvailable')));
                 }
 
                 return ListView.separated(
@@ -146,10 +147,12 @@ class GroupDetailsPage extends StatelessWidget {
                     final tripDate = (data['tripDate'] as Timestamp?)?.toDate();
 
                     return ListTile(
-                      title: Text(title.isEmpty ? 'Untitled trip' : title),
+                      title: Text(
+                        title.isEmpty ? tr.t('untitled_trip') : title,
+                      ),
                       subtitle: Text(
                         tripDate == null
-                            ? 'No date'
+                            ? tr.t('no_date')
                             : _formatTripDate(tripDate),
                       ),
                       onTap: () async {
@@ -162,8 +165,9 @@ class GroupDetailsPage extends StatelessWidget {
                           if (context.mounted) {
                             Navigator.of(sheetContext).pop();
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content: Text('Trip linked to group')),
+                              SnackBar(
+                                content: Text(tr.t('tripLinkedToGroup')),
+                              ),
                             );
                           }
                         } on FirebaseException catch (e) {
@@ -178,7 +182,9 @@ class GroupDetailsPage extends StatelessWidget {
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                  content: Text('Failed to link trip: $e')),
+                                content:
+                                    Text('${tr.t('failedToLinkTrip')}: $e'),
+                              ),
                             );
                           }
                         }
@@ -231,21 +237,21 @@ class GroupDetailsPage extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Invite Members',
+                  tr.t('inviteMembers'),
                   style: Theme.of(sheetContext)
                       .textTheme
                       .titleLarge
                       ?.copyWith(fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 8),
-                const Text(
-                  'Share this invitation code with your friends so they can join the group.',
-                  style: TextStyle(color: _detailsBrown, height: 1.35),
+                Text(
+                  tr.t('shareInvitationCode'),
+                  style: const TextStyle(color: _detailsBrown, height: 1.35),
                 ),
                 const SizedBox(height: 18),
-                const Text(
-                  'Invitation Code',
-                  style: TextStyle(
+                Text(
+                  tr.t('invitationCode'),
+                  style: const TextStyle(
                     color: _detailsDarkText,
                     fontWeight: FontWeight.w700,
                   ),
@@ -285,10 +291,10 @@ class GroupDetailsPage extends StatelessWidget {
                         ),
                         onPressed: () => copyValue(
                           value: groupId,
-                          message: 'Invitation code copied',
+                          message: tr.t('invitationCodeCopied'),
                         ),
                         icon: const Icon(Icons.copy),
-                        label: const Text('Copy Code'),
+                        label: Text(tr.t('copyCode')),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -303,10 +309,10 @@ class GroupDetailsPage extends StatelessWidget {
                         ),
                         onPressed: () => copyValue(
                           value: inviteLink,
-                          message: 'Invitation link copied',
+                          message: tr.t('invitationLinkCopied'),
                         ),
                         icon: const Icon(Icons.link),
-                        label: const Text('Copy Link'),
+                        label: Text(tr.t('copyLink')),
                       ),
                     ),
                   ],
@@ -336,8 +342,8 @@ class GroupDetailsPage extends StatelessWidget {
             );
           }
           return Scaffold(
-            appBar: AppBar(title: const Text('Group Details')),
-            body: const Center(child: Text('Unable to load group.')),
+            appBar: AppBar(title: Text(tr.t('groupDetails'))),
+            body: Center(child: Text(tr.t('unableToLoadGroup'))),
           );
         }
         final group = groupSnapshot.data;
@@ -346,7 +352,7 @@ class GroupDetailsPage extends StatelessWidget {
         return Scaffold(
           backgroundColor: _detailsBackground,
           appBar: AppBar(
-            title: const Text('Group Details'),
+            title: Text(tr.t('groupDetails')),
             backgroundColor: _detailsBackground,
             foregroundColor: _detailsDarkText,
             elevation: 0,
@@ -378,8 +384,8 @@ class GroupDetailsPage extends StatelessWidget {
                             : memberIds.length;
                         final hasUpcomingTrip = tripId.isNotEmpty;
                         final subtitleParts = <String>[
-                          '$memberCount member${memberCount == 1 ? '' : 's'}',
-                          if (hasUpcomingTrip) '1 upcoming trip',
+                          '$memberCount ${tr.t(memberCount == 1 ? 'member' : 'members')}',
+                          if (hasUpcomingTrip) tr.t('upcomingTripCountOne'),
                         ];
 
                         return ListView(
@@ -411,7 +417,7 @@ class GroupDetailsPage extends StatelessWidget {
                             const SizedBox(height: 14),
                             Text(
                               group.name.trim().isEmpty
-                                  ? 'Group Chat'
+                                  ? tr.t('group_trip')
                                   : group.name,
                               textAlign: TextAlign.center,
                               style: Theme.of(context)
@@ -434,7 +440,7 @@ class GroupDetailsPage extends StatelessWidget {
                             const SizedBox(height: 8),
                             Text(
                               group.description.trim().isEmpty
-                                  ? 'No description yet.'
+                                  ? tr.t('noDescriptionYet')
                                   : group.description,
                               textAlign: TextAlign.center,
                               style: Theme.of(context)
@@ -464,16 +470,17 @@ class GroupDetailsPage extends StatelessWidget {
                                     color: _detailsOrange,
                                   ),
                                 ),
-                                title: const Text(
-                                  'Invite Members',
-                                  style: TextStyle(
+                                title: Text(
+                                  tr.t('inviteMembers'),
+                                  style: const TextStyle(
                                     color: _detailsDarkText,
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
-                                subtitle: const Text(
-                                  'Share an invitation code with friends',
-                                  style: TextStyle(color: _detailsMutedText),
+                                subtitle: Text(
+                                  tr.t('shareInvitationCodeShort'),
+                                  style:
+                                      const TextStyle(color: _detailsMutedText),
                                 ),
                                 trailing: const Icon(
                                   Icons.chevron_right,
@@ -503,12 +510,13 @@ class GroupDetailsPage extends StatelessWidget {
                                       group: group,
                                       groupId: groupId,
                                       groupService: resolvedGroupService,
+                                      tr: tr,
                                     ),
                                     icon: const Icon(Icons.checklist),
                                     label: Text(
                                       (group.tripId?.trim().isEmpty ?? true)
-                                          ? 'Link checklist'
-                                          : 'Open checklist',
+                                          ? tr.t('link_to_checklist')
+                                          : tr.t('open_checklist'),
                                     ),
                                   ),
                                 ),
@@ -537,16 +545,16 @@ class GroupDetailsPage extends StatelessWidget {
                                       Icons.calendar_month,
                                       color: _detailsOrange,
                                     ),
-                                    label: const Text('Plan trip'),
+                                    label: Text(tr.t('planTrip')),
                                   ),
                                 ),
                               ],
                             ),
                             if (tripId.isNotEmpty) ...[
                               const SizedBox(height: 24),
-                              const Text(
-                                'Upcoming Trip',
-                                style: TextStyle(
+                              Text(
+                                tr.t('upcomingTrip'),
+                                style: const TextStyle(
                                   color: _detailsDarkText,
                                   fontSize: 17,
                                   fontWeight: FontWeight.w800,
@@ -578,12 +586,12 @@ class GroupDetailsPage extends StatelessWidget {
                                         '${error.code} ${error.message}',
                                       );
                                     }
-                                    return const Text('No linked trip found.');
+                                    return Text(tr.t('no_linked_trip_found'));
                                   }
 
                                   final tripData = tripSnapshot.data?.data();
                                   if (tripData == null) {
-                                    return const Text('No linked trip found.');
+                                    return Text(tr.t('no_linked_trip_found'));
                                   }
 
                                   final title = (tripData['title'] ?? '')
@@ -612,7 +620,7 @@ class GroupDetailsPage extends StatelessWidget {
                                         children: [
                                           Text(
                                             title.isEmpty
-                                                ? 'Untitled trip'
+                                                ? tr.t('untitled_trip')
                                                 : title,
                                             style: const TextStyle(
                                               color: _detailsDarkText,
@@ -642,14 +650,13 @@ class GroupDetailsPage extends StatelessWidget {
                                                 const SizedBox(width: 6),
                                                 Text(
                                                   tripDate == null
-                                                      ? 'No date'
+                                                      ? tr.t('no_date')
                                                       : _formatTripDate(
                                                           tripDate,
                                                         ),
                                                   style: const TextStyle(
                                                     color: _detailsBrown,
-                                                    fontWeight:
-                                                        FontWeight.w700,
+                                                    fontWeight: FontWeight.w700,
                                                   ),
                                                 ),
                                               ],
@@ -663,9 +670,9 @@ class GroupDetailsPage extends StatelessWidget {
                               ),
                             ],
                             const SizedBox(height: 24),
-                            const Text(
-                              'Members',
-                              style: TextStyle(
+                            Text(
+                              tr.t('members'),
+                              style: const TextStyle(
                                 color: _detailsDarkText,
                                 fontSize: 17,
                                 fontWeight: FontWeight.w800,
@@ -679,6 +686,17 @@ class GroupDetailsPage extends StatelessWidget {
                                 padding: EdgeInsets.symmetric(vertical: 24),
                                 child: Center(
                                   child: CircularProgressIndicator(),
+                                ),
+                              )
+                            else if (memberIds.isEmpty)
+                              Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
+                                child: Text(
+                                  tr.t('no_members_yet'),
+                                  style: const TextStyle(
+                                    color: _detailsMutedText,
+                                  ),
                                 ),
                               )
                             else
@@ -710,7 +728,8 @@ class GroupDetailsPage extends StatelessWidget {
                                       const SizedBox(width: 12),
                                       Expanded(
                                         child: Text(
-                                          memberNames[memberId] ?? 'Member',
+                                          memberNames[memberId] ??
+                                              tr.t('member'),
                                           style: const TextStyle(
                                             color: _detailsDarkText,
                                             fontWeight: FontWeight.w700,
