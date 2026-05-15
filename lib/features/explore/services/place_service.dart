@@ -50,4 +50,37 @@ class PlaceService {
       'status': 'rejected',
     });
   }
+
+  Future<void> deletePlace(String placeId) async {
+    final placeRef = _firestore.collection('places').doc(placeId);
+    final reviewsSnapshot = await placeRef.collection('reviews').get();
+    var batch = _firestore.batch();
+    var operationCount = 0;
+
+    for (final review in reviewsSnapshot.docs) {
+      batch.delete(review.reference);
+      operationCount++;
+
+      if (operationCount == 450) {
+        await batch.commit();
+        batch = _firestore.batch();
+        operationCount = 0;
+      }
+    }
+
+    batch.delete(placeRef);
+    await batch.commit();
+  }
+
+  Future<void> deleteReview({
+    required String placeId,
+    required String reviewId,
+  }) async {
+    await _firestore
+        .collection('places')
+        .doc(placeId)
+        .collection('reviews')
+        .doc(reviewId)
+        .delete();
+  }
 }

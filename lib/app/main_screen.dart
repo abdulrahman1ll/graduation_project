@@ -25,6 +25,11 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
+  int _exploreFocusRequestId = 0;
+  String? _initialPlaceId;
+  double? _initialLat;
+  double? _initialLng;
+  bool _openDetailsOnLoad = false;
 
   @override
   Widget build(BuildContext context) {
@@ -33,6 +38,11 @@ class _MainScreenState extends State<MainScreen> {
         tr: widget.tr,
         isArabic: widget.isArabic,
         onToggleLanguage: widget.onToggleLanguage,
+        initialPlaceId: _initialPlaceId,
+        initialLat: _initialLat,
+        initialLng: _initialLng,
+        openDetailsOnLoad: _openDetailsOnLoad,
+        initialFocusRequestId: _exploreFocusRequestId,
       ),
       TripsPage(
         tr: widget.tr,
@@ -85,6 +95,29 @@ class _MainScreenState extends State<MainScreen> {
     Navigator.of(
       context,
     ).push(
-        MaterialPageRoute(builder: (_) => AdminDashboardPage(tr: widget.tr)));
+      MaterialPageRoute(
+        builder: (_) => AdminDashboardPage(
+          tr: widget.tr,
+          onOpenPlace: _openPlaceOnExploreMap,
+        ),
+      ),
+    );
+  }
+
+  void _openPlaceOnExploreMap({
+    required String placeId,
+    required double lat,
+    required double lng,
+    required bool openDetailsOnLoad,
+  }) {
+    Navigator.of(context).pop();
+    setState(() {
+      _selectedIndex = 0;
+      _initialPlaceId = placeId;
+      _initialLat = lat;
+      _initialLng = lng;
+      _openDetailsOnLoad = openDetailsOnLoad;
+      _exploreFocusRequestId++;
+    });
   }
 }

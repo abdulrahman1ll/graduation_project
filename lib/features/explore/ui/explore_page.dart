@@ -25,11 +25,21 @@ class ExplorePage extends StatefulWidget {
     required this.tr,
     required this.isArabic,
     required this.onToggleLanguage,
+    this.initialPlaceId,
+    this.initialLat,
+    this.initialLng,
+    this.openDetailsOnLoad = false,
+    this.initialFocusRequestId = 0,
   });
 
   final Tr tr;
   final bool isArabic;
   final VoidCallback onToggleLanguage;
+  final String? initialPlaceId;
+  final double? initialLat;
+  final double? initialLng;
+  final bool openDetailsOnLoad;
+  final int initialFocusRequestId;
 
   @override
   State<ExplorePage> createState() => _ExplorePageState();
@@ -83,6 +93,12 @@ class _ExplorePageState extends State<ExplorePage> {
 
   LatLng? selectedPoint;
   final PlaceService _placeService = PlaceService();
+  bool _hasHandledInitialPlace = false;
+
+  bool get _hasInitialPlaceTarget =>
+      widget.initialPlaceId != null &&
+      widget.initialLat != null &&
+      widget.initialLng != null;
 
   Future<void> _saveInteraction({
     required String placeId,
@@ -335,10 +351,31 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
   @override
   void initState() {
     super.initState();
+    if (_hasInitialPlaceTarget) {
+      _hasCenteredOnUserLocation = true;
+      selectedPoint = LatLng(widget.initialLat!, widget.initialLng!);
+    }
     _loadCurrentUserLocation();
     _loadUserPreferences();
     _testInteractions();
     exportInteractionsToConsole();
+  }
+
+  @override
+  void didUpdateWidget(covariant ExplorePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.initialFocusRequestId != widget.initialFocusRequestId ||
+        oldWidget.initialPlaceId != widget.initialPlaceId) {
+      _hasHandledInitialPlace = false;
+      if (_hasInitialPlaceTarget) {
+        setState(() {
+          _hasCenteredOnUserLocation = true;
+          selectedPoint = LatLng(widget.initialLat!, widget.initialLng!);
+        });
+        _focusInitialPlace();
+      }
+    }
   }
 
   @override
@@ -379,7 +416,9 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
       setState(() {
         _userLocation = LatLng(position.latitude, position.longitude);
       });
-      _centerCameraOnUserLocation();
+      if (!_hasInitialPlaceTarget) {
+        _centerCameraOnUserLocation();
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -403,6 +442,63 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
       ),
     );
     _hasCenteredOnUserLocation = true;
+  }
+
+  Future<void> _focusInitialPlace() async {
+    final controller = _mapController;
+    if (_hasHandledInitialPlace ||
+        !_hasInitialPlaceTarget ||
+        controller == null) {
+      return;
+    }
+
+    _hasHandledInitialPlace = true;
+    final target = LatLng(widget.initialLat!, widget.initialLng!);
+
+    if (mounted) {
+      setState(() {
+        selectedPoint = target;
+        _hasCenteredOnUserLocation = true;
+      });
+    }
+
+    await controller.animateCamera(
+      CameraUpdate.newCameraPosition(
+        CameraPosition(target: target, zoom: 16),
+      ),
+    );
+
+    if (!mounted || !widget.openDetailsOnLoad) {
+      return;
+    }
+
+    final placeId = widget.initialPlaceId;
+    if (placeId == null) {
+      return;
+    }
+
+    try {
+      final placeDoc = await FirebaseFirestore.instance
+          .collection('places')
+          .doc(placeId)
+          .get();
+      if (!mounted) return;
+
+      final data = placeDoc.data();
+      if (data == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Place no longer exists.')),
+        );
+        return;
+      }
+
+      _showPlaceDetails(data, placeDoc.id);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to open place details.')),
+      );
+    }
   }
 
   Future<void> fetchRoute({
@@ -799,9 +895,8 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
           children: [
             _buildExploreHeader(),
             Expanded(
-              flex: 2,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 6, 16, 16),
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(28),
@@ -926,7 +1021,11 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                                   ),
                                   onMapCreated: (controller) {
                                     _mapController = controller;
-                                    _centerCameraOnUserLocation();
+                                    if (_hasInitialPlaceTarget) {
+                                      _focusInitialPlace();
+                                    } else {
+                                      _centerCameraOnUserLocation();
+                                    }
                                   },
                                   myLocationEnabled: true,
                                   myLocationButtonEnabled: true,
@@ -953,215 +1052,299 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                                   routeDurationText: _routeDurationText,
                                 ),
                                 _buildMapZoomControls(),
-                                FutureBuilder<List<RecommendedPlace>>(
-                                  key: ValueKey(_recommendationRefreshKey),
-                                  future: _buildRecommendedPlaces(visibleDocs),
-                                  builder: (context, recommendationSnapshot) {
-                                    if (!recommendationSnapshot.hasData ||
-                                        recommendationSnapshot.data!.isEmpty) {
-                                      return const SizedBox.shrink();
-                                    }
+                                LayoutBuilder(
+                                  builder: (context, mapConstraints) {
+                                    final screenHeight =
+                                        MediaQuery.sizeOf(context).height;
+                                    final isCompactHeight = screenHeight < 700;
+                                    final maxPanelHeight =
+                                        isCompactHeight ? 190.0 : 206.0;
+                                    final panelHeight = math
+                                        .min(
+                                          maxPanelHeight,
+                                          math.max(
+                                            176.0,
+                                            mapConstraints.maxHeight * 0.42,
+                                          ),
+                                        )
+                                        .toDouble();
+                                    final cardWidth = math
+                                        .max(
+                                          150.0,
+                                          math.min(
+                                            isCompactHeight ? 156.0 : 166.0,
+                                            mapConstraints.maxWidth * 0.43,
+                                          ),
+                                        )
+                                        .toDouble();
+                                    final imageHeight =
+                                        isCompactHeight ? 48.0 : 52.0;
+                                    final cardHeight =
+                                        math.max(142.0, panelHeight - 50.0);
 
-                                    final recommendedPlaces =
-                                        recommendationSnapshot.data!;
+                                    return FutureBuilder<List<RecommendedPlace>>(
+                                      key: ValueKey(_recommendationRefreshKey),
+                                      future:
+                                          _buildRecommendedPlaces(visibleDocs),
+                                      builder:
+                                          (context, recommendationSnapshot) {
+                                        if (!recommendationSnapshot.hasData ||
+                                            recommendationSnapshot
+                                                .data!.isEmpty) {
+                                          return const SizedBox.shrink();
+                                        }
 
-                                    if (!_showRecommendations) {
-                                      return Positioned(
-                                        bottom: 18,
-                                        right: 18,
-                                        child: FloatingActionButton(
-                                          mini: true,
-                                          backgroundColor:
-                                              const Color(0xFF8B4A23),
-                                          foregroundColor: Colors.white,
-                                          elevation: 4,
-                                          onPressed: () {
-                                            setState(() {
-                                              _showRecommendations = true;
-                                            });
-                                          },
-                                          child: const Icon(Icons.auto_awesome),
-                                        ),
-                                      );
-                                    }
+                                        final recommendedPlaces =
+                                            recommendationSnapshot.data!;
 
-                                    return Stack(
-                                      children: [
-                                        Positioned(
-                                          bottom: 0,
-                                          left: 0,
-                                          right: 0,
-                                          child: Container(
-                                            height: 292,
-                                            padding: const EdgeInsets.fromLTRB(
-                                              16,
-                                              14,
-                                              16,
-                                              16,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              gradient: LinearGradient(
-                                                colors: [
-                                                  const Color(0xFFFFFBF5)
-                                                      .withValues(alpha: 0.92),
-                                                  const Color(0xFFFFFBF5)
-                                                      .withValues(alpha: 0.74),
-                                                  const Color(0xFFFFFBF5)
-                                                      .withValues(alpha: 0.18),
-                                                ],
-                                                begin: Alignment.bottomCenter,
-                                                end: Alignment.topCenter,
-                                              ),
-                                              borderRadius:
-                                                  const BorderRadius.vertical(
-                                                top: Radius.circular(28),
-                                              ),
-                                              boxShadow: [
-                                                BoxShadow(
-                                                  color: const Color(0xFF3B2415)
-                                                      .withValues(alpha: 0.10),
-                                                  blurRadius: 22,
-                                                  offset: const Offset(0, -8),
+                                        if (!_showRecommendations) {
+                                          return Stack(
+                                            children: [
+                                              Positioned(
+                                                right: 14,
+                                                bottom: 14,
+                                                child: FloatingActionButton(
+                                                  mini: true,
+                                                  backgroundColor:
+                                                      const Color(0xFF8B4A23),
+                                                  foregroundColor: Colors.white,
+                                                  elevation: 4,
+                                                  onPressed: () {
+                                                    setState(() {
+                                                      _showRecommendations =
+                                                          true;
+                                                    });
+                                                  },
+                                                  child: const Icon(
+                                                    Icons.auto_awesome,
+                                                  ),
                                                 ),
-                                              ],
-                                            ),
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Row(
-                                                  children: [
-                                                    Container(
-                                                      padding:
-                                                          const EdgeInsets.all(
-                                                              8),
-                                                      decoration: BoxDecoration(
-                                                        color: const Color(
-                                                                0xFF8B4A23)
-                                                            .withValues(
-                                                                alpha: 0.11),
-                                                        borderRadius:
-                                                            BorderRadius
-                                                                .circular(12),
-                                                      ),
-                                                      child: const Icon(
-                                                        Icons
-                                                            .auto_awesome_rounded,
-                                                        color:
-                                                            Color(0xFF8B4A23),
-                                                        size: 18,
-                                                      ),
+                                              ),
+                                            ],
+                                          );
+                                        }
+
+                                        return Stack(
+                                          children: [
+                                            Positioned(
+                                              bottom: 0,
+                                              left: 0,
+                                              right: 0,
+                                              child: Container(
+                                                height: panelHeight,
+                                                padding:
+                                                    const EdgeInsets.fromLTRB(
+                                                  12,
+                                                  8,
+                                                  12,
+                                                  8,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  gradient: LinearGradient(
+                                                    colors: [
+                                                      const Color(0xFFFFFBF5)
+                                                          .withValues(
+                                                              alpha: 0.92),
+                                                      const Color(0xFFFFFBF5)
+                                                          .withValues(
+                                                              alpha: 0.70),
+                                                      const Color(0xFFFFFBF5)
+                                                          .withValues(
+                                                              alpha: 0.14),
+                                                    ],
+                                                    begin:
+                                                        Alignment.bottomCenter,
+                                                    end: Alignment.topCenter,
+                                                  ),
+                                                  borderRadius:
+                                                      const BorderRadius
+                                                          .vertical(
+                                                    top: Radius.circular(24),
+                                                  ),
+                                                  boxShadow: [
+                                                    BoxShadow(
+                                                      color: const Color(
+                                                              0xFF3B2415)
+                                                          .withValues(
+                                                              alpha: 0.09),
+                                                      blurRadius: 18,
+                                                      offset:
+                                                          const Offset(0, -6),
                                                     ),
-                                                    const SizedBox(width: 10),
-                                                    const Expanded(
-                                                      child: Column(
-                                                        crossAxisAlignment:
-                                                            CrossAxisAlignment
-                                                                .start,
-                                                        children: [
-                                                          Text(
-                                                            'Recommended for you',
-                                                            style: TextStyle(
-                                                              color: Color(
-                                                                  0xFF2F2118),
-                                                              fontSize: 17,
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .w900,
-                                                            ),
+                                                  ],
+                                                ),
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Row(
+                                                      children: [
+                                                        Container(
+                                                          padding:
+                                                              const EdgeInsets
+                                                                  .all(6),
+                                                          decoration:
+                                                              BoxDecoration(
+                                                            color: const Color(
+                                                                    0xFF8B4A23)
+                                                                .withValues(
+                                                                    alpha:
+                                                                        0.11),
+                                                            borderRadius:
+                                                                BorderRadius
+                                                                    .circular(
+                                                                        10),
                                                           ),
-                                                          SizedBox(height: 2),
-                                                          Text(
-                                                            'Based on your preferences',
-                                                            style: TextStyle(
-                                                              color: Color(
-                                                                  0xFF7B6653),
-                                                              fontSize: 12,
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .w600,
-                                                            ),
+                                                          child: const Icon(
+                                                            Icons
+                                                                .auto_awesome_rounded,
+                                                            color: Color(
+                                                                0xFF8B4A23),
+                                                            size: 15,
                                                           ),
-                                                        ],
+                                                        ),
+                                                        const SizedBox(
+                                                            width: 8),
+                                                        const Expanded(
+                                                          child: Column(
+                                                            crossAxisAlignment:
+                                                                CrossAxisAlignment
+                                                                    .start,
+                                                            children: [
+                                                              Text(
+                                                                'Recommended for you',
+                                                                maxLines: 1,
+                                                                overflow:
+                                                                    TextOverflow
+                                                                        .ellipsis,
+                                                                style:
+                                                                    TextStyle(
+                                                                  color: Color(
+                                                                      0xFF2F2118),
+                                                                  fontSize: 14,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w900,
+                                                                ),
+                                                              ),
+                                                              SizedBox(
+                                                                  height: 1),
+                                                              Text(
+                                                                'Based on your preferences',
+                                                                maxLines: 1,
+                                                                overflow:
+                                                                    TextOverflow
+                                                                        .ellipsis,
+                                                                style:
+                                                                    TextStyle(
+                                                                  color: Color(
+                                                                      0xFF7B6653),
+                                                                  fontSize: 10,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w600,
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    const SizedBox(height: 4),
+                                                    Expanded(
+                                                      child: ListView.builder(
+                                                        scrollDirection:
+                                                            Axis.horizontal,
+                                                        padding:
+                                                            EdgeInsets.zero,
+                                                        itemCount:
+                                                            recommendedPlaces
+                                                                .length,
+                                                        itemBuilder:
+                                                            (context, index) {
+                                                          final item =
+                                                              recommendedPlaces[
+                                                                  index];
+                                                          final place =
+                                                              item.doc.data();
+
+                                                          return GestureDetector(
+                                                            onTap: () {
+                                                              final lat =
+                                                                  (place['lat']
+                                                                          as num)
+                                                                      .toDouble();
+                                                              final lng =
+                                                                  (place['lng']
+                                                                          as num)
+                                                                      .toDouble();
+
+                                                              fetchRoute(
+                                                                destinationLatitude:
+                                                                    lat,
+                                                                destinationLongitude:
+                                                                    lng,
+                                                              );
+
+                                                              _showPlaceDetails(
+                                                                place,
+                                                                item.doc.id,
+                                                              );
+                                                            },
+                                                            child: Align(
+                                                              alignment:
+                                                                  Alignment
+                                                                      .topLeft,
+                                                              child: SizedBox(
+                                                                height:
+                                                                    cardHeight,
+                                                                child:
+                                                                    _buildRecommendationCard(
+                                                                  place: place,
+                                                                  item: item,
+                                                                  rank:
+                                                                      index +
+                                                                          1,
+                                                                  width:
+                                                                      cardWidth,
+                                                                  imageHeight:
+                                                                      imageHeight,
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          );
+                                                        },
                                                       ),
                                                     ),
                                                   ],
                                                 ),
-                                                const SizedBox(height: 12),
-                                                Expanded(
-                                                  child: ListView.builder(
-                                                    scrollDirection:
-                                                        Axis.horizontal,
-                                                    padding: EdgeInsets.zero,
-                                                    itemCount: recommendedPlaces
-                                                        .length,
-                                                    itemBuilder:
-                                                        (context, index) {
-                                                      final item =
-                                                          recommendedPlaces[
-                                                              index];
-                                                      final place =
-                                                          item.doc.data();
-
-                                                      return GestureDetector(
-                                                        onTap: () {
-                                                          final lat =
-                                                              (place['lat']
-                                                                      as num)
-                                                                  .toDouble();
-                                                          final lng =
-                                                              (place['lng']
-                                                                      as num)
-                                                                  .toDouble();
-
-                                                          fetchRoute(
-                                                            destinationLatitude:
-                                                                lat,
-                                                            destinationLongitude:
-                                                                lng,
-                                                          );
-
-                                                          _showPlaceDetails(
-                                                            place,
-                                                            item.doc.id,
-                                                          );
-                                                        },
-                                                        child:
-                                                            _buildRecommendationCard(
-                                                          place: place,
-                                                          item: item,
-                                                          rank: index + 1,
-                                                        ),
-                                                      );
-                                                    },
-                                                  ),
-                                                ),
-                                              ],
+                                              ),
                                             ),
-                                          ),
-                                        ),
-                                        Positioned(
-                                          bottom: 222,
-                                          right: 12,
-                                          child: IconButton(
-                                            icon:
-                                                const Icon(Icons.close_rounded),
-                                            style: IconButton.styleFrom(
-                                              backgroundColor:
-                                                  const Color(0xFFFFFBF5)
+                                            Positioned(
+                                              bottom: panelHeight - 48,
+                                              right: 8,
+                                              child: IconButton(
+                                                icon: const Icon(
+                                                    Icons.close_rounded),
+                                                style: IconButton.styleFrom(
+                                                  backgroundColor: const Color(
+                                                          0xFFFFFBF5)
                                                       .withValues(alpha: 0.86),
-                                              foregroundColor:
-                                                  const Color(0xFF5B3922),
-                                              elevation: 2,
+                                                  foregroundColor:
+                                                      const Color(0xFF5B3922),
+                                                  elevation: 2,
+                                                ),
+                                                onPressed: () {
+                                                  setState(() {
+                                                    _showRecommendations =
+                                                        false;
+                                                  });
+                                                },
+                                              ),
                                             ),
-                                            onPressed: () {
-                                              setState(() {
-                                                _showRecommendations = false;
-                                              });
-                                            },
-                                          ),
-                                        ),
-                                      ],
+                                          ],
+                                        );
+                                      },
                                     );
                                   },
                                 ),
@@ -1183,7 +1366,7 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
 
   Widget _buildExploreHeader() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1226,7 +1409,7 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             widget.tr.t('exploreSubtitle'),
             textAlign: widget.isArabic ? TextAlign.right : TextAlign.left,
@@ -1237,8 +1420,7 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
               fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: 16),
-          _buildExploreSearchPill(),
+          const SizedBox(height: 12),
           _buildPlaceTypeFilterBar(),
         ],
       ),
@@ -1247,7 +1429,7 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
 
   Widget _buildPlaceTypeFilterBar() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 14, 0, 0),
+      padding: EdgeInsets.zero,
       child: SizedBox(
         height: 46,
         child: ListView(
@@ -1321,58 +1503,6 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
     );
   }
 
-  Widget _buildExploreSearchPill() {
-    return Container(
-      height: 58,
-      padding: const EdgeInsets.symmetric(horizontal: 18),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFFAF2).withValues(alpha: 0.94),
-        borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.64)),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF6F421D).withValues(alpha: 0.12),
-            blurRadius: 18,
-            offset: const Offset(0, 9),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.search_rounded,
-            color: Color(0xFF6D482B),
-            size: 28,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              widget.tr.t('exploreSearchHint'),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: const Color(0xFF5B3922).withValues(alpha: 0.78),
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          Container(
-            width: 1,
-            height: 30,
-            color: const Color(0xFFE3C9A8),
-          ),
-          const SizedBox(width: 12),
-          const Icon(
-            Icons.tune_rounded,
-            color: Color(0xFF6D482B),
-            size: 25,
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildMapZoomControls() {
     return Positioned(
       top: 18,
@@ -1434,21 +1564,23 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
     required Map<String, dynamic> place,
     required RecommendedPlace item,
     required int rank,
+    required double width,
+    required double imageHeight,
   }) {
     final environmentType = place['environmentType']?.toString() ?? '';
     final imageProvider = _placeImageProvider(place['imageBase64']?.toString());
 
     return Container(
-      width: 224,
-      margin: const EdgeInsets.only(right: 12),
+      width: width,
+      margin: const EdgeInsets.only(right: 10),
       decoration: BoxDecoration(
         color: const Color(0xFFFFFBF5).withValues(alpha: 0.90),
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF6F421D).withValues(alpha: 0.12),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
@@ -1457,10 +1589,10 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
         children: [
           ClipRRect(
             borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(21),
+              top: Radius.circular(17),
             ),
             child: SizedBox(
-              height: 82,
+              height: imageHeight,
               width: double.infinity,
               child: Stack(
                 fit: StackFit.expand,
@@ -1501,8 +1633,8 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                     left: 10,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 9,
-                        vertical: 5,
+                        horizontal: 8,
+                        vertical: 4,
                       ),
                       decoration: BoxDecoration(
                         color: const Color(0xFF8B4A23),
@@ -1512,7 +1644,7 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                         '#$rank',
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 12,
+                          fontSize: 11,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
@@ -1524,7 +1656,7 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                     child: Icon(
                       Icons.favorite_border_rounded,
                       color: Colors.white.withValues(alpha: 0.95),
-                      size: 25,
+                      size: 21,
                     ),
                   ),
                 ],
@@ -1533,7 +1665,7 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
           ),
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              padding: const EdgeInsets.fromLTRB(8, 5, 8, 5),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1543,46 +1675,50 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: Color(0xFF2F2118),
-                      fontSize: 15,
-                      height: 1.12,
+                      fontSize: 12,
+                      height: 1.0,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 3),
                   Row(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF2E4CF),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          environmentType,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Color(0xFF6D482B),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
+                      Flexible(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF2E4CF),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            environmentType,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Color(0xFF6D482B),
+                              fontSize: 9,
+                              height: 1.0,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
                         ),
                       ),
-                      const Spacer(),
+                      const SizedBox(width: 4),
                       const Icon(
                         Icons.star_rounded,
                         color: Color(0xFFD8A06A),
-                        size: 17,
+                        size: 14,
                       ),
-                      const SizedBox(width: 3),
+                      const SizedBox(width: 2),
                       Text(
                         item.averageRating.toStringAsFixed(1),
                         style: const TextStyle(
                           color: Color(0xFF3C2A1D),
-                          fontSize: 12,
+                          fontSize: 10,
+                          height: 1.0,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
@@ -1593,17 +1729,19 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                     children: [
                       const Icon(
                         Icons.location_on_outlined,
-                        size: 16,
+                        size: 13,
                         color: Color(0xFF8B6A52),
                       ),
-                      const SizedBox(width: 3),
+                      const SizedBox(width: 2),
                       Expanded(
                         child: Text(
                           '${item.distanceKm.toStringAsFixed(1)} km away',
+                          maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: Color(0xFF75604C),
-                            fontSize: 12,
+                            fontSize: 10,
+                            height: 1.0,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
