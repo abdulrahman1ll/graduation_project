@@ -6,6 +6,7 @@ import '../../../core/providers/role_provider.dart';
 import '../../../core/utils/localization.dart';
 import '../../../core/widgets/language_app_bar.dart';
 import '../../../widgets/kashta_background.dart';
+import '../../safety/ui/safety_checkin_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({
@@ -78,6 +79,18 @@ class _ProfilePageState extends State<ProfilePage> {
                 onTap: () => _showComingSoon(widget.tr.t('coming_soon')),
               ),
             ),
+            Card(
+              child: ListTile(
+                leading: const Icon(
+                  Icons.health_and_safety_outlined,
+                  color: Colors.orange,
+                ),
+                title: Text(widget.tr.t('safety_checkin_title')),
+                subtitle: Text(widget.tr.t('safety_checkin_profile_subtitle')),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: _openSafetyCheckin,
+              ),
+            ),
             if (isAdmin)
               Card(
                 child: ListTile(
@@ -100,6 +113,18 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  void _openSafetyCheckin() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SafetyCheckinPage(
+          tr: widget.tr,
+          isArabic: widget.isArabic,
+          onToggleLanguage: widget.onToggleLanguage,
         ),
       ),
     );
