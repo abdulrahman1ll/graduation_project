@@ -1146,12 +1146,12 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                                         MediaQuery.sizeOf(context).height;
                                     final isCompactHeight = screenHeight < 700;
                                     final maxPanelHeight =
-                                        isCompactHeight ? 176.0 : 192.0;
+                                        isCompactHeight ? 204.0 : 220.0;
                                     final panelHeight = math
                                         .min(
                                           maxPanelHeight,
                                           math.max(
-                                            156.0,
+                                            isCompactHeight ? 184.0 : 198.0,
                                             mapConstraints.maxHeight * 0.34,
                                           ),
                                         )
@@ -1166,9 +1166,9 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                                         )
                                         .toDouble();
                                     final imageHeight =
-                                        isCompactHeight ? 48.0 : 52.0;
+                                        isCompactHeight ? 45.0 : 50.0;
                                     final cardHeight =
-                                        math.max(132.0, panelHeight - 64.0);
+                                        isCompactHeight ? 150.0 : 158.0;
 
                                     return FutureBuilder<List<RecommendedPlace>>(
                                       key: ValueKey(_recommendationRefreshKey),
@@ -1223,9 +1223,9 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                                                 padding:
                                                     const EdgeInsets.fromLTRB(
                                                   12,
-                                                  8,
+                                                  7,
                                                   12,
-                                                  8,
+                                                  7,
                                                 ),
                                                 decoration: BoxDecoration(
                                                   color: KashtaColors
@@ -1255,7 +1255,7 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                                                       padding: const EdgeInsets
                                                           .symmetric(
                                                         horizontal: 10,
-                                                        vertical: 7,
+                                                        vertical: 5,
                                                       ),
                                                       decoration: BoxDecoration(
                                                         color: KashtaColors
@@ -1342,7 +1342,7 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                                                         ],
                                                       ),
                                                     ),
-                                                    const SizedBox(height: 4),
+                                                    const SizedBox(height: 3),
                                                     Expanded(
                                                       child: ListView.builder(
                                                         scrollDirection:
@@ -1353,9 +1353,9 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                                                             const EdgeInsets
                                                                 .fromLTRB(
                                                           0,
-                                                          4,
+                                                          2,
                                                           24,
-                                                          10,
+                                                          2,
                                                         ),
                                                         itemCount:
                                                             recommendedPlaces
@@ -1850,13 +1850,17 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                         size: 14,
                       ),
                       const SizedBox(width: 2),
-                      Text(
-                        item.averageRating.toStringAsFixed(1),
-                        style: const TextStyle(
-                          color: KashtaColors.textDark,
-                          fontSize: 10,
-                          height: 1.0,
-                          fontWeight: FontWeight.w900,
+                      Flexible(
+                        child: Text(
+                          item.averageRating.toStringAsFixed(1),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: KashtaColors.textDark,
+                            fontSize: 10,
+                            height: 1.0,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
                       ),
                     ],
