@@ -8,6 +8,7 @@ import '../../../core/providers/role_provider.dart';
 import '../../../core/theme/kashta_colors.dart';
 import '../../../core/utils/firestore_utils.dart';
 import '../../../core/utils/localization.dart';
+import '../../explore/models/place_suitability.dart';
 import '../../explore/services/place_service.dart';
 
 class PendingPlacesPage extends StatefulWidget {
@@ -22,6 +23,8 @@ class PendingPlacesPage extends StatefulWidget {
 class _PendingPlacesPageState extends State<PendingPlacesPage> {
   final PlaceService _placeService = PlaceService();
   final Set<String> _busyIds = <String>{};
+  final Map<String, PlaceSuitability> _selectedSuitabilityByPlaceId =
+      <String, PlaceSuitability>{};
 
   @override
   Widget build(BuildContext context) {
@@ -105,6 +108,8 @@ class _PendingPlacesPageState extends State<PendingPlacesPage> {
                         ),
                       ],
                       const SizedBox(height: 12),
+                      _buildSuitabilitySelector(placeId: placeId, tr: tr),
+                      const SizedBox(height: 12),
                       Row(
                         children: [
                           Expanded(
@@ -151,17 +156,92 @@ class _PendingPlacesPageState extends State<PendingPlacesPage> {
     );
   }
 
+  Widget _buildSuitabilitySelector({
+    required String placeId,
+    required Tr tr,
+  }) {
+    final selected = _selectedSuitabilityByPlaceId[placeId];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          tr.t('suitable_for_admin_label'),
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: PlaceSuitability.values.map((suitability) {
+            final isSelected = selected == suitability;
+            return ChoiceChip(
+              selected: isSelected,
+              onSelected: (_) {
+                setState(() {
+                  _selectedSuitabilityByPlaceId[placeId] = suitability;
+                });
+              },
+              showCheckmark: false,
+              avatar: Icon(
+                _suitabilityIcon(suitability),
+                size: 16,
+                color: isSelected ? Colors.white : KashtaColors.softOlive,
+              ),
+              label: Text(suitability.label(tr)),
+              selectedColor: KashtaColors.softOlive,
+              backgroundColor: KashtaColors.cardSurface,
+              side: BorderSide(
+                color: isSelected
+                    ? KashtaColors.softOlive
+                    : KashtaColors.sandBorder,
+              ),
+              labelStyle: TextStyle(
+                color: isSelected ? Colors.white : KashtaColors.textDark,
+                fontWeight: FontWeight.w700,
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  IconData _suitabilityIcon(PlaceSuitability suitability) {
+    switch (suitability) {
+      case PlaceSuitability.families:
+        return Icons.family_restroom_rounded;
+      case PlaceSuitability.youth:
+        return Icons.person_rounded;
+      case PlaceSuitability.both:
+        return Icons.groups_rounded;
+    }
+  }
+
   Future<void> _handleApproveReject({
     required String placeId,
     required bool approve,
   }) async {
+    final selectedSuitability = _selectedSuitabilityByPlaceId[placeId];
+    if (approve && selectedSuitability == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(widget.tr.t('select_suitable_for_before_approval')),
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _busyIds.add(placeId);
     });
 
     try {
       if (approve) {
-        await _placeService.approvePlace(placeId);
+        await _placeService.approvePlace(
+          placeId: placeId,
+          suitableFor: selectedSuitability!.value,
+        );
       } else {
         await _placeService.rejectPlace(placeId);
       }

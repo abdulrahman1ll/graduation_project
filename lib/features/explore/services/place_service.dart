@@ -39,9 +39,20 @@ class PlaceService {
     });
   }
 
-  Future<void> approvePlace(String placeId) async {
+  Future<void> approvePlace({
+    required String placeId,
+    required String suitableFor,
+  }) async {
+    final normalizedSuitableFor = suitableFor.trim().toLowerCase();
+    if (normalizedSuitableFor != 'families' &&
+        normalizedSuitableFor != 'youth' &&
+        normalizedSuitableFor != 'both') {
+      throw ArgumentError.value(suitableFor, 'suitableFor');
+    }
+
     await _firestore.collection('places').doc(placeId).update({
       'status': 'approved',
+      'suitableFor': normalizedSuitableFor,
     });
   }
 

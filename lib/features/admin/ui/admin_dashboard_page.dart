@@ -6,6 +6,7 @@ import '../../../core/providers/role_provider.dart';
 import '../../../core/theme/kashta_colors.dart';
 import '../../../core/utils/firestore_utils.dart';
 import '../../../core/utils/localization.dart';
+import '../../explore/models/place_suitability.dart';
 import '../../explore/services/place_service.dart';
 
 class AdminDashboardPage extends StatefulWidget {
@@ -31,6 +32,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   final PlaceService _placeService = PlaceService();
   final Set<String> _busyPlaceIds = <String>{};
   final Set<String> _busyReviewIds = <String>{};
+  final Map<String, PlaceSuitability> _selectedSuitabilityByPlaceId =
+      <String, PlaceSuitability>{};
 
   @override
   Widget build(BuildContext context) {
@@ -209,6 +212,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   const SizedBox(height: 4),
                   Text('Status: $status'),
                   const SizedBox(height: 10),
+                  if (showModerationActions) ...[
+                    _buildSuitabilitySelector(placeId: placeId),
+                    const SizedBox(height: 10),
+                  ],
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
@@ -259,6 +266,65 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         ),
       ),
     );
+  }
+
+  Widget _buildSuitabilitySelector({required String placeId}) {
+    final selected = _selectedSuitabilityByPlaceId[placeId];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          widget.tr.t('suitable_for_admin_label'),
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: PlaceSuitability.values.map((suitability) {
+            final isSelected = selected == suitability;
+            return ChoiceChip(
+              selected: isSelected,
+              onSelected: (_) {
+                setState(() {
+                  _selectedSuitabilityByPlaceId[placeId] = suitability;
+                });
+              },
+              showCheckmark: false,
+              avatar: Icon(
+                _suitabilityIcon(suitability),
+                size: 16,
+                color: isSelected ? Colors.white : KashtaColors.softOlive,
+              ),
+              label: Text(suitability.label(widget.tr)),
+              selectedColor: KashtaColors.softOlive,
+              backgroundColor: KashtaColors.cardSurface,
+              side: BorderSide(
+                color: isSelected
+                    ? KashtaColors.softOlive
+                    : KashtaColors.sandBorder,
+              ),
+              labelStyle: TextStyle(
+                color: isSelected ? Colors.white : KashtaColors.textDark,
+                fontWeight: FontWeight.w700,
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  IconData _suitabilityIcon(PlaceSuitability suitability) {
+    switch (suitability) {
+      case PlaceSuitability.families:
+        return Icons.family_restroom_rounded;
+      case PlaceSuitability.youth:
+        return Icons.person_rounded;
+      case PlaceSuitability.both:
+        return Icons.groups_rounded;
+    }
   }
 
   Widget _buildReviewItem(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
@@ -377,13 +443,22 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     required String placeId,
     required bool approve,
   }) async {
+    final selectedSuitability = _selectedSuitabilityByPlaceId[placeId];
+    if (approve && selectedSuitability == null) {
+      _showSnackBar(widget.tr.t('select_suitable_for_before_approval'));
+      return;
+    }
+
     setState(() {
       _busyPlaceIds.add(placeId);
     });
 
     try {
       if (approve) {
-        await _placeService.approvePlace(placeId);
+        await _placeService.approvePlace(
+          placeId: placeId,
+          suitableFor: selectedSuitability!.value,
+        );
       } else {
         await _placeService.rejectPlace(placeId);
       }

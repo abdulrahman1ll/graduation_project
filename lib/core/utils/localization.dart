@@ -96,6 +96,16 @@ class Tr {
     'reviews': 'Reviews',
     'weatherLabel': 'Weather',
     'windLabel': 'Wind',
+    'suitable_for_admin_label': 'Suitable For',
+    'suitable_for_display_label': 'Suitable for',
+    'suitable_families': 'Families',
+    'suitable_youth': 'Youth',
+    'suitable_both': 'Families & Youth',
+    'not_specified': 'Not specified',
+    'no_image_available': 'No image available',
+    'no_reviews_yet': 'No reviews yet.',
+    'select_suitable_for_before_approval':
+        'Please select who this place is suitable for before approval.',
     'load_error': 'Failed to load trips',
     'no_trips': 'No trips yet. Add a new trip.',
     'new_trip': 'New Trip',
@@ -433,6 +443,19 @@ class Tr {
     'reviews': '\u0627\u0644\u0645\u0631\u0627\u062c\u0639\u0627\u062a',
     'weatherLabel': '\u0627\u0644\u0637\u0642\u0633',
     'windLabel': '\u0627\u0644\u0631\u064a\u0627\u062d',
+    'suitable_for_admin_label': '\u0645\u0646\u0627\u0633\u0628 \u0644\u0640',
+    'suitable_for_display_label': '\u0645\u0646\u0627\u0633\u0628 \u0644\u0640',
+    'suitable_families': '\u0627\u0644\u0639\u0648\u0627\u0626\u0644',
+    'suitable_youth': '\u0627\u0644\u0634\u0628\u0627\u0628',
+    'suitable_both':
+        '\u0627\u0644\u0639\u0648\u0627\u0626\u0644 \u0648\u0627\u0644\u0634\u0628\u0627\u0628',
+    'not_specified': '\u063a\u064a\u0631 \u0645\u062d\u062f\u062f',
+    'no_image_available':
+        '\u0644\u0627 \u062a\u0648\u062c\u062f \u0635\u0648\u0631\u0629',
+    'no_reviews_yet':
+        '\u0644\u0627 \u062a\u0648\u062c\u062f \u0645\u0631\u0627\u062c\u0639\u0627\u062a \u0628\u0639\u062f.',
+    'select_suitable_for_before_approval':
+        '\u064a\u0631\u062c\u0649 \u062a\u062d\u062f\u064a\u062f \u0644\u0645\u0646 \u064a\u0646\u0627\u0633\u0628 \u0647\u0630\u0627 \u0627\u0644\u0645\u0643\u0627\u0646 \u0642\u0628\u0644 \u0627\u0644\u0645\u0648\u0627\u0641\u0642\u0629.',
     'load_error':
         '\u062a\u0639\u0630\u0631 \u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u0631\u062d\u0644\u0627\u062a',
     'no_trips':
