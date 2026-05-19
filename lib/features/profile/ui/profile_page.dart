@@ -8,6 +8,7 @@ import '../../../core/utils/localization.dart';
 import '../../../core/widgets/language_app_bar.dart';
 import '../../../widgets/kashta_background.dart';
 import '../../safety/ui/safety_checkin_page.dart';
+import 'favorites_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({
@@ -16,24 +17,25 @@ class ProfilePage extends StatefulWidget {
     required this.isArabic,
     required this.onToggleLanguage,
     required this.onOpenAdminDashboard,
+    required this.onOpenPlace,
   });
 
   final Tr tr;
   final bool isArabic;
   final VoidCallback onToggleLanguage;
   final VoidCallback onOpenAdminDashboard;
+  final void Function({
+    required String placeId,
+    required double lat,
+    required double lng,
+    required bool openDetailsOnLoad,
+  }) onOpenPlace;
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  void _showComingSoon(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
-  }
-
   @override
   Widget build(BuildContext context) {
     final isAnonymous = FirebaseAuth.instance.currentUser?.isAnonymous ?? false;
@@ -61,23 +63,10 @@ class _ProfilePageState extends State<ProfilePage> {
             const SizedBox(height: 8),
             Card(
               child: ListTile(
-                leading: const Icon(Icons.edit_outlined),
-                title: Text(widget.tr.t('edit_profile')),
-                onTap: () => _showComingSoon(widget.tr.t('coming_soon')),
-              ),
-            ),
-            Card(
-              child: ListTile(
-                leading: const Icon(Icons.hiking_outlined),
-                title: Text(widget.tr.t('my_trips')),
-                onTap: () => _showComingSoon(widget.tr.t('coming_soon')),
-              ),
-            ),
-            Card(
-              child: ListTile(
                 leading: const Icon(Icons.star_border),
                 title: Text(widget.tr.t('favorites')),
-                onTap: () => _showComingSoon(widget.tr.t('coming_soon')),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: _openFavorites,
               ),
             ),
             Card(
@@ -129,6 +118,19 @@ class _ProfilePageState extends State<ProfilePage> {
           tr: widget.tr,
           isArabic: widget.isArabic,
           onToggleLanguage: widget.onToggleLanguage,
+        ),
+      ),
+    );
+  }
+
+  void _openFavorites() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FavoritesPage(
+          tr: widget.tr,
+          isArabic: widget.isArabic,
+          onToggleLanguage: widget.onToggleLanguage,
+          onOpenPlace: widget.onOpenPlace,
         ),
       ),
     );

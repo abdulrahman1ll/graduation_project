@@ -279,6 +279,9 @@ class Tr {
     'signed_in_account': 'Signed in account',
     'sign_out': 'Sign Out',
     'favorites': 'Favorites',
+    'no_favorite_places_yet': 'No favorite places yet.',
+    'untitled_place': 'Untitled place',
+    'place_location_unavailable': 'Place location is unavailable.',
     'desert': 'Desert',
     'beach': 'Beach',
     'family': 'Family',
@@ -684,6 +687,12 @@ class Tr {
     'signed_in_account': '\u062d\u0633\u0627\u0628 \u0645\u0633\u062c\u0644',
     'sign_out': '\u062a\u0633\u062c\u064a\u0644 \u062e\u0631\u0648\u062c',
     'favorites': '\u0627\u0644\u0645\u0641\u0636\u0644\u0629',
+    'no_favorite_places_yet':
+        '\u0644\u0627 \u062a\u0648\u062c\u062f \u0623\u0645\u0627\u0643\u0646 \u0645\u0641\u0636\u0644\u0629 \u0628\u0639\u062f.',
+    'untitled_place':
+        '\u0645\u0643\u0627\u0646 \u0628\u0644\u0627 \u0627\u0633\u0645',
+    'place_location_unavailable':
+        '\u0645\u0648\u0642\u0639 \u0627\u0644\u0645\u0643\u0627\u0646 \u063a\u064a\u0631 \u0645\u062a\u0627\u062d.',
     'desert': '\u0635\u062d\u0631\u0627\u0621',
     'beach': '\u0634\u0627\u0637\u0626',
     'family': '\u0639\u0627\u0626\u0644\u064a',

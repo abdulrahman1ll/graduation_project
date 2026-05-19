@@ -10,6 +10,7 @@ import '../../../../core/models/app_language.dart';
 import '../../../../core/theme/kashta_colors.dart';
 import '../../../../core/utils/localization.dart';
 import '../../models/place_suitability.dart';
+import '../../../profile/services/favorite_service.dart';
 
 class PlaceDetailsSheet extends StatefulWidget {
   const PlaceDetailsSheet({
@@ -39,6 +40,7 @@ class PlaceDetailsSheet extends StatefulWidget {
 
 class _PlaceDetailsSheetState extends State<PlaceDetailsSheet> {
   final TextEditingController _commentController = TextEditingController();
+  final FavoriteService _favoriteService = FavoriteService();
 
   int _selectedRating = 0;
   Uint8List? _selectedImageBytes;
@@ -227,13 +229,22 @@ class _PlaceDetailsSheetState extends State<PlaceDetailsSheet> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      (widget.data['name'] ?? '').toString(),
-                      style: const TextStyle(
-                        color: KashtaColors.textDark,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w900,
-                      ),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            (widget.data['name'] ?? '').toString(),
+                            style: const TextStyle(
+                              color: KashtaColors.textDark,
+                              fontSize: 24,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        _buildFavoriteButton(),
+                      ],
                     ),
                     const SizedBox(height: 10),
                     _buildInfoRow(
@@ -287,6 +298,52 @@ class _PlaceDetailsSheetState extends State<PlaceDetailsSheet> {
             : imageSource.buildImage(fit: BoxFit.cover),
       ),
     );
+  }
+
+  Widget _buildFavoriteButton() {
+    return StreamBuilder<bool>(
+      stream: _favoriteService.isFavoriteStream(widget.placeId),
+      builder: (context, snapshot) {
+        final isFavorite = snapshot.data ?? false;
+
+        return IconButton.filledTonal(
+          tooltip: widget.tr.t('favorites'),
+          onPressed: () => _toggleFavorite(),
+          icon: Icon(
+            isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+          ),
+          color: isFavorite ? KashtaColors.primary : KashtaColors.textDark,
+          style: IconButton.styleFrom(
+            backgroundColor: KashtaColors.backgroundCream,
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _toggleFavorite() async {
+    try {
+      await _favoriteService.toggleFavorite(
+        placeId: widget.placeId,
+        placeData: widget.data,
+      );
+    } on FirebaseException catch (e) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message ?? e.code)),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(widget.tr.t('operation_failed'))),
+      );
+    }
   }
 
   Widget _buildReviewFallbackHeaderImage() {

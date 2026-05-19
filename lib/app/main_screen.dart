@@ -62,6 +62,7 @@ class _MainScreenState extends State<MainScreen> {
         isArabic: widget.isArabic,
         onToggleLanguage: widget.onToggleLanguage,
         onOpenAdminDashboard: _openAdminDashboard,
+        onOpenPlace: _openPlaceOnExploreMap,
       ),
     ];
 
