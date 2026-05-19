@@ -7,22 +7,42 @@ import '../models/group.dart';
 import '../services/group_service.dart';
 import '../helpers/group_checklist_flow.dart';
 import '../../../core/models/app_language.dart';
-import '../../../core/theme/kashta_colors.dart';
 import '../../trips/ui/add_trip_page.dart';
 import '../../trips/models/trip_member.dart';
 import '../../trips/services/trip_service.dart';
 import '../../../core/utils/firestore_utils.dart';
 import '../../../core/utils/localization.dart';
 
-const Color _detailsBackground = KashtaColors.backgroundCream;
-const Color _detailsCard = KashtaColors.cardSurface;
-const Color _detailsCardBorder = KashtaColors.sandBorder;
-const Color _detailsSoftOrange = KashtaColors.softOrange;
-const Color _detailsOrange = KashtaColors.primary;
-const Color _detailsBrown = KashtaColors.textDark;
-const Color _detailsDarkText = KashtaColors.textDark;
-const Color _detailsMutedText = KashtaColors.textDark;
+const Color _detailsBackground = Color(0xFFFDF3E6);
+const Color _detailsCard = Color(0xFFFFF9F1);
+const Color _detailsCardBorder = Color(0xFFEFDFCD);
+const Color _detailsSoftPeach = Color(0xFFFBE1D3);
+const Color _detailsAvatarClay = Color(0xFFE29F79);
+const Color _detailsOrange = Color(0xFFD97845);
+const Color _detailsDarkText = Color(0xFF2E2B28);
+const Color _detailsMutedText = Color(0xFF7A6A5B);
+const Color _detailsWarmShadow = Color(0xFF8A5A2B);
 const double _detailsRadius = 16;
+
+List<BoxShadow> _detailsSoftShadow({double opacity = 0.08}) {
+  return [
+    BoxShadow(
+      color: _detailsWarmShadow.withValues(alpha: opacity),
+      blurRadius: 16,
+      offset: const Offset(0, 6),
+    ),
+  ];
+}
+
+Color _memberAvatarColor(int index) {
+  const colors = <Color>[
+    Color(0xFFAAC0AF),
+    Color(0xFFE29F79),
+    Color(0xFFEFDFCD),
+    Color(0xFFD6E1D8),
+  ];
+  return colors[index % colors.length];
+}
 
 class GroupDetailsPage extends StatelessWidget {
   const GroupDetailsPage({
@@ -247,7 +267,8 @@ class GroupDetailsPage extends StatelessWidget {
                 const SizedBox(height: 8),
                 Text(
                   tr.t('shareInvitationCode'),
-                  style: const TextStyle(color: _detailsBrown, height: 1.35),
+                  style:
+                      const TextStyle(color: _detailsMutedText, height: 1.35),
                 ),
                 const SizedBox(height: 18),
                 Text(
@@ -284,7 +305,7 @@ class GroupDetailsPage extends StatelessWidget {
                     Expanded(
                       child: OutlinedButton.icon(
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: _detailsBrown,
+                          foregroundColor: _detailsDarkText,
                           side: const BorderSide(color: _detailsCardBorder),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(999),
@@ -393,26 +414,19 @@ class GroupDetailsPage extends StatelessWidget {
                           padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
                           children: [
                             Center(
-                              child: Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: const BoxDecoration(
-                                  color: _detailsSoftOrange,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: CircleAvatar(
-                                  radius: 46,
-                                  backgroundColor: _detailsSoftOrange,
-                                  backgroundImage: group.imageUrl == null
-                                      ? null
-                                      : NetworkImage(group.imageUrl!),
-                                  child: group.imageUrl == null
-                                      ? const Icon(
-                                          Icons.groups_rounded,
-                                          size: 38,
-                                          color: _detailsOrange,
-                                        )
-                                      : null,
-                                ),
+                              child: CircleAvatar(
+                                radius: 43,
+                                backgroundColor: _detailsAvatarClay,
+                                backgroundImage: group.imageUrl == null
+                                    ? null
+                                    : NetworkImage(group.imageUrl!),
+                                child: group.imageUrl == null
+                                    ? const Icon(
+                                        Icons.groups_rounded,
+                                        size: 34,
+                                        color: Colors.white,
+                                      )
+                                    : null,
                               ),
                             ),
                             const SizedBox(height: 14),
@@ -448,46 +462,51 @@ class GroupDetailsPage extends StatelessWidget {
                                   .textTheme
                                   .bodyMedium
                                   ?.copyWith(
-                                    color: _detailsBrown,
+                                    color: _detailsMutedText,
                                     height: 1.35,
                                   ),
                             ),
                             const SizedBox(height: 20),
-                            Card(
-                              elevation: 0,
-                              color: _detailsCard,
-                              shape: RoundedRectangleBorder(
+                            Container(
+                              decoration: BoxDecoration(
+                                color: _detailsCard,
                                 borderRadius:
                                     BorderRadius.circular(_detailsRadius),
-                                side: const BorderSide(
-                                  color: _detailsCardBorder,
-                                ),
+                                boxShadow: _detailsSoftShadow(),
                               ),
-                              child: ListTile(
-                                leading: const CircleAvatar(
-                                  backgroundColor: _detailsSoftOrange,
-                                  child: Icon(
-                                    Icons.group_add_outlined,
-                                    color: _detailsOrange,
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  borderRadius:
+                                      BorderRadius.circular(_detailsRadius),
+                                  onTap: () => _showInviteMembersSheet(context),
+                                  child: ListTile(
+                                    leading: const CircleAvatar(
+                                      backgroundColor: _detailsSoftPeach,
+                                      child: Icon(
+                                        Icons.group_add_outlined,
+                                        color: _detailsOrange,
+                                      ),
+                                    ),
+                                    title: Text(
+                                      tr.t('inviteMembers'),
+                                      style: const TextStyle(
+                                        color: _detailsDarkText,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    subtitle: Text(
+                                      tr.t('shareInvitationCodeShort'),
+                                      style: const TextStyle(
+                                        color: _detailsMutedText,
+                                      ),
+                                    ),
+                                    trailing: const Icon(
+                                      Icons.chevron_right,
+                                      color: _detailsMutedText,
+                                    ),
                                   ),
                                 ),
-                                title: Text(
-                                  tr.t('inviteMembers'),
-                                  style: const TextStyle(
-                                    color: _detailsDarkText,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                subtitle: Text(
-                                  tr.t('shareInvitationCodeShort'),
-                                  style:
-                                      const TextStyle(color: _detailsMutedText),
-                                ),
-                                trailing: const Icon(
-                                  Icons.chevron_right,
-                                  color: _detailsBrown,
-                                ),
-                                onTap: () => _showInviteMembersSheet(context),
                               ),
                             ),
                             const SizedBox(height: 12),
@@ -498,6 +517,8 @@ class GroupDetailsPage extends StatelessWidget {
                                     style: FilledButton.styleFrom(
                                       backgroundColor: _detailsOrange,
                                       foregroundColor: Colors.white,
+                                      minimumSize:
+                                          const Size.fromHeight(48),
                                       padding: const EdgeInsets.symmetric(
                                         vertical: 14,
                                       ),
@@ -525,7 +546,10 @@ class GroupDetailsPage extends StatelessWidget {
                                 Expanded(
                                   child: OutlinedButton.icon(
                                     style: OutlinedButton.styleFrom(
-                                      foregroundColor: _detailsBrown,
+                                      backgroundColor: _detailsCard,
+                                      foregroundColor: _detailsOrange,
+                                      minimumSize:
+                                          const Size.fromHeight(48),
                                       side: const BorderSide(
                                         color: _detailsCardBorder,
                                       ),
@@ -602,16 +626,13 @@ class GroupDetailsPage extends StatelessWidget {
                                       (tripData['tripDate'] as Timestamp?)
                                           ?.toDate();
 
-                                  return Card(
-                                    elevation: 0,
-                                    color: _detailsCard,
-                                    shape: RoundedRectangleBorder(
+                                  return Container(
+                                    decoration: BoxDecoration(
+                                      color: _detailsCard,
                                       borderRadius: BorderRadius.circular(
                                         _detailsRadius,
                                       ),
-                                      side: const BorderSide(
-                                        color: _detailsCardBorder,
-                                      ),
+                                      boxShadow: _detailsSoftShadow(),
                                     ),
                                     child: Padding(
                                       padding: const EdgeInsets.all(16),
@@ -636,7 +657,7 @@ class GroupDetailsPage extends StatelessWidget {
                                               vertical: 6,
                                             ),
                                             decoration: BoxDecoration(
-                                              color: _detailsSoftOrange,
+                                              color: _detailsSoftPeach,
                                               borderRadius:
                                                   BorderRadius.circular(999),
                                             ),
@@ -656,7 +677,7 @@ class GroupDetailsPage extends StatelessWidget {
                                                           tripDate,
                                                         ),
                                                   style: const TextStyle(
-                                                    color: _detailsBrown,
+                                                    color: _detailsDarkText,
                                                     fontWeight: FontWeight.w700,
                                                   ),
                                                 ),
@@ -701,8 +722,8 @@ class GroupDetailsPage extends StatelessWidget {
                                 ),
                               )
                             else
-                              ...memberIds.map(
-                                (memberId) => Container(
+                              ...memberIds.asMap().entries.map(
+                                (entry) => Container(
                                   margin: const EdgeInsets.only(bottom: 10),
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 12,
@@ -711,25 +732,25 @@ class GroupDetailsPage extends StatelessWidget {
                                   decoration: BoxDecoration(
                                     color: _detailsCard,
                                     borderRadius: BorderRadius.circular(14),
-                                    border: Border.all(
-                                      color: _detailsCardBorder,
-                                    ),
+                                    boxShadow:
+                                        _detailsSoftShadow(opacity: 0.07),
                                   ),
                                   child: Row(
                                     children: [
-                                      const CircleAvatar(
+                                      CircleAvatar(
                                         radius: 18,
-                                        backgroundColor: _detailsSoftOrange,
-                                        child: Icon(
+                                        backgroundColor:
+                                            _memberAvatarColor(entry.key),
+                                        child: const Icon(
                                           Icons.person,
                                           size: 18,
-                                          color: _detailsOrange,
+                                          color: _detailsDarkText,
                                         ),
                                       ),
                                       const SizedBox(width: 12),
                                       Expanded(
                                         child: Text(
-                                          memberNames[memberId] ??
+                                          memberNames[entry.value] ??
                                               tr.t('member'),
                                           style: const TextStyle(
                                             color: _detailsDarkText,

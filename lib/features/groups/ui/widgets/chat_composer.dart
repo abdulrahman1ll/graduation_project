@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/kashta_colors.dart';
 import '../../../../core/utils/localization.dart';
 
+const Color _chatPrimaryOrange = Color(0xFFD97845);
+const Color _chatCardSurface = Color(0xFFFFF9F1);
+
 class ChatComposer extends StatefulWidget {
   const ChatComposer({
     super.key,
@@ -61,7 +64,7 @@ class _ChatComposerState extends State<ChatComposer> {
                     ? widget.tr.t('writeMessage')
                     : widget.tr.t('joinGroupToChat'),
                 filled: true,
-                fillColor: KashtaColors.cardSurface,
+                fillColor: _chatCardSurface,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(16),
                   borderSide: BorderSide(
@@ -79,7 +82,7 @@ class _ChatComposerState extends State<ChatComposer> {
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(16),
                   borderSide: BorderSide(
-                    color: KashtaColors.primary.withValues(alpha: 0.48),
+                    color: _chatPrimaryOrange.withValues(alpha: 0.48),
                     width: 1,
                   ),
                 ),
@@ -94,7 +97,7 @@ class _ChatComposerState extends State<ChatComposer> {
           FilledButton(
             onPressed: widget.enabled && !widget.isSending ? _submit : null,
             style: FilledButton.styleFrom(
-              backgroundColor: KashtaColors.primary,
+              backgroundColor: _chatPrimaryOrange,
               foregroundColor: Colors.white,
               minimumSize: const Size(46, 46),
               maximumSize: const Size(46, 46),

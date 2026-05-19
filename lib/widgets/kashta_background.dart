@@ -6,11 +6,13 @@ class KashtaBackground extends StatelessWidget {
   const KashtaBackground({
     super.key,
     required this.child,
+    this.imagePath = 'assets/tripPic.png',
     this.overlayColor = KashtaColors.backgroundCream,
     this.overlayOpacity = 0.35,
   });
 
   final Widget child;
+  final String imagePath;
   final Color overlayColor;
   final double overlayOpacity;
 
@@ -20,7 +22,7 @@ class KashtaBackground extends StatelessWidget {
       children: [
         Positioned.fill(
           child: Image.asset(
-            'assets/orr.png',
+            imagePath,
             fit: BoxFit.cover,
           ),
         ),

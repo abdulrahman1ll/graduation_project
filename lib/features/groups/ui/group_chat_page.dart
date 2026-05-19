@@ -15,6 +15,11 @@ import 'group_details_page.dart';
 import 'widgets/chat_composer.dart';
 import 'widgets/chat_message_bubble.dart';
 
+const Color _chatPrimaryOrange = Color(0xFFD97845);
+const Color _chatBackgroundCream = Color(0xFFFDF3E6);
+const Color _chatSoftOrangeTint = Color(0xFFF38D68);
+const Color _chatCardSurface = Color(0xFFFFF9F1);
+
 class GroupChatPage extends StatefulWidget {
   const GroupChatPage({
     super.key,
@@ -191,6 +196,25 @@ class _GroupChatPageState extends State<GroupChatPage> {
     return ChatMessageType.text;
   }
 
+  bool _isSameVisualMessageGroup(
+    List<ChatMessage> messages,
+    int firstIndex,
+    int secondIndex,
+  ) {
+    if (firstIndex < 0 ||
+        secondIndex < 0 ||
+        firstIndex >= messages.length ||
+        secondIndex >= messages.length) {
+      return false;
+    }
+
+    final first = messages[firstIndex];
+    final second = messages[secondIndex];
+    return first.type != ChatMessageType.system &&
+        second.type != ChatMessageType.system &&
+        first.senderId == second.senderId;
+  }
+
   void _showError(String message) {
     if (!mounted) {
       return;
@@ -240,14 +264,14 @@ class _GroupChatPageState extends State<GroupChatPage> {
                   CircleAvatar(
                     radius: 20,
                     backgroundColor:
-                        KashtaColors.softOrange.withValues(alpha: 0.24),
+                        _chatSoftOrangeTint.withValues(alpha: 0.24),
                     backgroundImage: group?.imageUrl == null
                         ? null
                         : NetworkImage(group!.imageUrl!),
                     child: group?.imageUrl == null
                         ? const Icon(
                             Icons.groups,
-                            color: KashtaColors.primary,
+                            color: _chatPrimaryOrange,
                           )
                         : null,
                   ),
@@ -294,7 +318,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
               ),
               Positioned.fill(
                 child: Container(
-                  color: Colors.transparent,
+                  color: _chatBackgroundCream.withValues(alpha: 0.50),
                 ),
               ),
               Column(
@@ -340,14 +364,26 @@ class _GroupChatPageState extends State<GroupChatPage> {
                             final message = messages[index];
                             final senderName = _senderNames[message.senderId] ??
                                 tr.t('member');
+                            final isFirstInGroup =
+                                !_isSameVisualMessageGroup(
+                              messages,
+                              index - 1,
+                              index,
+                            );
+                            final isLastInGroup =
+                                !_isSameVisualMessageGroup(
+                              messages,
+                              index,
+                              index + 1,
+                            );
                             return ChatMessageBubble(
                               key: ValueKey(message.id),
                               message: message,
                               senderName: senderName,
                               tr: tr,
                               currentUserId: _currentUserId,
-                              isSeenByCurrentUser: _currentUserId != null &&
-                                  message.hasRead(_currentUserId!),
+                              isFirstInGroup: isFirstInGroup,
+                              isLastInGroup: isLastInGroup,
                               canPin: _role == GroupRole.admin &&
                                   message.type != ChatMessageType.system,
                               onTogglePin: () => _togglePin(message),
@@ -411,7 +447,7 @@ class _PinnedMessageBanner extends StatelessWidget {
             margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: KashtaColors.softOrange.withValues(alpha: 0.20),
+              color: _chatSoftOrangeTint.withValues(alpha: 0.20),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
@@ -419,7 +455,7 @@ class _PinnedMessageBanner extends StatelessWidget {
                 const Icon(
                   Icons.push_pin,
                   size: 16,
-                  color: KashtaColors.primary,
+                  color: _chatPrimaryOrange,
                 ),
                 const SizedBox(width: 6),
                 Expanded(
@@ -473,7 +509,7 @@ class _PinnedMessageBanner extends StatelessWidget {
                     return Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: KashtaColors.cardSurface,
+                        color: _chatCardSurface,
                         border: Border.all(color: KashtaColors.sandBorder),
                         borderRadius: BorderRadius.circular(12),
                       ),

@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/theme/kashta_colors.dart';
 import '../../../../core/utils/localization.dart';
 import '../../models/chat_message.dart';
 import '../../models/chat_types.dart';
+
+const Color _chatPrimaryOrange = Color(0xFFD97845);
+const Color _chatSandBorder = Color(0xFFEFDFCD);
+const Color _chatOtherUserBubble = Color(0xFFEEF3EA);
+const Color _chatMyMessageBubble = Color(0xFFFBE1D3);
+const Color _chatCardSurface = Color(0xFFFFF9F1);
+const Color _chatTextDark = Color(0xFF2E2B28);
+const Color _chatTextSecondary = Color(0xFF7A6A5B);
 
 String localizedSystemMessageContent(Tr tr, String content) {
   const createdSuffix = ' created the group';
@@ -40,7 +47,8 @@ class ChatMessageBubble extends StatelessWidget {
     required this.senderName,
     required this.tr,
     required this.currentUserId,
-    required this.isSeenByCurrentUser,
+    required this.isFirstInGroup,
+    required this.isLastInGroup,
     required this.canPin,
     required this.onTogglePin,
   });
@@ -49,7 +57,8 @@ class ChatMessageBubble extends StatelessWidget {
   final String senderName;
   final Tr tr;
   final String? currentUserId;
-  final bool isSeenByCurrentUser;
+  final bool isFirstInGroup;
+  final bool isLastInGroup;
   final bool canPin;
   final VoidCallback onTogglePin;
 
@@ -60,19 +69,19 @@ class ChatMessageBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     if (message.type == ChatMessageType.system) {
       return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
+        padding: const EdgeInsets.symmetric(vertical: 8),
         child: Center(
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: KashtaColors.cardSurface,
-              border: Border.all(color: KashtaColors.sandBorder),
+              color: _chatCardSurface,
+              border: Border.all(color: _chatSandBorder),
               borderRadius: BorderRadius.circular(999),
             ),
             child: Text(
               localizedSystemMessageContent(tr, message.content),
               style: const TextStyle(
-                color: KashtaColors.textDark,
+                color: _chatTextSecondary,
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
               ),
@@ -83,20 +92,23 @@ class ChatMessageBubble extends StatelessWidget {
       );
     }
 
-    final backgroundColor = _isMine
-        ? KashtaColors.softOrange.withValues(alpha: 0.20)
-        : KashtaColors.cardSurface;
+    final backgroundColor =
+        _isMine ? _chatMyMessageBubble : _chatOtherUserBubble;
     final alignment =
         _isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start;
     final radius = BorderRadius.only(
-      topLeft: const Radius.circular(18),
-      topRight: const Radius.circular(18),
-      bottomLeft: Radius.circular(_isMine ? 18 : 4),
-      bottomRight: Radius.circular(_isMine ? 4 : 18),
+      topLeft: Radius.circular(!_isMine && !isFirstInGroup ? 8 : 18),
+      topRight: Radius.circular(_isMine && !isFirstInGroup ? 8 : 18),
+      bottomLeft: Radius.circular(!_isMine && !isLastInGroup ? 8 : 18),
+      bottomRight: Radius.circular(_isMine && !isLastInGroup ? 8 : 18),
     );
+    final showSenderName = !_isMine && isFirstInGroup;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: EdgeInsets.only(
+        top: isFirstInGroup ? 9 : 2,
+        bottom: isLastInGroup ? 9 : 2,
+      ),
       child: GestureDetector(
         onLongPress: canPin
             ? () async {
@@ -142,64 +154,57 @@ class ChatMessageBubble extends StatelessWidget {
                     color: backgroundColor,
                     borderRadius: radius,
                     border: message.isPinned
-                        ? Border.all(color: KashtaColors.primary, width: 1.2)
+                        ? Border.all(color: _chatPrimaryOrange, width: 1.1)
                         : null,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        _isMine ? tr.t('you') : senderName,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: KashtaColors.textDark,
+                      if (showSenderName) ...[
+                        Text(
+                          senderName,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: _chatTextDark,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 4),
+                        const SizedBox(height: 4),
+                      ],
                       SelectableText(
                         message.content,
                         style: TextStyle(
                           fontSize: 15,
                           color: message.type == ChatMessageType.link
-                              ? KashtaColors.primary
-                              : null,
+                              ? _chatPrimaryOrange
+                              : _chatTextDark,
                           decoration: message.type == ChatMessageType.link
                               ? TextDecoration.underline
                               : TextDecoration.none,
                         ),
                       ),
-                      const SizedBox(height: 6),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            _formatTime(message.createdAt),
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: KashtaColors.textDark,
-                            ),
+                      if (isLastInGroup) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          _footerText,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: _chatTextSecondary,
+                            fontWeight: FontWeight.w500,
                           ),
-                          const SizedBox(width: 8),
-                          Text(
-                            isSeenByCurrentUser ? tr.t('seen') : tr.t('sent'),
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: KashtaColors.textDark,
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
                 if (message.isPinned)
-                  const Positioned(
+                  const PositionedDirectional(
                     top: 8,
-                    right: 8,
-                    child: Text(
-                      '📌',
-                      style: TextStyle(fontSize: 14),
+                    end: 8,
+                    child: Icon(
+                      Icons.push_pin,
+                      size: 14,
+                      color: _chatTextSecondary,
                     ),
                   ),
               ],
@@ -208,6 +213,14 @@ class ChatMessageBubble extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String get _footerText {
+    final time = _formatTime(message.createdAt);
+    if (!_isMine || message.createdAt == null) {
+      return time;
+    }
+    return '$time \u2713\u2713';
   }
 
   String _formatTime(DateTime? value) {
