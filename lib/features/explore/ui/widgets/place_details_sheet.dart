@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/models/app_language.dart';
+import '../../../../core/theme/kashta_colors.dart';
 import '../../../../core/utils/localization.dart';
 
 class PlaceDetailsSheet extends StatefulWidget {
@@ -237,7 +238,7 @@ class _PlaceDetailsSheetState extends State<PlaceDetailsSheet> {
                         children: [
                           const Icon(
                             Icons.thermostat,
-                            color: Colors.orange,
+                            color: KashtaColors.primary,
                           ),
                           const SizedBox(width: 6),
                           Text('${temp.toStringAsFixed(1)} \u00B0C'),
@@ -245,7 +246,7 @@ class _PlaceDetailsSheetState extends State<PlaceDetailsSheet> {
                       ),
                       Row(
                         children: [
-                          const Icon(Icons.cloud, color: Colors.grey),
+                          const Icon(Icons.cloud, color: KashtaColors.textDark),
                           const SizedBox(width: 6),
                           Text(
                             "${widget.tr.t('weatherLabel')}: $displayWeather",
@@ -254,7 +255,7 @@ class _PlaceDetailsSheetState extends State<PlaceDetailsSheet> {
                       ),
                       Row(
                         children: [
-                          const Icon(Icons.air, color: Colors.blue),
+                          const Icon(Icons.air, color: KashtaColors.softOlive),
                           const SizedBox(width: 6),
                           Text(
                             "${widget.tr.t('windLabel')}: "
@@ -266,7 +267,7 @@ class _PlaceDetailsSheetState extends State<PlaceDetailsSheet> {
                         children: [
                           const Icon(
                             Icons.emoji_nature,
-                            color: Colors.green,
+                            color: KashtaColors.softOlive,
                           ),
                           const SizedBox(width: 6),
                           Text(
@@ -302,7 +303,7 @@ class _PlaceDetailsSheetState extends State<PlaceDetailsSheet> {
                   return IconButton(
                     icon: Icon(
                       index < _selectedRating ? Icons.star : Icons.star_border,
-                      color: Colors.orange,
+                      color: KashtaColors.primary,
                     ),
                     onPressed: () {
                       setState(() {
@@ -471,7 +472,7 @@ class _PlaceDetailsSheetState extends State<PlaceDetailsSheet> {
                                     review['rating'] ?? 0,
                                     (index) => const Icon(
                                       Icons.star,
-                                      color: Colors.orange,
+                                      color: KashtaColors.primary,
                                       size: 18,
                                     ),
                                   ),

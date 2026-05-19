@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/kashta_colors.dart';
 import '../../../../core/utils/localization.dart';
 import '../../models/chat_message.dart';
 import '../../models/chat_types.dart';
@@ -64,13 +65,14 @@ class ChatMessageBubble extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: const Color(0xFFF3F4F6),
+              color: KashtaColors.cardSurface,
+              border: Border.all(color: KashtaColors.sandBorder),
               borderRadius: BorderRadius.circular(999),
             ),
             child: Text(
               localizedSystemMessageContent(tr, message.content),
               style: const TextStyle(
-                color: Color(0xFF4B5563),
+                color: KashtaColors.textDark,
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
               ),
@@ -81,8 +83,9 @@ class ChatMessageBubble extends StatelessWidget {
       );
     }
 
-    final backgroundColor =
-        _isMine ? const Color(0xFFFEE8C7) : const Color(0xFFEEFAEE);
+    final backgroundColor = _isMine
+        ? KashtaColors.softOrange.withValues(alpha: 0.20)
+        : KashtaColors.cardSurface;
     final alignment =
         _isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start;
     final radius = BorderRadius.only(
@@ -139,7 +142,7 @@ class ChatMessageBubble extends StatelessWidget {
                     color: backgroundColor,
                     borderRadius: radius,
                     border: message.isPinned
-                        ? Border.all(color: Colors.orange, width: 1.2)
+                        ? Border.all(color: KashtaColors.primary, width: 1.2)
                         : null,
                   ),
                   child: Column(
@@ -150,7 +153,7 @@ class ChatMessageBubble extends StatelessWidget {
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFF6B7280),
+                          color: KashtaColors.textDark,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -159,7 +162,7 @@ class ChatMessageBubble extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 15,
                           color: message.type == ChatMessageType.link
-                              ? Colors.blue.shade700
+                              ? KashtaColors.primary
                               : null,
                           decoration: message.type == ChatMessageType.link
                               ? TextDecoration.underline
@@ -174,7 +177,7 @@ class ChatMessageBubble extends StatelessWidget {
                             _formatTime(message.createdAt),
                             style: const TextStyle(
                               fontSize: 11,
-                              color: Color(0xFF6B7280),
+                              color: KashtaColors.textDark,
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -182,7 +185,7 @@ class ChatMessageBubble extends StatelessWidget {
                             isSeenByCurrentUser ? tr.t('seen') : tr.t('sent'),
                             style: const TextStyle(
                               fontSize: 11,
-                              color: Color(0xFF6B7280),
+                              color: KashtaColors.textDark,
                             ),
                           ),
                         ],

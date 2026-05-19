@@ -7,20 +7,21 @@ import '../models/group.dart';
 import '../services/group_service.dart';
 import '../helpers/group_checklist_flow.dart';
 import '../../../core/models/app_language.dart';
+import '../../../core/theme/kashta_colors.dart';
 import '../../trips/ui/add_trip_page.dart';
 import '../../trips/models/trip_member.dart';
 import '../../trips/services/trip_service.dart';
 import '../../../core/utils/firestore_utils.dart';
 import '../../../core/utils/localization.dart';
 
-const Color _detailsBackground = Color(0xFFFFF8EF);
-const Color _detailsCard = Color(0xFFFFFBF5);
-const Color _detailsCardBorder = Color(0xFFF0DEC8);
-const Color _detailsSoftOrange = Color(0xFFFFE8C2);
-const Color _detailsOrange = Color(0xFFFF8A00);
-const Color _detailsBrown = Color(0xFF6B4F35);
-const Color _detailsDarkText = Color(0xFF2F2419);
-const Color _detailsMutedText = Color(0xFF8A735C);
+const Color _detailsBackground = KashtaColors.backgroundCream;
+const Color _detailsCard = KashtaColors.cardSurface;
+const Color _detailsCardBorder = KashtaColors.sandBorder;
+const Color _detailsSoftOrange = KashtaColors.softOrange;
+const Color _detailsOrange = KashtaColors.primary;
+const Color _detailsBrown = KashtaColors.textDark;
+const Color _detailsDarkText = KashtaColors.textDark;
+const Color _detailsMutedText = KashtaColors.textDark;
 const double _detailsRadius = 16;
 
 class GroupDetailsPage extends StatelessWidget {
@@ -264,7 +265,7 @@ class GroupDetailsPage extends StatelessWidget {
                     vertical: 12,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: _detailsCard,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: _detailsCardBorder),
                   ),

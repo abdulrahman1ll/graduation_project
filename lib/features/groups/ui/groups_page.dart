@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../groups.dart' as chat;
 import '../../../core/providers/role_provider.dart';
+import '../../../core/theme/kashta_colors.dart';
 import '../../../core/utils/localization.dart';
 import '../../../core/widgets/language_app_bar.dart';
 import '../../../widgets/kashta_background.dart';
@@ -239,7 +240,7 @@ class _GroupsPageState extends State<GroupsPage> {
     final currentUserId = _currentUserId;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F8F8),
+      backgroundColor: KashtaColors.backgroundCream,
       appBar: appBarWithLanguage(
         tr: widget.tr,
         isArabic: widget.isArabic,
@@ -266,7 +267,7 @@ class _GroupsPageState extends State<GroupsPage> {
                         hintText: widget.tr.t('searchGroups'),
                         prefixIcon: const Icon(Icons.search),
                         filled: true,
-                        fillColor: Colors.white,
+                        fillColor: KashtaColors.cardSurface,
                         contentPadding:
                             const EdgeInsets.symmetric(vertical: 14),
                         border: OutlineInputBorder(
@@ -342,10 +343,10 @@ class _GroupsPageState extends State<GroupsPage> {
             : '$senderName: $lastMessageContent';
 
         return Material(
-          color: Colors.white,
+          color: KashtaColors.cardSurface,
           borderRadius: BorderRadius.circular(20),
           elevation: 1.5,
-          shadowColor: Colors.black.withValues(alpha: 0.06),
+          shadowColor: KashtaColors.textDark.withValues(alpha: 0.06),
           child: InkWell(
             borderRadius: BorderRadius.circular(20),
             onTap: () {
@@ -366,12 +367,16 @@ class _GroupsPageState extends State<GroupsPage> {
                 children: [
                   CircleAvatar(
                     radius: 28,
-                    backgroundColor: const Color(0xFFFFE0B2),
+                    backgroundColor:
+                        KashtaColors.softOrange.withValues(alpha: 0.24),
                     backgroundImage: group.imageUrl == null
                         ? null
                         : NetworkImage(group.imageUrl!),
                     child: group.imageUrl == null
-                        ? const Icon(Icons.groups, color: Colors.orange)
+                        ? const Icon(
+                            Icons.groups,
+                            color: KashtaColors.primary,
+                          )
                         : null,
                   ),
                   const SizedBox(width: 12),
@@ -400,7 +405,7 @@ class _GroupsPageState extends State<GroupsPage> {
                               _formatTime(
                                   lastMessage?.createdAt ?? group.createdAt),
                               style: const TextStyle(
-                                color: Color(0xFF6B7280),
+                                color: KashtaColors.textDark,
                                 fontSize: 12,
                               ),
                             ),
@@ -414,7 +419,7 @@ class _GroupsPageState extends State<GroupsPage> {
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            color: Color(0xFF4B5563),
+                            color: KashtaColors.textDark,
                             height: 1.3,
                           ),
                         ),
@@ -428,7 +433,8 @@ class _GroupsPageState extends State<GroupsPage> {
                                   vertical: 4,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFFFF3E0),
+                                  color: KashtaColors.softOrange
+                                      .withValues(alpha: 0.16),
                                   borderRadius: BorderRadius.circular(999),
                                 ),
                                 child: Text(
@@ -447,7 +453,7 @@ class _GroupsPageState extends State<GroupsPage> {
                                   vertical: 4,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: Colors.orange,
+                                  color: KashtaColors.primary,
                                   borderRadius: BorderRadius.circular(999),
                                 ),
                                 child: Text(
@@ -633,18 +639,21 @@ class _GroupsEmptyState extends StatelessWidget {
               width: 88,
               height: 88,
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: KashtaColors.cardSurface,
                 borderRadius: BorderRadius.circular(24),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
+                    color: KashtaColors.textDark.withValues(alpha: 0.05),
                     blurRadius: 14,
                     offset: const Offset(0, 6),
                   ),
                 ],
               ),
-              child: const Icon(Icons.groups_rounded,
-                  size: 42, color: Colors.orange),
+              child: const Icon(
+                Icons.groups_rounded,
+                size: 42,
+                color: KashtaColors.primary,
+              ),
             ),
             const SizedBox(height: 16),
             Text(
@@ -658,7 +667,7 @@ class _GroupsEmptyState extends StatelessWidget {
             Text(
               tr.t('groupsChatEmptySubtitle'),
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Color(0xFF6B7280)),
+              style: const TextStyle(color: KashtaColors.textDark),
             ),
             const SizedBox(height: 16),
             FilledButton.icon(
@@ -690,7 +699,7 @@ class _CreateGroupFab extends StatelessWidget {
           return const SizedBox.shrink();
         }
         return FloatingActionButton.extended(
-          backgroundColor: Colors.orange,
+          backgroundColor: KashtaColors.primary,
           foregroundColor: Colors.white,
           icon: const Icon(Icons.add),
           label: Text(tr.t('newGroup')),

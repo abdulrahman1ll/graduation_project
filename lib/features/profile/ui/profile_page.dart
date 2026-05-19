@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/providers/role_provider.dart';
+import '../../../core/theme/kashta_colors.dart';
 import '../../../core/utils/localization.dart';
 import '../../../core/widgets/language_app_bar.dart';
 import '../../../widgets/kashta_background.dart';
@@ -83,7 +84,7 @@ class _ProfilePageState extends State<ProfilePage> {
               child: ListTile(
                 leading: const Icon(
                   Icons.health_and_safety_outlined,
-                  color: Colors.orange,
+                  color: KashtaColors.primary,
                 ),
                 title: Text(widget.tr.t('safety_checkin_title')),
                 subtitle: Text(widget.tr.t('safety_checkin_profile_subtitle')),
@@ -96,16 +97,19 @@ class _ProfilePageState extends State<ProfilePage> {
                 child: ListTile(
                   leading: const Icon(
                     Icons.shield_outlined,
-                    color: Colors.orange,
+                    color: KashtaColors.primary,
                   ),
                   title: Text(widget.tr.t('admin_dashboard')),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: widget.onOpenAdminDashboard,
                 ),
-              ),
+            ),
             Card(
               child: ListTile(
-                leading: const Icon(Icons.logout, color: Colors.redAccent),
+                leading: const Icon(
+                  Icons.logout,
+                  color: KashtaColors.softOrange,
+                ),
                 title: Text(widget.tr.t('sign_out')),
                 onTap: () async {
                   await FirebaseAuth.instance.signOut();

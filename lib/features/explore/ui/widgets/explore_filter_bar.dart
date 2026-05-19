@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/kashta_colors.dart';
 import '../../../../core/utils/localization.dart';
 
 class ExploreFilterBar extends StatelessWidget {
@@ -37,23 +38,23 @@ class ExploreFilterBar extends StatelessWidget {
                 size: 18,
                 color: showOnlyFavorites
                     ? Colors.white
-                    : const Color(0xFF6D482B),
+                    : KashtaColors.textDark,
               ),
               label: Text(tr.t('favorites')),
-              selectedColor: const Color(0xFF8B4A23),
+              selectedColor: KashtaColors.primary,
               side: BorderSide(
                 color: showOnlyFavorites
-                    ? const Color(0xFF8B4A23)
-                    : Colors.white.withValues(alpha: 0.50),
+                    ? KashtaColors.primary
+                    : KashtaColors.sandBorder,
               ),
-              backgroundColor: Colors.white.withValues(alpha: 0.78),
+              backgroundColor: KashtaColors.cardSurface.withValues(alpha: 0.78),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(999),
               ),
               labelStyle: TextStyle(
                 color: showOnlyFavorites
                     ? Colors.white
-                    : const Color(0xFF5B3922),
+                    : KashtaColors.textDark,
                 fontWeight: FontWeight.w800,
               ),
             ),
@@ -114,21 +115,21 @@ class _CategoryChip extends StatelessWidget {
       avatar: Icon(
         icon,
         size: 18,
-        color: isSelected ? Colors.white : const Color(0xFF7A6656),
+        color: isSelected ? Colors.white : KashtaColors.textDark,
       ),
       label: Text(label),
-      selectedColor: const Color(0xFF8B4A23),
+      selectedColor: KashtaColors.primary,
       side: BorderSide(
         color: isSelected
-            ? const Color(0xFF8B4A23)
-            : Colors.white.withValues(alpha: 0.50),
+            ? KashtaColors.primary
+            : KashtaColors.sandBorder,
       ),
-      backgroundColor: Colors.white.withValues(alpha: 0.78),
+      backgroundColor: KashtaColors.cardSurface.withValues(alpha: 0.78),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(999),
       ),
       labelStyle: TextStyle(
-        color: isSelected ? Colors.white : const Color(0xFF5B3922),
+        color: isSelected ? Colors.white : KashtaColors.textDark,
         fontWeight: FontWeight.w800,
       ),
     );

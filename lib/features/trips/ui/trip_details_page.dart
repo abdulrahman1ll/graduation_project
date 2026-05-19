@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/kashta_colors.dart';
 import '../../../core/utils/firestore_utils.dart';
 import '../../../core/utils/localization.dart';
 import '../../groups/services/group_service.dart';
@@ -238,8 +239,8 @@ class _TripAttendanceSectionState extends State<_TripAttendanceSection> {
                       Icon(
                         status == 'going' ? Icons.check_circle : Icons.cancel,
                         color: status == 'going'
-                            ? const Color(0xFF43A047)
-                            : const Color(0xFFE53935),
+                            ? KashtaColors.softOlive
+                            : KashtaColors.softOrange,
                       ),
                       const SizedBox(width: 8),
                       Expanded(
@@ -326,7 +327,7 @@ class _TripDetailChip extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 18, color: Colors.orange),
+        Icon(icon, size: 18, color: KashtaColors.primary),
         const SizedBox(width: 6),
         Text(text, style: const TextStyle(fontWeight: FontWeight.w600)),
       ],

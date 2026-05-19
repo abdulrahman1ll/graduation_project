@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/kashta_colors.dart';
 import '../../../core/utils/firestore_utils.dart';
 import '../../../core/utils/localization.dart';
 import '../../groups/models/group.dart';
@@ -130,7 +131,10 @@ class _AddTripPageState extends State<AddTripPage> {
                         const SizedBox(height: 6),
                         Text(
                           tr.t('link_group_later'),
-                          style: TextStyle(color: Colors.grey.shade700),
+                          style: TextStyle(
+                            color:
+                                KashtaColors.textDark.withValues(alpha: 0.72),
+                          ),
                         ),
                       ],
                     ],
@@ -196,7 +200,7 @@ class _AddTripPageState extends State<AddTripPage> {
                   : const Icon(Icons.add),
               label: Text(tr.t('create_trip')),
               style: FilledButton.styleFrom(
-                backgroundColor: Colors.orange,
+                backgroundColor: KashtaColors.primary,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 textStyle: const TextStyle(fontWeight: FontWeight.w700),
@@ -355,9 +359,9 @@ class _TripPreview extends StatelessWidget {
       margin: const EdgeInsets.only(top: 16),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: KashtaColors.cardSurface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE8E0D5)),
+        border: Border.all(color: KashtaColors.sandBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -399,7 +403,7 @@ class _PreviewLine extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, size: 18, color: Colors.orange),
+        Icon(icon, size: 18, color: KashtaColors.primary),
         const SizedBox(width: 8),
         Expanded(
           child: Text(

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/theme/kashta_colors.dart';
 import '../../../core/utils/localization.dart';
 import '../../../core/widgets/language_app_bar.dart';
 import '../../../widgets/kashta_background.dart';
@@ -126,7 +127,7 @@ class _SafetyCheckinPageState extends State<SafetyCheckinPage> {
                       Text(
                         widget.tr.t('safety_saved_info_note'),
                         style: TextStyle(
-                          color: Colors.brown.shade600,
+                          color: KashtaColors.textDark.withValues(alpha: 0.72),
                           fontSize: 12,
                           height: 1.35,
                         ),
@@ -147,7 +148,7 @@ class _SafetyCheckinPageState extends State<SafetyCheckinPage> {
                               : const Icon(Icons.save_outlined),
                           label: Text(widget.tr.t('safety_save_info')),
                           style: FilledButton.styleFrom(
-                            backgroundColor: Colors.orange,
+                            backgroundColor: KashtaColors.primary,
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             textStyle: const TextStyle(
@@ -188,13 +189,16 @@ class _SafetyCheckinPageState extends State<SafetyCheckinPage> {
                           const Icon(
                             Icons.update,
                             size: 18,
-                            color: Colors.orange,
+                            color: KashtaColors.primary,
                           ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               '${widget.tr.t('safety_last_update')}: ${_formatDateTime(_lastUpdateTime)}',
-                              style: TextStyle(color: Colors.brown.shade700),
+                              style: TextStyle(
+                                color: KashtaColors.textDark
+                                    .withValues(alpha: 0.72),
+                              ),
                             ),
                           ),
                         ],
@@ -223,7 +227,7 @@ class _SafetyCheckinPageState extends State<SafetyCheckinPage> {
                       Text(
                         widget.tr.t('safety_whatsapp_manual_note'),
                         style: TextStyle(
-                          color: Colors.brown.shade600,
+                          color: KashtaColors.textDark.withValues(alpha: 0.72),
                           fontSize: 12,
                           height: 1.35,
                         ),
@@ -234,7 +238,7 @@ class _SafetyCheckinPageState extends State<SafetyCheckinPage> {
                         icon: const Icon(Icons.chat_outlined),
                         label: Text(widget.tr.t('safety_share_whatsapp')),
                         style: FilledButton.styleFrom(
-                          backgroundColor: Colors.orange,
+                          backgroundColor: KashtaColors.primary,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           textStyle: const TextStyle(
@@ -544,7 +548,7 @@ class _SectionCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(icon, color: Colors.orange),
+                Icon(icon, color: KashtaColors.primary),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -591,19 +595,20 @@ class _SafetyTextField extends StatelessWidget {
         textInputAction: textInputAction,
         decoration: InputDecoration(
           labelText: label,
-          prefixIcon: Icon(icon, color: Colors.orange),
+          prefixIcon: Icon(icon, color: KashtaColors.primary),
           filled: true,
-          fillColor: const Color(0xFFFFFBF6),
+          fillColor: KashtaColors.cardSurface,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: Color(0xFFE8E0D5)),
+            borderSide: const BorderSide(color: KashtaColors.sandBorder),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: Colors.orange, width: 1.6),
+            borderSide:
+                const BorderSide(color: KashtaColors.primary, width: 1.6),
           ),
         ),
       ),
@@ -626,16 +631,20 @@ class _MessagePreview extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFFBF6),
+        color: KashtaColors.cardSurface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE8E0D5)),
+        border: Border.all(color: KashtaColors.sandBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.message_outlined, color: Colors.orange, size: 18),
+              const Icon(
+                Icons.message_outlined,
+                color: KashtaColors.primary,
+                size: 18,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../../core/theme/kashta_colors.dart';
 import '../../../core/utils/localization.dart';
 
 class WelcomePreferencesPage extends StatefulWidget {
@@ -61,9 +62,11 @@ class _WelcomePreferencesPageState extends State<WelcomePreferencesPage> {
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
         margin: const EdgeInsets.only(bottom: 10),
         decoration: BoxDecoration(
-          color: selected ? Colors.orange.shade100 : Colors.white,
+          color: selected
+              ? KashtaColors.softOrange.withValues(alpha: 0.20)
+              : KashtaColors.cardSurface,
           border: Border.all(
-            color: selected ? Colors.orange : Colors.grey.shade300,
+            color: selected ? KashtaColors.primary : KashtaColors.sandBorder,
           ),
           borderRadius: BorderRadius.circular(12),
         ),
@@ -77,7 +80,7 @@ class _WelcomePreferencesPageState extends State<WelcomePreferencesPage> {
     final tr = widget.tr;
 
     return Scaffold(
-        backgroundColor: const Color(0xFFF8F3ED),
+        backgroundColor: KashtaColors.backgroundCream,
         body: SafeArea(
           child: SingleChildScrollView(
             child: Padding(
@@ -90,13 +93,13 @@ class _WelcomePreferencesPageState extends State<WelcomePreferencesPage> {
                     width: 120,
                     height: 120,
                     decoration: BoxDecoration(
-                      color: Colors.orange.shade100,
+                      color: KashtaColors.softOrange.withValues(alpha: 0.20),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
                       Icons.landscape_rounded,
                       size: 60,
-                      color: Colors.orange,
+                      color: KashtaColors.primary,
                     ),
                   ),
 
@@ -116,7 +119,9 @@ class _WelcomePreferencesPageState extends State<WelcomePreferencesPage> {
                   Text(
                     tr.t('choose_preferences'),
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.grey.shade700),
+                    style: TextStyle(
+                      color: KashtaColors.textDark.withValues(alpha: 0.72),
+                    ),
                   ),
 
                   const SizedBox(height: 30),
@@ -186,7 +191,7 @@ class _WelcomePreferencesPageState extends State<WelcomePreferencesPage> {
                     child: ElevatedButton(
                       onPressed: _loading ? null : _savePreferences,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orange,
+                        backgroundColor: KashtaColors.primary,
                       ),
                       child: _loading
                           ? const CircularProgressIndicator(color: Colors.white)

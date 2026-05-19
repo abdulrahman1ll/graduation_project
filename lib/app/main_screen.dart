@@ -5,6 +5,7 @@ import '../features/explore/ui/explore_page.dart';
 import '../features/groups/ui/groups_page.dart';
 import '../features/profile/ui/profile_page.dart';
 import '../features/trips/ui/trips_page.dart';
+import '../core/theme/kashta_colors.dart';
 import '../core/utils/localization.dart';
 
 class MainScreen extends StatefulWidget {
@@ -68,8 +69,8 @@ class _MainScreenState extends State<MainScreen> {
         currentIndex: _selectedIndex,
         onTap: (index) => setState(() => _selectedIndex = index),
         type: BottomNavigationBarType.fixed,
-        selectedItemColor: Colors.orange,
-        unselectedItemColor: Colors.grey,
+        selectedItemColor: KashtaColors.primary,
+        unselectedItemColor: KashtaColors.textDark.withValues(alpha: 0.58),
         items: [
           BottomNavigationBarItem(
             icon: const Icon(Icons.map),

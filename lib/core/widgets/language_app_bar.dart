@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../theme/kashta_colors.dart';
 import '../utils/localization.dart';
 
 PreferredSizeWidget appBarWithLanguage({
@@ -18,7 +19,7 @@ PreferredSizeWidget appBarWithLanguage({
         child: Text(
           isArabic ? 'EN' : 'AR',
           style: const TextStyle(
-            color: Colors.orange,
+            color: KashtaColors.primary,
             fontWeight: FontWeight.bold,
           ),
         ),

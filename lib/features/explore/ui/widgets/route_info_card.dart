@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/kashta_colors.dart';
+
 class RouteInfoCard extends StatelessWidget {
   const RouteInfoCard({
     super.key,
@@ -24,7 +26,7 @@ class RouteInfoCard extends StatelessWidget {
       left: 16,
       right: 16,
       child: Card(
-        color: Colors.white,
+        color: KashtaColors.cardSurface,
         elevation: 4,
         child: Padding(
           padding: const EdgeInsets.symmetric(

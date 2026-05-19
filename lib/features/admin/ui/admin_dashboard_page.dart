@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/providers/role_provider.dart';
+import '../../../core/theme/kashta_colors.dart';
 import '../../../core/utils/firestore_utils.dart';
 import '../../../core/utils/localization.dart';
 import '../../explore/services/place_service.dart';
@@ -187,7 +188,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               allowOpenPlace ? () => _openPlaceFromData(placeId, data) : null,
           child: DecoratedBox(
             decoration: BoxDecoration(
-              border: Border.all(color: Colors.black12),
+              color: KashtaColors.cardSurface,
+              border: Border.all(color: KashtaColors.sandBorder),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Padding(
@@ -220,7 +222,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                     approve: true,
                                   ),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
+                            backgroundColor: KashtaColors.softOlive,
                             foregroundColor: Colors.white,
                           ),
                           child: Text(widget.tr.t('approve')),
@@ -233,7 +235,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                     approve: false,
                                   ),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
+                            backgroundColor: KashtaColors.softOrange,
                             foregroundColor: Colors.white,
                           ),
                           child: Text(widget.tr.t('reject')),
@@ -245,7 +247,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                         icon: const Icon(Icons.delete_outline),
                         label: const Text('Delete'),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.red,
+                          foregroundColor: KashtaColors.softOrange,
                         ),
                       ),
                     ],
@@ -277,7 +279,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           onTap: placeRef == null ? null : () => _openReviewPlace(placeRef),
           child: DecoratedBox(
             decoration: BoxDecoration(
-              border: Border.all(color: Colors.black12),
+              color: KashtaColors.cardSurface,
+              border: Border.all(color: KashtaColors.sandBorder),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Padding(
@@ -321,7 +324,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     icon: const Icon(Icons.delete_outline),
                     label: const Text('Delete'),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.red,
+                      foregroundColor: KashtaColors.softOrange,
                     ),
                   ),
                 ],
@@ -464,7 +467,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             FilledButton(
               onPressed: () => Navigator.of(context).pop(true),
               style: FilledButton.styleFrom(
-                backgroundColor: Colors.red,
+                backgroundColor: KashtaColors.softOrange,
                 foregroundColor: Colors.white,
               ),
               child: const Text('Delete'),

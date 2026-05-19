@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/models/app_language.dart';
+import '../../../core/theme/kashta_colors.dart';
 import '../../../core/utils/firestore_utils.dart';
 import '../../../core/utils/localization.dart';
 import '../../../core/widgets/language_app_bar.dart';
@@ -176,7 +177,7 @@ class _TripsPageState extends State<TripsPage> {
                             minHeight: 32,
                           ),
                           iconSize: 22,
-                          color: Colors.grey.shade700,
+                          color: KashtaColors.textDark.withValues(alpha: 0.72),
                           onPressed: pastCount == 0
                               ? null
                               : () {
@@ -225,7 +226,7 @@ class _TripsPageState extends State<TripsPage> {
                           minHeight: 32,
                         ),
                         iconSize: 22,
-                        color: Colors.grey.shade700,
+                          color: KashtaColors.textDark.withValues(alpha: 0.72),
                         onPressed: pastCount == 0
                             ? null
                             : () {
@@ -252,7 +253,10 @@ class _TripsPageState extends State<TripsPage> {
                       child: Center(
                         child: Text(
                           widget.tr.t('no_upcoming_trips'),
-                          style: TextStyle(color: Colors.grey.shade700),
+                          style: TextStyle(
+                            color:
+                                KashtaColors.textDark.withValues(alpha: 0.72),
+                          ),
                         ),
                       ),
                     )
@@ -320,7 +324,7 @@ class _PastTripsSection extends StatelessWidget {
             tr.t('past_trips'),
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w700,
-                  color: Colors.grey.shade700,
+                  color: KashtaColors.textDark.withValues(alpha: 0.72),
                 ),
           ),
           if (isExpanded) ...[
@@ -331,7 +335,7 @@ class _PastTripsSection extends StatelessWidget {
             Text(
               '${trips.length} ${tr.t(trips.length == 1 ? 'past_trip_hidden' : 'past_trips_hidden')}',
               style: TextStyle(
-                color: Colors.grey.shade600,
+                color: KashtaColors.textDark.withValues(alpha: 0.64),
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -379,11 +383,13 @@ class _TripDecisionCard extends StatelessWidget {
 
         return Card(
           elevation: isPast ? 0.5 : 1.5,
-          color: isPast ? const Color(0xFFFAFAFA) : Colors.white,
+          color: isPast
+              ? KashtaColors.backgroundCream.withValues(alpha: 0.82)
+              : KashtaColors.cardSurface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
             side: isPast
-                ? const BorderSide(color: Color(0xFFE0E0E0))
+                ? const BorderSide(color: KashtaColors.sandBorder)
                 : BorderSide.none,
           ),
           margin: const EdgeInsets.only(bottom: 12),
@@ -435,7 +441,7 @@ class _TripDecisionCard extends StatelessWidget {
                       Icon(
                         Icons.warning_amber_rounded,
                         size: 17,
-                        color: Colors.grey.shade500,
+                        color: KashtaColors.softOrange,
                       ),
                       const SizedBox(width: 6),
                       Expanded(
@@ -444,7 +450,7 @@ class _TripDecisionCard extends StatelessWidget {
                               ? '1 ${tr.t('member_not_confirmed')}'
                               : '$pendingCount ${tr.t('members_not_confirmed')}',
                           style: TextStyle(
-                            color: Colors.grey.shade600,
+                            color: KashtaColors.textDark.withValues(alpha: 0.64),
                             fontWeight: FontWeight.w500,
                             fontSize: 13,
                           ),
@@ -462,7 +468,8 @@ class _TripDecisionCard extends StatelessWidget {
                       label: Text(tr.t('open_checklist')),
                       style: isPast
                           ? TextButton.styleFrom(
-                              foregroundColor: Colors.grey.shade500,
+                              foregroundColor:
+                                  KashtaColors.textDark.withValues(alpha: 0.52),
                             )
                           : null,
                     ),
@@ -473,7 +480,8 @@ class _TripDecisionCard extends StatelessWidget {
                       label: Text(tr.t('view_details')),
                       style: isPast
                           ? TextButton.styleFrom(
-                              foregroundColor: Colors.grey.shade500,
+                              foregroundColor:
+                                  KashtaColors.textDark.withValues(alpha: 0.52),
                             )
                           : null,
                     ),
@@ -532,7 +540,7 @@ class _TripGroupText extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
-          color: Colors.grey.shade700,
+          color: KashtaColors.textDark.withValues(alpha: 0.72),
           height: 1.25,
         ),
       ),
@@ -564,17 +572,17 @@ class _TripReadyStatus {
         members.where((member) => member.status == 'not_going').length;
 
     if (notGoingCount > goingCount && notGoingCount >= pendingCount) {
-      return _TripReadyStatus(
-        label: tr.t('not_happening'),
-        color: Color(0xFF616161),
-        icon: Icons.circle,
-      );
+        return _TripReadyStatus(
+          label: tr.t('not_happening'),
+        color: KashtaColors.softOrange,
+          icon: Icons.circle,
+        );
     }
 
     if (goingCount > pendingCount && goingCount >= notGoingCount) {
       return _TripReadyStatus(
         label: tr.t('ready'),
-        color: Color(0xFF616161),
+        color: KashtaColors.softOlive,
         icon: Icons.circle,
       );
     }
@@ -626,12 +634,12 @@ class _TripInfoChip extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 19, color: const Color.fromARGB(255, 238, 156, 54)),
+        Icon(icon, size: 19, color: KashtaColors.primary),
         const SizedBox(width: 6),
         Text(
           text,
           style: TextStyle(
-            color: Colors.grey.shade900,
+            color: KashtaColors.textDark,
             fontSize: 15,
             fontWeight: FontWeight.w600,
           ),
@@ -683,7 +691,7 @@ class _TripStatCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       elevation: 1.5,
-      color: Colors.white,
+      color: KashtaColors.cardSurface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: SizedBox(
         height: 90,
@@ -700,7 +708,7 @@ class _TripStatCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: Colors.grey.shade900,
+                        color: KashtaColors.textDark,
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
                       ),
@@ -713,7 +721,8 @@ class _TripStatCard extends StatelessWidget {
                         ? const SizedBox.shrink()
                         : IconTheme(
                             data: IconThemeData(
-                              color: Colors.grey.shade700,
+                              color:
+                                  KashtaColors.textDark.withValues(alpha: 0.72),
                               size: 22,
                             ),
                             child: action!,
@@ -727,7 +736,7 @@ class _TripStatCard extends StatelessWidget {
                 style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: Colors.orange),
+                    color: KashtaColors.primary),
               ),
             ],
           ),
@@ -1016,24 +1025,30 @@ class _AddChecklistItemsPageState extends State<AddChecklistItemsPage> {
                             hintText: widget.tr.t('search_checklist_items'),
                             prefixIcon: const Icon(Icons.search),
                             filled: true,
-                            fillColor: const Color(0xFFF7F7F7),
+                            fillColor: KashtaColors.cardSurface,
                             contentPadding: const EdgeInsets.symmetric(
                               vertical: 14,
                             ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(22),
                               borderSide:
-                                  BorderSide(color: Colors.grey.shade300),
+                                  const BorderSide(
+                                color: KashtaColors.sandBorder,
+                              ),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(22),
                               borderSide:
-                                  BorderSide(color: Colors.grey.shade300),
+                                  const BorderSide(
+                                color: KashtaColors.sandBorder,
+                              ),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(22),
                               borderSide:
-                                  const BorderSide(color: Colors.orange),
+                                  const BorderSide(
+                                color: KashtaColors.primary,
+                              ),
                             ),
                           ),
                         ),
@@ -1070,7 +1085,7 @@ class _AddChecklistItemsPageState extends State<AddChecklistItemsPage> {
                                       horizontal: 12,
                                     ),
                                     elevation: 1.5,
-                                    color: Colors.white,
+                                    color: KashtaColors.cardSurface,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(14),
                                     ),
@@ -1147,7 +1162,7 @@ class _AddChecklistItemsPageState extends State<AddChecklistItemsPage> {
                                               const EdgeInsets.only(top: 5),
                                           child: Container(
                                             decoration: BoxDecoration(
-                                              color: Colors.white,
+                                              color: KashtaColors.cardSurface,
                                               borderRadius:
                                                   BorderRadius.circular(12),
                                             ),
@@ -1176,7 +1191,8 @@ class _AddChecklistItemsPageState extends State<AddChecklistItemsPage> {
                                                         const Icon(
                                                           Icons.check_circle,
                                                           color:
-                                                              Color(0xFF43A047),
+                                                              KashtaColors
+                                                                  .softOlive,
                                                           size: 18,
                                                         ),
                                                         const SizedBox(
@@ -1185,9 +1201,8 @@ class _AddChecklistItemsPageState extends State<AddChecklistItemsPage> {
                                                           widget.tr.t('added'),
                                                           style:
                                                               const TextStyle(
-                                                            color: Color(
-                                                              0xFF43A047,
-                                                            ),
+                                                            color: KashtaColors
+                                                                .softOlive,
                                                             fontWeight:
                                                                 FontWeight.w600,
                                                           ),
@@ -1197,7 +1212,8 @@ class _AddChecklistItemsPageState extends State<AddChecklistItemsPage> {
                                                   : IconButton(
                                                       icon: const Icon(
                                                         Icons.add_circle,
-                                                        color: Colors.orange,
+                                                        color:
+                                                            KashtaColors.primary,
                                                         size: 18,
                                                       ),
                                                       onPressed: () =>
@@ -1387,13 +1403,13 @@ class _TripChecklistPageState extends State<TripChecklistPage> {
             onPressed: openAddChecklistItems,
             icon: const Icon(
               Icons.playlist_add,
-              color: Colors.orange,
+              color: KashtaColors.primary,
               size: 26,
             ),
           ),
         ],
       ),
-      backgroundColor: const Color(0xFFF8EFE2),
+      backgroundColor: KashtaColors.backgroundCream,
       body: Stack(
         children: [
           Positioned.fill(
@@ -1404,7 +1420,7 @@ class _TripChecklistPageState extends State<TripChecklistPage> {
           ),
           Positioned.fill(
             child: Container(
-              color: const Color(0xFFF8EFE2).withValues(alpha: 0.2),
+              color: KashtaColors.backgroundCream.withValues(alpha: 0.2),
             ),
           ),
           StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -1453,7 +1469,7 @@ class _TripChecklistPageState extends State<TripChecklistPage> {
                       Container(
                         height: 10,
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF1F1F1),
+                          color: KashtaColors.sandBorder,
                           borderRadius: BorderRadius.circular(999),
                         ),
                       ),
@@ -1492,7 +1508,7 @@ class _TripChecklistPageState extends State<TripChecklistPage> {
                     child: Container(
                       height: 10,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF1F1F1),
+                        color: KashtaColors.sandBorder,
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: ClipRRect(
@@ -1505,8 +1521,8 @@ class _TripChecklistPageState extends State<TripChecklistPage> {
                               decoration: const BoxDecoration(
                                 gradient: LinearGradient(
                                   colors: [
-                                    Color(0xFFFFC15A),
-                                    Color(0xFFFF8A3D),
+                                    KashtaColors.softOrange,
+                                    KashtaColors.primary,
                                   ],
                                 ),
                               ),

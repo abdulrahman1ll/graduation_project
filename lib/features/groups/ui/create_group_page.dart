@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/models/app_language.dart';
+import '../../../core/theme/kashta_colors.dart';
 import '../../../core/utils/localization.dart';
 import '../services/group_service.dart';
 import 'group_chat_page.dart';
@@ -178,7 +179,8 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
                   onTap: _saving ? null : _pickImage,
                   child: CircleAvatar(
                     radius: 46,
-                    backgroundColor: const Color(0xFFFFE0B2),
+                    backgroundColor:
+                        KashtaColors.softOrange.withValues(alpha: 0.24),
                     backgroundImage: _selectedImageBytes == null
                         ? null
                         : MemoryImage(_selectedImageBytes!),
@@ -186,7 +188,7 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
                         ? const Icon(
                             Icons.add_a_photo_outlined,
                             size: 30,
-                            color: Colors.orange,
+                            color: KashtaColors.primary,
                           )
                         : null,
                   ),
@@ -249,7 +251,7 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
               FilledButton(
                 onPressed: _saving ? null : _save,
                 style: FilledButton.styleFrom(
-                  backgroundColor: Colors.orange,
+                  backgroundColor: KashtaColors.primary,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),

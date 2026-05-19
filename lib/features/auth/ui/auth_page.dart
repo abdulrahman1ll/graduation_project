@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
+import '../../../core/theme/kashta_colors.dart';
 import '../../../core/utils/localization.dart';
 
 class AuthPage extends StatefulWidget {
@@ -48,7 +49,7 @@ class _AuthPageState extends State<AuthPage> {
     final heroHeight = (size.height * 0.42).clamp(300.0, 380.0);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8EFE2),
+      backgroundColor: KashtaColors.backgroundCream,
       body: SafeArea(
         bottom: false,
         child: SingleChildScrollView(
@@ -95,8 +96,8 @@ class _AuthPageState extends State<AuthPage> {
               gradient: LinearGradient(
                 colors: [
                   const Color(0xFF2D1A10).withValues(alpha: 0.62),
-                  const Color(0xFF9B5628).withValues(alpha: 0.28),
-                  const Color(0xFFF8EFE2).withValues(alpha: 0.94),
+                  KashtaColors.softOrange.withValues(alpha: 0.28),
+                  KashtaColors.backgroundCream.withValues(alpha: 0.94),
                 ],
                 stops: const [0.0, 0.55, 1.0],
                 begin: Alignment.topCenter,
@@ -173,12 +174,12 @@ class _AuthPageState extends State<AuthPage> {
       margin: const EdgeInsets.symmetric(horizontal: 18),
       padding: const EdgeInsets.fromLTRB(20, 22, 20, 24),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFFBF5),
+        color: KashtaColors.cardSurface,
         borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: const Color(0xFFE9D7BF)),
+        border: Border.all(color: KashtaColors.sandBorder),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF6F421D).withValues(alpha: 0.14),
+            color: KashtaColors.primary.withValues(alpha: 0.14),
             blurRadius: 30,
             offset: const Offset(0, 18),
           ),
@@ -191,7 +192,7 @@ class _AuthPageState extends State<AuthPage> {
             _isSignUp ? tr.t('sign_up') : tr.t('sign_in'),
             textAlign: TextAlign.start,
             style: const TextStyle(
-              color: Color(0xFF2F2118),
+              color: KashtaColors.textDark,
               fontSize: 24,
               fontWeight: FontWeight.w900,
             ),
@@ -201,7 +202,7 @@ class _AuthPageState extends State<AuthPage> {
             tr.t('welcome_subtitle'),
             textAlign: TextAlign.start,
             style: const TextStyle(
-              color: Color(0xFF7B6653),
+              color: KashtaColors.textDark,
               fontSize: 14,
               height: 1.4,
               fontWeight: FontWeight.w500,
@@ -266,10 +267,10 @@ class _AuthPageState extends State<AuthPage> {
                 ? null
                 : (_isSignUp ? _signUpWithEmail : _signInWithEmail),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF8B4A23),
+              backgroundColor: KashtaColors.primary,
               foregroundColor: Colors.white,
               disabledBackgroundColor:
-                  const Color(0xFF8B4A23).withValues(alpha: 0.48),
+                  KashtaColors.primary.withValues(alpha: 0.48),
               minimumSize: const Size.fromHeight(54),
               elevation: 0,
               shadowColor: Colors.transparent,
@@ -300,7 +301,7 @@ class _AuthPageState extends State<AuthPage> {
             TextButton(
               onPressed: _loading ? null : _signInAnonymously,
               style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFF8B4A23),
+                foregroundColor: KashtaColors.primary,
                 textStyle: const TextStyle(fontWeight: FontWeight.w800),
               ),
               child: Text(tr.t('continue_guest')),
@@ -315,7 +316,7 @@ class _AuthPageState extends State<AuthPage> {
                   height: 24,
                   child: CircularProgressIndicator(
                     strokeWidth: 2.6,
-                    color: Color(0xFF8B4A23),
+                    color: KashtaColors.primary,
                   ),
                 ),
               ),
@@ -342,23 +343,24 @@ class _AuthPageState extends State<AuthPage> {
       decoration: InputDecoration(
         hintText: hintText,
         hintStyle: const TextStyle(
-          color: Color(0xFF9C8672),
+          color: KashtaColors.textDark,
           fontWeight: FontWeight.w500,
         ),
-        prefixIcon: Icon(icon, color: const Color(0xFF9B6B43)),
+        prefixIcon: Icon(icon, color: KashtaColors.primary),
         filled: true,
-        fillColor: const Color(0xFFF8EFE4),
+        fillColor: KashtaColors.cardSurface,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 18,
           vertical: 18,
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
-          borderSide: const BorderSide(color: Color(0xFFE8D7C0)),
+          borderSide: const BorderSide(color: KashtaColors.sandBorder),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
-          borderSide: const BorderSide(color: Color(0xFFB6783F), width: 1.4),
+          borderSide:
+              const BorderSide(color: KashtaColors.primary, width: 1.4),
         ),
       ),
     );
@@ -372,10 +374,11 @@ class _AuthPageState extends State<AuthPage> {
     return OutlinedButton(
       onPressed: onPressed,
       style: OutlinedButton.styleFrom(
-        foregroundColor: selected ? Colors.white : const Color(0xFF5B3922),
-        backgroundColor: selected ? const Color(0xFF8B4A23) : Colors.white,
+        foregroundColor: selected ? Colors.white : KashtaColors.textDark,
+        backgroundColor:
+            selected ? KashtaColors.primary : KashtaColors.cardSurface,
         side: BorderSide(
-          color: selected ? const Color(0xFF8B4A23) : const Color(0xFFD9BE9C),
+          color: selected ? KashtaColors.primary : KashtaColors.sandBorder,
         ),
         minimumSize: const Size.fromHeight(46),
         shape: RoundedRectangleBorder(
@@ -397,9 +400,9 @@ class _AuthPageState extends State<AuthPage> {
       icon: Icon(icon, size: 24),
       label: Text(label),
       style: OutlinedButton.styleFrom(
-        foregroundColor: const Color(0xFF5B3922),
-        backgroundColor: Colors.white.withValues(alpha: 0.62),
-        side: const BorderSide(color: Color(0xFFE1CCB2)),
+        foregroundColor: KashtaColors.textDark,
+        backgroundColor: KashtaColors.cardSurface.withValues(alpha: 0.62),
+        side: const BorderSide(color: KashtaColors.sandBorder),
         minimumSize: const Size.fromHeight(50),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),

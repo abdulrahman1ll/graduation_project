@@ -9,6 +9,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
 import '../services/ai_recommendation_service.dart';
+import '../../../core/theme/kashta_colors.dart';
 import '../../../core/utils/firestore_utils.dart';
 import '../../../core/utils/localization.dart';
 import '../../../widgets/kashta_background.dart';
@@ -580,7 +581,7 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
           Polyline(
             polylineId: const PolylineId('route'),
             points: routePoints,
-            color: Colors.orange,
+            color: KashtaColors.primary,
             width: 5,
           ),
         };
@@ -679,7 +680,7 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: KashtaColors.cardSurface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -1106,7 +1107,7 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                                                 child: FloatingActionButton(
                                                   mini: true,
                                                   backgroundColor:
-                                                      const Color(0xFF8B4A23),
+                                                      KashtaColors.primary,
                                                   foregroundColor: Colors.white,
                                                   elevation: 4,
                                                   onPressed: () {
@@ -1142,13 +1143,13 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                                                 decoration: BoxDecoration(
                                                   gradient: LinearGradient(
                                                     colors: [
-                                                      const Color(0xFFFFFBF5)
+                                                      KashtaColors.cardSurface
                                                           .withValues(
                                                               alpha: 0.92),
-                                                      const Color(0xFFFFFBF5)
+                                                      KashtaColors.cardSurface
                                                           .withValues(
                                                               alpha: 0.70),
-                                                      const Color(0xFFFFFBF5)
+                                                      KashtaColors.cardSurface
                                                           .withValues(
                                                               alpha: 0.14),
                                                     ],
@@ -1163,10 +1164,11 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                                                   ),
                                                   boxShadow: [
                                                     BoxShadow(
-                                                      color: const Color(
-                                                              0xFF3B2415)
+                                                      color: KashtaColors
+                                                          .textDark
                                                           .withValues(
-                                                              alpha: 0.09),
+                                                        alpha: 0.09,
+                                                      ),
                                                       blurRadius: 18,
                                                       offset:
                                                           const Offset(0, -6),
@@ -1185,11 +1187,11 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                                                                   .all(6),
                                                           decoration:
                                                               BoxDecoration(
-                                                            color: const Color(
-                                                                    0xFF8B4A23)
+                                                            color: KashtaColors
+                                                                .primary
                                                                 .withValues(
-                                                                    alpha:
-                                                                        0.11),
+                                                              alpha: 0.11,
+                                                            ),
                                                             borderRadius:
                                                                 BorderRadius
                                                                     .circular(
@@ -1198,8 +1200,8 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                                                           child: const Icon(
                                                             Icons
                                                                 .auto_awesome_rounded,
-                                                            color: Color(
-                                                                0xFF8B4A23),
+                                                            color: KashtaColors
+                                                                .primary,
                                                             size: 15,
                                                           ),
                                                         ),
@@ -1219,8 +1221,8 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                                                                         .ellipsis,
                                                                 style:
                                                                     TextStyle(
-                                                                  color: Color(
-                                                                      0xFF2F2118),
+                                                                  color: KashtaColors
+                                                                      .textDark,
                                                                   fontSize: 14,
                                                                   fontWeight:
                                                                       FontWeight
@@ -1237,8 +1239,8 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                                                                         .ellipsis,
                                                                 style:
                                                                     TextStyle(
-                                                                  color: Color(
-                                                                      0xFF7B6653),
+                                                                  color: KashtaColors
+                                                                      .textDark,
                                                                   fontSize: 10,
                                                                   fontWeight:
                                                                       FontWeight
@@ -1327,11 +1329,11 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                                                 icon: const Icon(
                                                     Icons.close_rounded),
                                                 style: IconButton.styleFrom(
-                                                  backgroundColor: const Color(
-                                                          0xFFFFFBF5)
+                                                  backgroundColor: KashtaColors
+                                                      .cardSurface
                                                       .withValues(alpha: 0.86),
                                                   foregroundColor:
-                                                      const Color(0xFF5B3922),
+                                                      KashtaColors.textDark,
                                                   elevation: 2,
                                                 ),
                                                 onPressed: () {
@@ -1377,7 +1379,7 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                   widget.tr.t('explore'),
                   textAlign: widget.isArabic ? TextAlign.right : TextAlign.left,
                   style: const TextStyle(
-                    color: Color(0xFF2F2118),
+                    color: KashtaColors.textDark,
                     fontSize: 28,
                     fontWeight: FontWeight.w900,
                     height: 1,
@@ -1388,9 +1390,9 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
               TextButton(
                 onPressed: widget.onToggleLanguage,
                 style: TextButton.styleFrom(
-                  foregroundColor: const Color(0xFF8B4A23),
+                  foregroundColor: KashtaColors.primary,
                   backgroundColor:
-                      const Color(0xFFFFFBF5).withValues(alpha: 0.74),
+                      KashtaColors.cardSurface.withValues(alpha: 0.74),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 15,
                     vertical: 8,
@@ -1398,7 +1400,7 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(999),
                     side: BorderSide(
-                      color: Colors.white.withValues(alpha: 0.45),
+                      color: KashtaColors.sandBorder.withValues(alpha: 0.78),
                     ),
                   ),
                 ),
@@ -1414,7 +1416,7 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
             widget.tr.t('exploreSubtitle'),
             textAlign: widget.isArabic ? TextAlign.right : TextAlign.left,
             style: TextStyle(
-              color: const Color(0xFF7B6653).withValues(alpha: 0.94),
+              color: KashtaColors.textDark.withValues(alpha: 0.72),
               fontSize: 13,
               height: 1.35,
               fontWeight: FontWeight.w700,
@@ -1483,21 +1485,21 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
       avatar: Icon(
         icon,
         size: 18,
-        color: isSelected ? Colors.white : const Color(0xFF7A6656),
+        color: isSelected ? Colors.white : KashtaColors.textDark,
       ),
       label: Text(label),
-      selectedColor: const Color(0xFF8B4A23),
+      selectedColor: KashtaColors.primary,
       side: BorderSide(
         color: isSelected
-            ? const Color(0xFF8B4A23)
-            : Colors.white.withValues(alpha: 0.50),
+            ? KashtaColors.primary
+            : KashtaColors.sandBorder,
       ),
-      backgroundColor: Colors.white.withValues(alpha: 0.78),
+      backgroundColor: KashtaColors.cardSurface.withValues(alpha: 0.78),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(999),
       ),
       labelStyle: TextStyle(
-        color: isSelected ? Colors.white : const Color(0xFF5B3922),
+        color: isSelected ? Colors.white : KashtaColors.textDark,
         fontWeight: isSelected ? FontWeight.w900 : FontWeight.w800,
       ),
     );
@@ -1509,11 +1511,11 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
       left: 16,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: const Color(0xFFFFFBF5).withValues(alpha: 0.82),
+          color: KashtaColors.cardSurface.withValues(alpha: 0.82),
           borderRadius: BorderRadius.circular(18),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF3B2415).withValues(alpha: 0.12),
+              color: KashtaColors.textDark.withValues(alpha: 0.12),
               blurRadius: 16,
               offset: const Offset(0, 8),
             ),
@@ -1531,7 +1533,7 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
             Container(
               width: 30,
               height: 1,
-              color: const Color(0xFFE6CFB2),
+              color: KashtaColors.sandBorder,
             ),
             _mapZoomButton(
               icon: Icons.remove_rounded,
@@ -1552,7 +1554,7 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
     return IconButton(
       onPressed: onPressed,
       icon: Icon(icon),
-      color: const Color(0xFF5B3922),
+      color: KashtaColors.textDark,
       iconSize: 22,
       padding: EdgeInsets.zero,
       constraints: const BoxConstraints.tightFor(width: 42, height: 40),
@@ -1574,11 +1576,11 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
       width: width,
       margin: const EdgeInsets.only(right: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFFBF5).withValues(alpha: 0.90),
+        color: KashtaColors.cardSurface.withValues(alpha: 0.90),
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF6F421D).withValues(alpha: 0.12),
+            color: KashtaColors.primary.withValues(alpha: 0.12),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
@@ -1607,9 +1609,9 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
-                            Color(0xFFE8C29A),
-                            Color(0xFFD8A06A),
-                            Color(0xFFC98A55),
+                            KashtaColors.cardSurface,
+                            KashtaColors.softOrange,
+                            KashtaColors.primary,
                           ],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
@@ -1620,7 +1622,7 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          Colors.black.withValues(alpha: 0.12),
+                          KashtaColors.textDark.withValues(alpha: 0.12),
                           Colors.transparent,
                         ],
                         begin: Alignment.topCenter,
@@ -1637,7 +1639,7 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF8B4A23),
+                        color: KashtaColors.primary,
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
@@ -1674,7 +1676,7 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      color: Color(0xFF2F2118),
+                      color: KashtaColors.textDark,
                       fontSize: 12,
                       height: 1.0,
                       fontWeight: FontWeight.w900,
@@ -1690,7 +1692,7 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                             vertical: 3,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF2E4CF),
+                            color: KashtaColors.backgroundCream,
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: Text(
@@ -1698,7 +1700,7 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                              color: Color(0xFF6D482B),
+                              color: KashtaColors.textDark,
                               fontSize: 9,
                               height: 1.0,
                               fontWeight: FontWeight.w800,
@@ -1709,14 +1711,14 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                       const SizedBox(width: 4),
                       const Icon(
                         Icons.star_rounded,
-                        color: Color(0xFFD8A06A),
+                        color: KashtaColors.softOrange,
                         size: 14,
                       ),
                       const SizedBox(width: 2),
                       Text(
                         item.averageRating.toStringAsFixed(1),
                         style: const TextStyle(
-                          color: Color(0xFF3C2A1D),
+                          color: KashtaColors.textDark,
                           fontSize: 10,
                           height: 1.0,
                           fontWeight: FontWeight.w900,
@@ -1730,7 +1732,7 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                       const Icon(
                         Icons.location_on_outlined,
                         size: 13,
-                        color: Color(0xFF8B6A52),
+                        color: KashtaColors.primary,
                       ),
                       const SizedBox(width: 2),
                       Expanded(
@@ -1739,7 +1741,7 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            color: Color(0xFF75604C),
+                            color: KashtaColors.textDark,
                             fontSize: 10,
                             height: 1.0,
                             fontWeight: FontWeight.w700,

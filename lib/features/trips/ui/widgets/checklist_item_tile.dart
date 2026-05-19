@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/kashta_colors.dart';
 import '../../../../core/utils/localization.dart';
 import '../../services/checklist_user_resolver.dart';
 
@@ -45,12 +46,15 @@ class _ChecklistItemTileState extends State<ChecklistItemTile> {
     final canMarkDone = normalizedCurrentUserId != null &&
         normalizedAssignedTo == normalizedCurrentUserId;
     final canShowRelease = canMarkDone;
-    final cardColor = widget.done ? const Color(0xFFFFF7ED) : Colors.white;
-    final iconColor =
-        widget.done ? Colors.orange.withValues(alpha: 0.6) : Colors.orange;
+    final cardColor = widget.done
+        ? KashtaColors.softOrange.withValues(alpha: 0.14)
+        : KashtaColors.cardSurface;
+    final iconColor = widget.done
+        ? KashtaColors.primary.withValues(alpha: 0.6)
+        : KashtaColors.primary;
     final titleColor = widget.done
-        ? const Color(0xFF1F1F1F).withValues(alpha: 0.58)
-        : const Color(0xFF1F1F1F);
+        ? KashtaColors.textDark.withValues(alpha: 0.58)
+        : KashtaColors.textDark;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
@@ -58,7 +62,7 @@ class _ChecklistItemTileState extends State<ChecklistItemTile> {
       decoration: BoxDecoration(
         color: cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFC8B89B), width: 1.4),
+        border: Border.all(color: KashtaColors.sandBorder, width: 1.4),
       ),
       child: ListTile(
         dense: true,
@@ -79,8 +83,11 @@ class _ChecklistItemTileState extends State<ChecklistItemTile> {
                     ),
             child: Checkbox(
               value: widget.done,
-              activeColor: Colors.orange,
-              side: const BorderSide(color: Color(0xFFD0D0D0), width: 1.4),
+              activeColor: KashtaColors.primary,
+              side: const BorderSide(
+                color: KashtaColors.sandBorder,
+                width: 1.4,
+              ),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(5),
               ),
@@ -109,7 +116,7 @@ class _ChecklistItemTileState extends State<ChecklistItemTile> {
                   decoration: widget.done
                       ? TextDecoration.lineThrough
                       : TextDecoration.none,
-                  decorationColor: const Color(0xFF8A8A8A).withValues(
+                  decorationColor: KashtaColors.textDark.withValues(
                     alpha: 0.55,
                   ),
                 ),
@@ -137,7 +144,7 @@ class _ChecklistItemTileState extends State<ChecklistItemTile> {
                     : const Icon(
                         Icons.add_circle_outline,
                         size: 20,
-                        color: Colors.orange,
+                        color: KashtaColors.primary,
                       ),
                 visualDensity: VisualDensity.compact,
                 padding: const EdgeInsets.all(4),
@@ -160,7 +167,7 @@ class _ChecklistItemTileState extends State<ChecklistItemTile> {
                         : const Icon(
                             Icons.close,
                             size: 18,
-                            color: Color(0xFF7A6B55),
+                            color: KashtaColors.textDark,
                           ),
                     visualDensity: VisualDensity.compact,
                     padding: const EdgeInsets.all(4),
@@ -310,9 +317,9 @@ class _AssignmentBadge extends StatelessWidget {
   _BadgeStyle _badgeStyle(String label) {
     if (label == tr.t('you')) {
       return const _BadgeStyle(
-        backgroundColor: Color(0xFFCFEFD8),
-        borderColor: Color(0xFF7AC48F),
-        textColor: Color(0xFF166534),
+        backgroundColor: KashtaColors.softOlive,
+        borderColor: KashtaColors.softOlive,
+        textColor: KashtaColors.textDark,
         fontWeight: FontWeight.w700,
         hasBorder: true,
       );
@@ -320,8 +327,8 @@ class _AssignmentBadge extends StatelessWidget {
 
     return const _BadgeStyle(
       backgroundColor: Colors.transparent,
-      borderColor: Color(0xFFBFC5CC),
-      textColor: Color(0xFF535B65),
+      borderColor: KashtaColors.sandBorder,
+      textColor: KashtaColors.textDark,
       fontWeight: FontWeight.w600,
       hasBorder: true,
     );

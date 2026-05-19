@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/kashta_colors.dart';
 import '../../../core/utils/localization.dart';
 import '../models/chat_message.dart';
 import '../models/chat_types.dart';
@@ -238,12 +239,16 @@ class _GroupChatPageState extends State<GroupChatPage> {
                 children: [
                   CircleAvatar(
                     radius: 20,
-                    backgroundColor: const Color(0xFFFFE0B2),
+                    backgroundColor:
+                        KashtaColors.softOrange.withValues(alpha: 0.24),
                     backgroundImage: group?.imageUrl == null
                         ? null
                         : NetworkImage(group!.imageUrl!),
                     child: group?.imageUrl == null
-                        ? const Icon(Icons.groups, color: Colors.orange)
+                        ? const Icon(
+                            Icons.groups,
+                            color: KashtaColors.primary,
+                          )
                         : null,
                   ),
                   const SizedBox(width: 12),
@@ -406,12 +411,16 @@ class _PinnedMessageBanner extends StatelessWidget {
             margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: Colors.orange.shade100,
+              color: KashtaColors.softOrange.withValues(alpha: 0.20),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
               children: [
-                const Icon(Icons.push_pin, size: 16, color: Colors.orange),
+                const Icon(
+                  Icons.push_pin,
+                  size: 16,
+                  color: KashtaColors.primary,
+                ),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
@@ -464,7 +473,8 @@ class _PinnedMessageBanner extends StatelessWidget {
                     return Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFFF3E0),
+                        color: KashtaColors.cardSurface,
+                        border: Border.all(color: KashtaColors.sandBorder),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Column(
@@ -475,7 +485,7 @@ class _PinnedMessageBanner extends StatelessWidget {
                             style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
-                              color: Color(0xFF6B7280),
+                              color: KashtaColors.textDark,
                             ),
                           ),
                           const SizedBox(height: 6),

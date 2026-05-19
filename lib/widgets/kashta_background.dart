@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../core/theme/kashta_colors.dart';
+
 class KashtaBackground extends StatelessWidget {
   const KashtaBackground({
     super.key,
     required this.child,
-    this.overlayColor = const Color(0xFFF8EFE2),
-    this.overlayOpacity = 0.72,
+    this.overlayColor = KashtaColors.backgroundCream,
+    this.overlayOpacity = 0.35,
   });
 
   final Widget child;
@@ -18,7 +20,7 @@ class KashtaBackground extends StatelessWidget {
       children: [
         Positioned.fill(
           child: Image.asset(
-            'assets/kas.png',
+            'assets/orr.png',
             fit: BoxFit.cover,
           ),
         ),

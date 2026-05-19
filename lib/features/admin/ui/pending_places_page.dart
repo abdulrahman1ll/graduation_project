@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/providers/role_provider.dart';
+import '../../../core/theme/kashta_colors.dart';
 import '../../../core/utils/firestore_utils.dart';
 import '../../../core/utils/localization.dart';
 import '../../explore/services/place_service.dart';
@@ -113,9 +114,9 @@ class _PendingPlacesPageState extends State<PendingPlacesPage> {
                                   : () => _handleApproveReject(
                                         placeId: placeId,
                                         approve: true,
-                                      ),
+                              ),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green,
+                                backgroundColor: KashtaColors.softOlive,
                                 foregroundColor: Colors.white,
                               ),
                               child: Text(tr.t('approve')),
@@ -129,9 +130,9 @@ class _PendingPlacesPageState extends State<PendingPlacesPage> {
                                   : () => _handleApproveReject(
                                         placeId: placeId,
                                         approve: false,
-                                      ),
+                              ),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.red,
+                                backgroundColor: KashtaColors.softOrange,
                                 foregroundColor: Colors.white,
                               ),
                               child: Text(tr.t('reject')),
