@@ -8,6 +8,8 @@ import '../features/trips/ui/trips_page.dart';
 import '../core/theme/kashta_colors.dart';
 import '../core/utils/localization.dart';
 
+const Color _updatedPrimary = Color(0xFFD97845);
+
 class MainScreen extends StatefulWidget {
   const MainScreen({
     super.key,
@@ -66,11 +68,14 @@ class _MainScreenState extends State<MainScreen> {
     return Scaffold(
       body: pages[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
+        backgroundColor: KashtaColors.cardSurface,
         currentIndex: _selectedIndex,
         onTap: (index) => setState(() => _selectedIndex = index),
         type: BottomNavigationBarType.fixed,
-        selectedItemColor: KashtaColors.primary,
-        unselectedItemColor: KashtaColors.textDark.withValues(alpha: 0.58),
+        selectedItemColor: (_selectedIndex == 0 || _selectedIndex == 2)
+            ? _updatedPrimary
+            : KashtaColors.primary,
+        unselectedItemColor: const Color(0xFF7A6A5B).withValues(alpha: 0.76),
         items: [
           BottomNavigationBarItem(
             icon: const Icon(Icons.map),

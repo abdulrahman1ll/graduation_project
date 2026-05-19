@@ -1,10 +1,12 @@
 import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
@@ -12,13 +14,42 @@ import '../services/ai_recommendation_service.dart';
 import '../../../core/theme/kashta_colors.dart';
 import '../../../core/utils/firestore_utils.dart';
 import '../../../core/utils/localization.dart';
-import '../../../widgets/kashta_background.dart';
 import '../models/recommended_place.dart';
 import '../services/place_service.dart';
 import '../services/weather_service.dart';
 import 'widgets/add_place_sheet.dart';
 import 'widgets/place_details_sheet.dart';
 import 'widgets/route_info_card.dart';
+
+const Color _explorePrimary = Color(0xFFD97845);
+const Color _exploreTextSecondary = Color(0xFF7A6A5B);
+const String _kashtaPlaceMarkerAsset =
+    'assets/markers/kashta_place_marker.png';
+const double _kashtaPlaceMarkerLogicalSize = 72;
+const List<BoxShadow> _mapPanelShadow = <BoxShadow>[
+  BoxShadow(
+    color: Color(0x218A5A2B),
+    blurRadius: 22,
+    spreadRadius: 0,
+    offset: Offset(0, 8),
+  ),
+];
+const List<BoxShadow> _recommendationCardShadow = <BoxShadow>[
+  BoxShadow(
+    color: Color(0x1A8A5A2B),
+    blurRadius: 18,
+    spreadRadius: 0,
+    offset: Offset(0, 6),
+  ),
+];
+const List<BoxShadow> _floatingControlShadow = <BoxShadow>[
+  BoxShadow(
+    color: Color(0x148A5A2B),
+    blurRadius: 14,
+    spreadRadius: 0,
+    offset: Offset(0, 6),
+  ),
+];
 
 class ExplorePage extends StatefulWidget {
   const ExplorePage({
@@ -85,6 +116,9 @@ class _ExplorePageState extends State<ExplorePage> {
   GoogleMapController? _mapController;
   LatLng? _userLocation;
   bool _hasCenteredOnUserLocation = false;
+  bool _isMapReady = false;
+  BitmapDescriptor? _approvedPlaceMarkerIcon;
+  bool _hasLoadedApprovedPlaceMarkerIcon = false;
 
   Set<Polyline> _routePolylines = <Polyline>{};
   String? _routeDistanceText;
@@ -363,6 +397,16 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_hasLoadedApprovedPlaceMarkerIcon) {
+      return;
+    }
+    _hasLoadedApprovedPlaceMarkerIcon = true;
+    _loadApprovedPlaceMarkerIcon(MediaQuery.devicePixelRatioOf(context));
+  }
+
+  @override
   void didUpdateWidget(covariant ExplorePage oldWidget) {
     super.didUpdateWidget(oldWidget);
 
@@ -428,6 +472,27 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
     }
   }
 
+  Future<void> _loadApprovedPlaceMarkerIcon(double devicePixelRatio) async {
+    final data = await rootBundle.load(_kashtaPlaceMarkerAsset);
+    final targetWidth =
+        (_kashtaPlaceMarkerLogicalSize * devicePixelRatio).round();
+    final codec = await ui.instantiateImageCodec(
+      data.buffer.asUint8List(),
+      targetWidth: targetWidth,
+    );
+    final frame = await codec.getNextFrame();
+    final bytes = await frame.image.toByteData(format: ui.ImageByteFormat.png);
+    if (!mounted || bytes == null) {
+      return;
+    }
+
+    setState(() {
+      _approvedPlaceMarkerIcon = BitmapDescriptor.fromBytes(
+        bytes.buffer.asUint8List(),
+      );
+    });
+  }
+
   void _centerCameraOnUserLocation() {
     final controller = _mapController;
     final userLocation = _userLocation;
@@ -443,6 +508,30 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
       ),
     );
     _hasCenteredOnUserLocation = true;
+  }
+
+  Future<void> _recenterOnUserLocation() async {
+    try {
+      final position = await getCurrentUserLocation();
+      if (!mounted) return;
+
+      final userLocation = LatLng(position.latitude, position.longitude);
+      setState(() {
+        _userLocation = userLocation;
+      });
+
+      await _mapController?.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(target: userLocation, zoom: 15),
+        ),
+      );
+      _hasCenteredOnUserLocation = true;
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
   }
 
   Future<void> _focusInitialPlace() async {
@@ -581,7 +670,7 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
           Polyline(
             polylineId: const PolylineId('route'),
             points: routePoints,
-            color: KashtaColors.primary,
+            color: _explorePrimary,
             width: 5,
           ),
         };
@@ -890,27 +979,23 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
 
   @override
   Widget build(BuildContext context) {
-    return KashtaBackground(
+    return ColoredBox(
+      color: KashtaColors.backgroundCream,
       child: SafeArea(
         child: Column(
           children: [
             _buildExploreHeader(),
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
-                child: DecoratedBox(
+                padding: const EdgeInsets.fromLTRB(18, 8, 18, 18),
+                child: Container(
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(28),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF6F421D).withValues(alpha: 0.16),
-                        blurRadius: 28,
-                        offset: const Offset(0, 14),
-                      ),
-                    ],
+                    color: KashtaColors.cardSurface,
+                    borderRadius: BorderRadius.circular(26),
+                    boxShadow: _mapPanelShadow,
                   ),
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(28),
+                    borderRadius: BorderRadius.circular(26),
                     child: StreamBuilder<Set<String>>(
                       stream: _favoritePlaceIdsStream(),
                       builder: (context, favoritesSnapshot) {
@@ -983,9 +1068,11 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                                       );
                                       _showPlaceDetails(data, doc.id);
                                     },
-                                    icon: BitmapDescriptor.defaultMarkerWithHue(
-                                      BitmapDescriptor.hueRed,
-                                    ),
+                                    icon: _approvedPlaceMarkerIcon ??
+                                        BitmapDescriptor.defaultMarkerWithHue(
+                                          BitmapDescriptor.hueRed,
+                                        ),
+                                    anchor: const Offset(0.5, 1.0),
                                   );
                                 })
                                 .whereType<Marker>()
@@ -993,16 +1080,6 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
 
                             final allMarkers = <Marker>{
                               ...approvedMarkers,
-                              if (_userLocation != null)
-                                Marker(
-                                  markerId: const MarkerId('user_location'),
-                                  position: _userLocation!,
-                                  infoWindow:
-                                      const InfoWindow(title: 'Your Location'),
-                                  icon: BitmapDescriptor.defaultMarkerWithHue(
-                                    BitmapDescriptor.hueAzure,
-                                  ),
-                                ),
                               if (selectedPoint != null)
                                 Marker(
                                   markerId: const MarkerId('selected_point'),
@@ -1022,6 +1099,11 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                                   ),
                                   onMapCreated: (controller) {
                                     _mapController = controller;
+                                    if (mounted) {
+                                      setState(() {
+                                        _isMapReady = true;
+                                      });
+                                    }
                                     if (_hasInitialPlaceTarget) {
                                       _focusInitialPlace();
                                     } else {
@@ -1029,7 +1111,7 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                                     }
                                   },
                                   myLocationEnabled: true,
-                                  myLocationButtonEnabled: true,
+                                  myLocationButtonEnabled: false,
                                   zoomControlsEnabled: false,
                                   zoomGesturesEnabled: true,
                                   scrollGesturesEnabled: true,
@@ -1047,25 +1129,30 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                                   markers: allMarkers,
                                   polylines: _routePolylines,
                                 ),
+                                if (!_isMapReady)
+                                  Positioned.fill(
+                                    child: _buildMapLoadingPlaceholder(),
+                                  ),
                                 RouteInfoCard(
                                   isFetchingRoute: _isFetchingRoute,
                                   routeDistanceText: _routeDistanceText,
                                   routeDurationText: _routeDurationText,
                                 ),
                                 _buildMapZoomControls(),
+                                _buildRecenterControl(),
                                 LayoutBuilder(
                                   builder: (context, mapConstraints) {
                                     final screenHeight =
                                         MediaQuery.sizeOf(context).height;
                                     final isCompactHeight = screenHeight < 700;
                                     final maxPanelHeight =
-                                        isCompactHeight ? 190.0 : 206.0;
+                                        isCompactHeight ? 176.0 : 192.0;
                                     final panelHeight = math
                                         .min(
                                           maxPanelHeight,
                                           math.max(
-                                            176.0,
-                                            mapConstraints.maxHeight * 0.42,
+                                            156.0,
+                                            mapConstraints.maxHeight * 0.34,
                                           ),
                                         )
                                         .toDouble();
@@ -1081,7 +1168,7 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                                     final imageHeight =
                                         isCompactHeight ? 48.0 : 52.0;
                                     final cardHeight =
-                                        math.max(142.0, panelHeight - 50.0);
+                                        math.max(132.0, panelHeight - 64.0);
 
                                     return FutureBuilder<List<RecommendedPlace>>(
                                       key: ValueKey(_recommendationRefreshKey),
@@ -1107,7 +1194,7 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                                                 child: FloatingActionButton(
                                                   mini: true,
                                                   backgroundColor:
-                                                      KashtaColors.primary,
+                                                      _explorePrimary,
                                                   foregroundColor: Colors.white,
                                                   elevation: 4,
                                                   onPressed: () {
@@ -1141,22 +1228,9 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                                                   8,
                                                 ),
                                                 decoration: BoxDecoration(
-                                                  gradient: LinearGradient(
-                                                    colors: [
-                                                      KashtaColors.cardSurface
-                                                          .withValues(
-                                                              alpha: 0.92),
-                                                      KashtaColors.cardSurface
-                                                          .withValues(
-                                                              alpha: 0.70),
-                                                      KashtaColors.cardSurface
-                                                          .withValues(
-                                                              alpha: 0.14),
-                                                    ],
-                                                    begin:
-                                                        Alignment.bottomCenter,
-                                                    end: Alignment.topCenter,
-                                                  ),
+                                                  color: KashtaColors
+                                                      .cardSurface
+                                                      .withValues(alpha: 0.90),
                                                   borderRadius:
                                                       const BorderRadius
                                                           .vertical(
@@ -1164,11 +1238,9 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                                                   ),
                                                   boxShadow: [
                                                     BoxShadow(
-                                                      color: KashtaColors
-                                                          .textDark
-                                                          .withValues(
-                                                        alpha: 0.09,
-                                                      ),
+                                                      color: const Color(
+                                                        0xFF8A5A2B,
+                                                      ).withValues(alpha: 0.08),
                                                       blurRadius: 18,
                                                       offset:
                                                           const Offset(0, -6),
@@ -1179,86 +1251,112 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                                                   crossAxisAlignment:
                                                       CrossAxisAlignment.start,
                                                   children: [
-                                                    Row(
-                                                      children: [
-                                                        Container(
-                                                          padding:
-                                                              const EdgeInsets
-                                                                  .all(6),
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: KashtaColors
-                                                                .primary
-                                                                .withValues(
-                                                              alpha: 0.11,
+                                                    Container(
+                                                      padding: const EdgeInsets
+                                                          .symmetric(
+                                                        horizontal: 10,
+                                                        vertical: 7,
+                                                      ),
+                                                      decoration: BoxDecoration(
+                                                        color: KashtaColors
+                                                            .cardSurface,
+                                                        borderRadius:
+                                                            BorderRadius
+                                                                .circular(14),
+                                                        boxShadow:
+                                                            _floatingControlShadow,
+                                                      ),
+                                                      child: Row(
+                                                        children: [
+                                                          Container(
+                                                            padding:
+                                                                const EdgeInsets
+                                                                    .all(6),
+                                                            decoration:
+                                                                BoxDecoration(
+                                                              color:
+                                                                  _explorePrimary
+                                                                      .withValues(
+                                                                alpha: 0.11,
+                                                              ),
+                                                              borderRadius:
+                                                                  BorderRadius
+                                                                      .circular(
+                                                                          10),
                                                             ),
-                                                            borderRadius:
-                                                                BorderRadius
-                                                                    .circular(
-                                                                        10),
+                                                            child: const Icon(
+                                                              Icons
+                                                                  .auto_awesome_rounded,
+                                                              color:
+                                                                  _explorePrimary,
+                                                              size: 15,
+                                                            ),
                                                           ),
-                                                          child: const Icon(
-                                                            Icons
-                                                                .auto_awesome_rounded,
-                                                            color: KashtaColors
-                                                                .primary,
-                                                            size: 15,
-                                                          ),
-                                                        ),
-                                                        const SizedBox(
-                                                            width: 8),
-                                                        const Expanded(
-                                                          child: Column(
-                                                            crossAxisAlignment:
-                                                                CrossAxisAlignment
-                                                                    .start,
-                                                            children: [
-                                                              Text(
-                                                                'Recommended for you',
-                                                                maxLines: 1,
-                                                                overflow:
-                                                                    TextOverflow
-                                                                        .ellipsis,
-                                                                style:
-                                                                    TextStyle(
-                                                                  color: KashtaColors
-                                                                      .textDark,
-                                                                  fontSize: 14,
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .w900,
+                                                          const SizedBox(
+                                                              width: 8),
+                                                          const Expanded(
+                                                            child: Column(
+                                                              crossAxisAlignment:
+                                                                  CrossAxisAlignment
+                                                                      .start,
+                                                              children: [
+                                                                Text(
+                                                                  'Recommended for you',
+                                                                  maxLines: 1,
+                                                                  overflow:
+                                                                      TextOverflow
+                                                                          .ellipsis,
+                                                                  style:
+                                                                      TextStyle(
+                                                                    color: KashtaColors
+                                                                        .textDark,
+                                                                    fontSize:
+                                                                        14,
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .w900,
+                                                                  ),
                                                                 ),
-                                                              ),
-                                                              SizedBox(
-                                                                  height: 1),
-                                                              Text(
-                                                                'Based on your preferences',
-                                                                maxLines: 1,
-                                                                overflow:
-                                                                    TextOverflow
-                                                                        .ellipsis,
-                                                                style:
-                                                                    TextStyle(
-                                                                  color: KashtaColors
-                                                                      .textDark,
-                                                                  fontSize: 10,
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .w600,
+                                                                SizedBox(
+                                                                    height: 1),
+                                                                Text(
+                                                                  'Based on your preferences',
+                                                                  maxLines: 1,
+                                                                  overflow:
+                                                                      TextOverflow
+                                                                          .ellipsis,
+                                                                  style:
+                                                                      TextStyle(
+                                                                    color:
+                                                                        _exploreTextSecondary,
+                                                                    fontSize:
+                                                                        10,
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .w700,
+                                                                  ),
                                                                 ),
-                                                              ),
-                                                            ],
+                                                              ],
+                                                            ),
                                                           ),
-                                                        ),
-                                                      ],
+                                                        ],
+                                                      ),
                                                     ),
                                                     const SizedBox(height: 4),
                                                     Expanded(
                                                       child: ListView.builder(
                                                         scrollDirection:
                                                             Axis.horizontal,
+                                                        clipBehavior:
+                                                            Clip.none,
                                                         padding:
-                                                            EdgeInsets.zero,
+                                                            const EdgeInsets
+                                                                .fromLTRB(
+                                                          0,
+                                                          4,
+                                                          24,
+                                                          10,
+                                                        ),
                                                         itemCount:
                                                             recommendedPlaces
                                                                 .length,
@@ -1366,9 +1464,32 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
     );
   }
 
+  Widget _buildMapLoadingPlaceholder() {
+    return const DecoratedBox(
+      decoration: BoxDecoration(color: KashtaColors.cardSurface),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(color: _explorePrimary),
+            SizedBox(height: 12),
+            Text(
+              'Loading map...',
+              style: TextStyle(
+                color: _exploreTextSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildExploreHeader() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 10, 20, 4),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1390,9 +1511,8 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
               TextButton(
                 onPressed: widget.onToggleLanguage,
                 style: TextButton.styleFrom(
-                  foregroundColor: KashtaColors.primary,
-                  backgroundColor:
-                      KashtaColors.cardSurface.withValues(alpha: 0.74),
+                  foregroundColor: _explorePrimary,
+                  backgroundColor: KashtaColors.cardSurface,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 15,
                     vertical: 8,
@@ -1415,8 +1535,8 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
           Text(
             widget.tr.t('exploreSubtitle'),
             textAlign: widget.isArabic ? TextAlign.right : TextAlign.left,
-            style: TextStyle(
-              color: KashtaColors.textDark.withValues(alpha: 0.72),
+            style: const TextStyle(
+              color: _exploreTextSecondary,
               fontSize: 13,
               height: 1.35,
               fontWeight: FontWeight.w700,
@@ -1436,30 +1556,33 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
         height: 46,
         child: ListView(
           scrollDirection: Axis.horizontal,
+          clipBehavior: Clip.none,
+          padding: const EdgeInsetsDirectional.only(end: 16),
           children: [
             _buildPlaceTypeChip(
               label: widget.tr.t('all'),
               icon: Icons.public_rounded,
               value: null,
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
             _buildPlaceTypeChip(
               label: widget.tr.t('desert'),
               icon: Icons.local_florist_rounded,
               value: 'desert',
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
             _buildPlaceTypeChip(
               label: widget.tr.t('beach'),
               icon: Icons.waves_rounded,
               value: 'beach',
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
             _buildPlaceTypeChip(
               label: widget.tr.t('nature'),
               icon: Icons.park_rounded,
               value: 'nature',
             ),
+            const SizedBox(width: 16),
           ],
         ),
       ),
@@ -1481,20 +1604,20 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
         });
       },
       showCheckmark: false,
-      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
       avatar: Icon(
         icon,
-        size: 18,
-        color: isSelected ? Colors.white : KashtaColors.textDark,
+        size: 15,
+        color: isSelected ? Colors.white : KashtaColors.softOlive,
       ),
       label: Text(label),
-      selectedColor: KashtaColors.primary,
+      selectedColor: _explorePrimary,
       side: BorderSide(
-        color: isSelected
-            ? KashtaColors.primary
-            : KashtaColors.sandBorder,
+        color: isSelected ? _explorePrimary : KashtaColors.sandBorder,
       ),
-      backgroundColor: KashtaColors.cardSurface.withValues(alpha: 0.78),
+      backgroundColor: KashtaColors.cardSurface,
+      elevation: isSelected ? 0 : 1,
+      shadowColor: const Color(0xFF8A5A2B).withValues(alpha: 0.08),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(999),
       ),
@@ -1511,15 +1634,9 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
       left: 16,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: KashtaColors.cardSurface.withValues(alpha: 0.82),
+          color: KashtaColors.cardSurface,
           borderRadius: BorderRadius.circular(18),
-          boxShadow: [
-            BoxShadow(
-              color: KashtaColors.textDark.withValues(alpha: 0.12),
-              blurRadius: 16,
-              offset: const Offset(0, 8),
-            ),
-          ],
+          boxShadow: _floatingControlShadow,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1542,6 +1659,35 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
               },
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRecenterControl() {
+    return Positioned(
+      top: 18,
+      right: 16,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: KashtaColors.cardSurface,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x148A5A2B),
+              blurRadius: 12,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
+        child: IconButton(
+          onPressed: _recenterOnUserLocation,
+          icon: const Icon(Icons.my_location_rounded),
+          color: _exploreTextSecondary,
+          iconSize: 21,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints.tightFor(width: 46, height: 46),
+          splashRadius: 24,
         ),
       ),
     );
@@ -1576,15 +1722,9 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
       width: width,
       margin: const EdgeInsets.only(right: 10),
       decoration: BoxDecoration(
-        color: KashtaColors.cardSurface.withValues(alpha: 0.90),
+        color: KashtaColors.cardSurface,
         borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: KashtaColors.primary.withValues(alpha: 0.12),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-          ),
-        ],
+        boxShadow: _recommendationCardShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1607,29 +1747,16 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                   else
                     const DecoratedBox(
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            KashtaColors.cardSurface,
-                            KashtaColors.softOrange,
-                            KashtaColors.primary,
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
+                        color: KashtaColors.cardSurface,
+                      ),
+                      child: Center(
+                        child: Icon(
+                          Icons.landscape_rounded,
+                          color: _exploreTextSecondary,
+                          size: 26,
                         ),
                       ),
                     ),
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          KashtaColors.textDark.withValues(alpha: 0.12),
-                          Colors.transparent,
-                        ],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                      ),
-                    ),
-                  ),
                   Positioned(
                     top: 10,
                     left: 10,
@@ -1639,7 +1766,7 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: KashtaColors.primary,
+                        color: _explorePrimary,
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
@@ -1655,10 +1782,18 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                   Positioned(
                     top: 9,
                     right: 10,
-                    child: Icon(
-                      Icons.favorite_border_rounded,
-                      color: Colors.white.withValues(alpha: 0.95),
-                      size: 21,
+                    child: Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: KashtaColors.cardSurface.withValues(alpha: 0.92),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.favorite_border_rounded,
+                        color: _explorePrimary,
+                        size: 18,
+                      ),
                     ),
                   ),
                 ],
@@ -1711,7 +1846,7 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                       const SizedBox(width: 4),
                       const Icon(
                         Icons.star_rounded,
-                        color: KashtaColors.softOrange,
+                        color: _explorePrimary,
                         size: 14,
                       ),
                       const SizedBox(width: 2),
@@ -1732,7 +1867,7 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                       const Icon(
                         Icons.location_on_outlined,
                         size: 13,
-                        color: KashtaColors.primary,
+                        color: _explorePrimary,
                       ),
                       const SizedBox(width: 2),
                       Expanded(
@@ -1741,7 +1876,7 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            color: KashtaColors.textDark,
+                            color: _exploreTextSecondary,
                             fontSize: 10,
                             height: 1.0,
                             fontWeight: FontWeight.w700,

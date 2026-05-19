@@ -60,6 +60,7 @@ flutter:
     - assets/kas.png
     - assets/kas2.png
     - assets/orr.png
+    - assets/markers/kashta_place_marker.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:

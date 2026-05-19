@@ -8,9 +8,25 @@ import '../groups.dart' as chat;
 import '../../../core/providers/role_provider.dart';
 import '../../../core/theme/kashta_colors.dart';
 import '../../../core/utils/localization.dart';
-import '../../../core/widgets/language_app_bar.dart';
-import '../../../widgets/kashta_background.dart';
 import 'widgets/chat_message_bubble.dart';
+
+const Color _groupsTextSecondary = Color(0xFF7A6A5B);
+const Color _groupsPrimary = Color(0xFFD97845);
+const double _groupsRadius = 18;
+const List<Color> _defaultGroupAvatarColors = <Color>[
+  Color(0xFFAAC0AF),
+  Color(0xFFE29F79),
+  Color(0xFFEFDFCD),
+  Color(0xFFD6E1D8),
+];
+const List<BoxShadow> _groupCardShadow = <BoxShadow>[
+  BoxShadow(
+    color: Color(0x1A8A5A2B),
+    blurRadius: 16,
+    spreadRadius: 0,
+    offset: Offset(0, 6),
+  ),
+];
 
 class GroupsPage extends StatefulWidget {
   const GroupsPage({
@@ -241,48 +257,119 @@ class _GroupsPageState extends State<GroupsPage> {
 
     return Scaffold(
       backgroundColor: KashtaColors.backgroundCream,
-      appBar: appBarWithLanguage(
-        tr: widget.tr,
-        isArabic: widget.isArabic,
-        title: widget.tr.t('groupsTitle'),
-        onToggleLanguage: widget.onToggleLanguage,
-        actions: [
-          TextButton.icon(
-            onPressed: _showJoinGroupDialog,
-            icon: const Icon(Icons.group_add_outlined),
-            label: Text(widget.tr.t('joinGroup')),
+      appBar: AppBar(
+        backgroundColor: KashtaColors.backgroundCream,
+        foregroundColor: KashtaColors.textDark,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        titleSpacing: 20,
+        title: Text(
+          widget.tr.t('groupsTitle'),
+          style: const TextStyle(
+            color: KashtaColors.textDark,
+            fontWeight: FontWeight.w800,
           ),
+        ),
+        actions: [
+          Padding(
+            padding: const EdgeInsetsDirectional.only(end: 6),
+            child: OutlinedButton.icon(
+              onPressed: _showJoinGroupDialog,
+              icon: const Icon(Icons.group_add_outlined, size: 18),
+              label: Text(widget.tr.t('joinGroup')),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(0, 40),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                foregroundColor: _groupsPrimary,
+                backgroundColor: KashtaColors.cardSurface,
+                side: const BorderSide(color: KashtaColors.sandBorder),
+                textStyle: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
         ],
       ),
-      body: KashtaBackground(
-        child: currentUserId == null
-            ? Center(child: Text(widget.tr.t('failedToLoadGroups')))
-            : Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+      body: currentUserId == null
+          ? Center(
+              child: Text(
+                widget.tr.t('failedToLoadGroups'),
+                style: const TextStyle(color: KashtaColors.textDark),
+              ),
+            )
+          : Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: KashtaColors.cardSurface,
+                      borderRadius: BorderRadius.circular(18),
+                      boxShadow: [
+                        BoxShadow(
+                          color: KashtaColors.textDark.withValues(alpha: 0.04),
+                          blurRadius: 14,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
                     child: TextField(
                       controller: _searchController,
+                      cursorColor: _groupsPrimary,
+                      style: const TextStyle(
+                        color: KashtaColors.textDark,
+                        fontWeight: FontWeight.w600,
+                      ),
                       decoration: InputDecoration(
                         hintText: widget.tr.t('searchGroups'),
-                        prefixIcon: const Icon(Icons.search),
+                        hintStyle: const TextStyle(
+                          color: _groupsTextSecondary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        prefixIcon: const Icon(
+                          Icons.search_rounded,
+                          color: _groupsPrimary,
+                        ),
                         filled: true,
                         fillColor: KashtaColors.cardSurface,
-                        contentPadding:
-                            const EdgeInsets.symmetric(vertical: 14),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 15,
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(18),
+                          borderSide: const BorderSide(
+                            color: KashtaColors.sandBorder,
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(18),
+                          borderSide: const BorderSide(
+                            color: _groupsPrimary,
+                            width: 1.3,
+                          ),
+                        ),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
+                          borderRadius: BorderRadius.circular(18),
+                          borderSide: const BorderSide(
+                            color: KashtaColors.sandBorder,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                  Expanded(
-                    child: _buildBody(context, currentUserId),
-                  ),
-                ],
-              ),
-      ),
+                ),
+                Expanded(
+                  child: _buildBody(context, currentUserId),
+                ),
+              ],
+            ),
       floatingActionButton: _CreateGroupFab(
         emptyState: _visibleGroups.isEmpty && !_loading,
         tr: widget.tr,
@@ -292,11 +379,18 @@ class _GroupsPageState extends State<GroupsPage> {
 
   Widget _buildBody(BuildContext context, String currentUserId) {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(
+        child: CircularProgressIndicator(color: _groupsPrimary),
+      );
     }
 
     if (_error != null) {
-      return Center(child: Text(widget.tr.t('failedToLoadGroups')));
+      return Center(
+        child: Text(
+          widget.tr.t('failedToLoadGroups'),
+          style: const TextStyle(color: KashtaColors.textDark),
+        ),
+      );
     }
 
     final visibleGroups = _visibleGroups;
@@ -313,16 +407,20 @@ class _GroupsPageState extends State<GroupsPage> {
           },
         );
       }
-      return Center(child: Text(widget.tr.t('noGroupsMatchSearch')));
+      return _GroupsQuietState(
+        icon: Icons.search_off_rounded,
+        text: widget.tr.t('noGroupsMatchSearch'),
+      );
     }
 
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
       itemCount: visibleGroups.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         final group = visibleGroups[index];
         final summary = _summaries[group.id];
+        final avatarColor =
+            _defaultGroupAvatarColors[index % _defaultGroupAvatarColors.length];
         final lastMessage = summary?.lastMessage;
         final senderName = lastMessage == null
             ? ''
@@ -342,135 +440,160 @@ class _GroupsPageState extends State<GroupsPage> {
             ? group.description
             : '$senderName: $lastMessageContent';
 
-        return Material(
-          color: KashtaColors.cardSurface,
-          borderRadius: BorderRadius.circular(20),
-          elevation: 1.5,
-          shadowColor: KashtaColors.textDark.withValues(alpha: 0.06),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(20),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => chat.GroupChatPage(
-                    groupId: group.id,
-                    tr: widget.tr,
-                  ),
-                ),
-              );
-            },
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  CircleAvatar(
-                    radius: 28,
-                    backgroundColor:
-                        KashtaColors.softOrange.withValues(alpha: 0.24),
-                    backgroundImage: group.imageUrl == null
-                        ? null
-                        : NetworkImage(group.imageUrl!),
-                    child: group.imageUrl == null
-                        ? const Icon(
-                            Icons.groups,
-                            color: KashtaColors.primary,
-                          )
-                        : null,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: index == visibleGroups.length - 1 ? 0 : 12,
+          ),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: KashtaColors.cardSurface,
+              borderRadius: BorderRadius.circular(_groupsRadius),
+              boxShadow: _groupCardShadow,
+            ),
+            child: Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(_groupsRadius),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(_groupsRadius),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => chat.GroupChatPage(
+                        groupId: group.id,
+                        tr: widget.tr,
+                      ),
+                    ),
+                  );
+                },
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      CircleAvatar(
+                        radius: 28,
+                        backgroundColor: avatarColor,
+                        backgroundImage: group.imageUrl == null
+                            ? null
+                            : NetworkImage(group.imageUrl!),
+                        child: group.imageUrl == null
+                            ? const Icon(
+                                Icons.groups_rounded,
+                                color: KashtaColors.textDark,
+                              )
+                            : null,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(
-                              child: Text(
-                                group.name.trim().isEmpty
-                                    ? widget.tr.t('unnamedGroup')
-                                    : group.name,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 16,
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    group.name.trim().isEmpty
+                                        ? widget.tr.t('unnamedGroup')
+                                        : group.name,
+                                    style: const TextStyle(
+                                      color: KashtaColors.textDark,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 16,
+                                      height: 1.2,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                                const SizedBox(width: 10),
+                                _TimeBadge(
+                                  text: _formatTime(
+                                    lastMessage?.createdAt ?? group.createdAt,
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(height: 7),
                             Text(
-                              _formatTime(
-                                  lastMessage?.createdAt ?? group.createdAt),
+                              preview.isEmpty
+                                  ? widget.tr.t('noMessagesPreview')
+                                  : preview,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
-                                color: KashtaColors.textDark,
-                                fontSize: 12,
+                                color: _groupsTextSecondary,
+                                height: 1.35,
+                                fontWeight: FontWeight.w500,
                               ),
+                            ),
+                            const SizedBox(height: 11),
+                            Row(
+                              children: [
+                                if (summary?.hasPinned == true)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 9,
+                                      vertical: 5,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: KashtaColors.softOlive.withValues(
+                                        alpha: 0.26,
+                                      ),
+                                      borderRadius: BorderRadius.circular(999),
+                                      border: Border.all(
+                                        color: KashtaColors.softOlive
+                                            .withValues(alpha: 0.42),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      widget.tr.t('pinned'),
+                                      style: const TextStyle(
+                                        color: KashtaColors.textDark,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                const Spacer(),
+                                if ((summary?.unreadCount ?? 0) > 0)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: _groupsPrimary,
+                                      borderRadius: BorderRadius.circular(999),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: _groupsPrimary.withValues(
+                                            alpha: 0.22,
+                                          ),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 3),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Text(
+                                      '${summary!.unreadCount}',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
                           ],
                         ),
-                        const SizedBox(height: 6),
-                        Text(
-                          preview.isEmpty
-                              ? widget.tr.t('noMessagesPreview')
-                              : preview,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: KashtaColors.textDark,
-                            height: 1.3,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            if (summary?.hasPinned == true)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: KashtaColors.softOrange
-                                      .withValues(alpha: 0.16),
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
-                                child: Text(
-                                  widget.tr.t('pinned'),
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            const Spacer(),
-                            if ((summary?.unreadCount ?? 0) > 0)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: KashtaColors.primary,
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
-                                child: Text(
-                                  '${summary!.unreadCount}',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
@@ -586,14 +709,28 @@ class _JoinGroupDialogState extends State<_JoinGroupDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(widget.tr.t('joinGroup')),
+      backgroundColor: KashtaColors.cardSurface,
+      surfaceTintColor: KashtaColors.cardSurface,
+      title: Text(
+        widget.tr.t('joinGroup'),
+        style: const TextStyle(
+          color: KashtaColors.textDark,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
       content: TextField(
         controller: _controller,
         enabled: !_joining,
         autofocus: true,
+        cursorColor: _groupsPrimary,
+        style: const TextStyle(color: KashtaColors.textDark),
         decoration: InputDecoration(
           labelText: widget.tr.t('enterInvitationCode'),
           errorText: _validationMessage,
+          prefixIcon: const Icon(
+            Icons.key_rounded,
+            color: _groupsPrimary,
+          ),
         ),
         textInputAction: TextInputAction.done,
         onSubmitted: _joining ? null : (_) => _submit(),
@@ -605,6 +742,10 @@ class _JoinGroupDialogState extends State<_JoinGroupDialog> {
         ),
         FilledButton(
           onPressed: _joining ? null : _submit,
+          style: FilledButton.styleFrom(
+            backgroundColor: _groupsPrimary,
+            foregroundColor: Colors.white,
+          ),
           child: _joining
               ? const SizedBox(
                   width: 16,
@@ -636,11 +777,12 @@ class _GroupsEmptyState extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 88,
-              height: 88,
+              width: 76,
+              height: 76,
               decoration: BoxDecoration(
-                color: KashtaColors.cardSurface,
-                borderRadius: BorderRadius.circular(24),
+                color: KashtaColors.softOlive.withValues(alpha: 0.28),
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: KashtaColors.sandBorder),
                 boxShadow: [
                   BoxShadow(
                     color: KashtaColors.textDark.withValues(alpha: 0.05),
@@ -651,27 +793,35 @@ class _GroupsEmptyState extends StatelessWidget {
               ),
               child: const Icon(
                 Icons.groups_rounded,
-                size: 42,
-                color: KashtaColors.primary,
+                size: 36,
+                color: KashtaColors.textDark,
               ),
             ),
             const SizedBox(height: 16),
             Text(
               tr.t('no_groups_yet'),
               style: const TextStyle(
+                color: KashtaColors.textDark,
                 fontSize: 18,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w800,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               tr.t('groupsChatEmptySubtitle'),
               textAlign: TextAlign.center,
-              style: const TextStyle(color: KashtaColors.textDark),
+              style: const TextStyle(
+                color: _groupsTextSecondary,
+                height: 1.35,
+              ),
             ),
             const SizedBox(height: 16),
             FilledButton.icon(
               onPressed: onCreate,
+              style: FilledButton.styleFrom(
+                backgroundColor: _groupsPrimary,
+                foregroundColor: Colors.white,
+              ),
               icon: const Icon(Icons.add),
               label: Text(tr.t('createGroupTitle')),
             ),
@@ -699,10 +849,18 @@ class _CreateGroupFab extends StatelessWidget {
           return const SizedBox.shrink();
         }
         return FloatingActionButton.extended(
-          backgroundColor: KashtaColors.primary,
+          backgroundColor: _groupsPrimary,
           foregroundColor: Colors.white,
+          elevation: 4,
+          highlightElevation: 5,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
           icon: const Icon(Icons.add),
-          label: Text(tr.t('newGroup')),
+          label: Text(
+            tr.t('newGroup'),
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          ),
           onPressed: () {
             Navigator.of(context).push(
               MaterialPageRoute(
@@ -712,6 +870,81 @@ class _CreateGroupFab extends StatelessWidget {
           },
         );
       },
+    );
+  }
+}
+
+class _TimeBadge extends StatelessWidget {
+  const _TimeBadge({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    if (text.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: KashtaColors.backgroundCream,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: KashtaColors.sandBorder),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: _groupsTextSecondary,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          height: 1.1,
+        ),
+      ),
+    );
+  }
+}
+
+class _GroupsQuietState extends StatelessWidget {
+  const _GroupsQuietState({
+    required this.icon,
+    required this.text,
+  });
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 54,
+              height: 54,
+              decoration: BoxDecoration(
+                color: KashtaColors.softOlive.withValues(alpha: 0.24),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: KashtaColors.sandBorder),
+              ),
+              child: Icon(icon, color: KashtaColors.textDark, size: 26),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              text,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: _groupsTextSecondary,
+                fontWeight: FontWeight.w600,
+                height: 1.35,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
