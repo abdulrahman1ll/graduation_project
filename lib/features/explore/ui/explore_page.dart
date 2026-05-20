@@ -23,8 +23,7 @@ import 'widgets/route_info_card.dart';
 
 const Color _explorePrimary = Color(0xFFD97845);
 const Color _exploreTextSecondary = Color(0xFF7A6A5B);
-const String _kashtaPlaceMarkerAsset =
-    'assets/markers/kashta_place_marker.png';
+const String _kashtaPlaceMarkerAsset = 'assets/markers/kashta_place_marker.png';
 const double _kashtaPlaceMarkerLogicalSize = 72;
 const List<BoxShadow> _mapPanelShadow = <BoxShadow>[
   BoxShadow(
@@ -846,6 +845,7 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
         onSubmit: ({
           required BuildContext sheetContext,
           required String name,
+          required String description,
           required String environmentType,
           required Uint8List? selectedImageBytes,
         }) async {
@@ -864,6 +864,7 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
           try {
             await _placeService.addPlace(
               name: name.trim(),
+              description: description.trim(),
               environmentType: environmentType,
               latitude: lat,
               longitude: lng,
@@ -1170,7 +1171,8 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                                     final cardHeight =
                                         isCompactHeight ? 150.0 : 158.0;
 
-                                    return FutureBuilder<List<RecommendedPlace>>(
+                                    return FutureBuilder<
+                                        List<RecommendedPlace>>(
                                       key: ValueKey(_recommendationRefreshKey),
                                       future:
                                           _buildRecommendedPlaces(visibleDocs),
@@ -1347,8 +1349,7 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                                                       child: ListView.builder(
                                                         scrollDirection:
                                                             Axis.horizontal,
-                                                        clipBehavior:
-                                                            Clip.none,
+                                                        clipBehavior: Clip.none,
                                                         padding:
                                                             const EdgeInsets
                                                                 .fromLTRB(
@@ -1370,14 +1371,14 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
 
                                                           return GestureDetector(
                                                             onTap: () {
-                                                              final lat =
-                                                                  (place['lat']
-                                                                          as num)
-                                                                      .toDouble();
-                                                              final lng =
-                                                                  (place['lng']
-                                                                          as num)
-                                                                      .toDouble();
+                                                              final lat = (place[
+                                                                          'lat']
+                                                                      as num)
+                                                                  .toDouble();
+                                                              final lng = (place[
+                                                                          'lng']
+                                                                      as num)
+                                                                  .toDouble();
 
                                                               fetchRoute(
                                                                 destinationLatitude:
@@ -1403,8 +1404,7 @@ FINAL_ORDERING_VALUE: $finalOrderingValue
                                                                   place: place,
                                                                   item: item,
                                                                   rank:
-                                                                      index +
-                                                                          1,
+                                                                      index + 1,
                                                                   width:
                                                                       cardWidth,
                                                                   imageHeight:

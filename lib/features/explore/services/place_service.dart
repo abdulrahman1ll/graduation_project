@@ -13,6 +13,7 @@ class PlaceService {
 
   Future<void> addPlace({
     required String name,
+    String? description,
     required String environmentType,
     required double latitude,
     required double longitude,
@@ -27,7 +28,8 @@ class PlaceService {
       );
     }
 
-    await _firestore.collection('places').add({
+    final trimmedDescription = description?.trim() ?? '';
+    final placeData = <String, dynamic>{
       'name': name.trim(),
       'environmentType': environmentType,
       'lat': latitude,
@@ -36,7 +38,13 @@ class PlaceService {
       'createdBy': user.uid,
       'createdAt': FieldValue.serverTimestamp(),
       'status': 'pending',
-    });
+    };
+
+    if (trimmedDescription.isNotEmpty) {
+      placeData['description'] = trimmedDescription;
+    }
+
+    await _firestore.collection('places').add(placeData);
   }
 
   Future<void> approvePlace({

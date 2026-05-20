@@ -12,6 +12,7 @@ class AddPlaceSheet extends StatefulWidget {
   final Future<void> Function({
     required BuildContext sheetContext,
     required String name,
+    required String description,
     required String environmentType,
     required Uint8List? selectedImageBytes,
   }) onSubmit;
@@ -22,6 +23,7 @@ class AddPlaceSheet extends StatefulWidget {
 
 class _AddPlaceSheetState extends State<AddPlaceSheet> {
   final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _descriptionController = TextEditingController();
 
   String _environmentType = 'desert';
   Uint8List? _selectedImageBytes;
@@ -29,6 +31,7 @@ class _AddPlaceSheetState extends State<AddPlaceSheet> {
   @override
   void dispose() {
     _nameController.dispose();
+    _descriptionController.dispose();
     super.dispose();
   }
 
@@ -71,6 +74,18 @@ class _AddPlaceSheetState extends State<AddPlaceSheet> {
             ),
           ),
           const SizedBox(height: 12),
+          TextField(
+            controller: _descriptionController,
+            maxLength: 200,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              labelText: 'Description',
+              hintText: 'Write a short description about this place...',
+              border: OutlineInputBorder(),
+              counterText: '',
+            ),
+          ),
+          const SizedBox(height: 12),
           DropdownButtonFormField<String>(
             initialValue: _environmentType,
             items: const [
@@ -105,6 +120,7 @@ class _AddPlaceSheetState extends State<AddPlaceSheet> {
               await widget.onSubmit(
                 sheetContext: context,
                 name: _nameController.text.trim(),
+                description: _descriptionController.text.trim(),
                 environmentType: _environmentType,
                 selectedImageBytes: _selectedImageBytes,
               );

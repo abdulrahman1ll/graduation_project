@@ -193,6 +193,9 @@ class _PlaceDetailsSheetState extends State<PlaceDetailsSheet> {
     }
   }
 
+  String get _placeDescription =>
+      (widget.data['description'] ?? '').toString().trim();
+
   String _formattedWind(Object? value) {
     final raw = (value ?? '').toString().trim();
     if (raw.isEmpty) {
@@ -247,10 +250,10 @@ class _PlaceDetailsSheetState extends State<PlaceDetailsSheet> {
                       ],
                     ),
                     const SizedBox(height: 10),
+                    _buildDescription(),
                     _buildInfoRow(
                       icon: Icons.terrain_rounded,
-                      text:
-                          '${widget.tr.t('environmentLabel')}: '
+                      text: '${widget.tr.t('environmentLabel')}: '
                           '${_localizedEnvironmentValue(widget.data['environmentType'])}',
                     ),
                     const SizedBox(height: 8),
@@ -282,6 +285,28 @@ class _PlaceDetailsSheetState extends State<PlaceDetailsSheet> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildDescription() {
+    final description = _placeDescription;
+    if (description.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Text(
+        description,
+        maxLines: 3,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          color: KashtaColors.textDark,
+          fontSize: 14,
+          height: 1.4,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 
@@ -452,15 +477,13 @@ class _PlaceDetailsSheetState extends State<PlaceDetailsSheet> {
             const SizedBox(height: 4),
             _buildInfoRow(
               icon: Icons.air,
-              text:
-                  "${widget.tr.t('windLabel')}: "
+              text: "${widget.tr.t('windLabel')}: "
                   "${_formattedWind(wind)}",
             ),
             const SizedBox(height: 4),
             _buildInfoRow(
               icon: Icons.emoji_nature,
-              text:
-                  "${widget.tr.t('kashtaConditions')}: "
+              text: "${widget.tr.t('kashtaConditions')}: "
                   "$displayKashtaCondition",
             ),
           ],
